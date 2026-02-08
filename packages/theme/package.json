@@ -1,0 +1,58 @@
+{
+  "name": "@robot-admin/theme",
+  "version": "0.1.0",
+  "description": "Theme switching and management system for Robot Admin",
+  "type": "module",
+  "keywords": [
+    "vue",
+    "theme",
+    "dark-mode",
+    "pinia",
+    "view-transition"
+  ],
+  "author": "ChenYu <ycyplus@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "directory": "packages/theme"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0",
+    "pinia": "^2.0.0 || ^3.0.0",
+    "naive-ui": "^2.38.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "naive-ui": "^2.41.0",
+    "pinia": "^3.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "~5.8.0",
+    "vue": "^3.5.13"
+  }
+}
