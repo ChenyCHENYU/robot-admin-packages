@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/theme",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Theme switching and management system for Robot Admin",
   "type": "module",
   "keywords": [

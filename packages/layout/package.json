@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/layout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Layout and settings management system for Robot Admin",
   "type": "module",
   "keywords": [
