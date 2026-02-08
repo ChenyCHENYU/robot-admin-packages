@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/request-core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Axios + 7 plugins + CRUD composables for Vue 3",
   "type": "module",
   "keywords": [

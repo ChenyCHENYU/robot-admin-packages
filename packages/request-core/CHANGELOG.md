@@ -1,5 +1,15 @@
 # @robot-admin/request-core
 
+## 0.1.3
+
+### Patch Changes
+
+- 更新 README 文档：
+  - 优化文档结构，更清晰直观
+  - 添加 30 秒快速上手指南
+  - 使用表格展示所有 API 和配置
+  - 添加完整示例和最佳实践
+
 ## 0.1.2
 
 ### Patch Changes
