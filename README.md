@@ -319,21 +319,210 @@ bun link @robot-admin/new-package
 
 ---
 
-## 🔗 本地开发关联
+## 🔗 使用包（消费者指南）
 
-### 主项目配置
+### 📥 安装包
 
-在 `Robot_Admin/package.json` 中：
+```bash
+# 在你的项目中安装
+bun add @robot-admin/request-core
+
+# 或使用 npm/pnpm
+npm install @robot-admin/request-core
+pnpm add @robot-admin/request-core
+```
+
+### 🎯 本地调试模式
+
+#### 自动识别机制
+
+```bash
+# Node.js 模块解析机制（Bun/npm/yarn 通用）
+node_modules/@robot-admin/request-core/
+├── symlink → 本地 monorepo  # 开发环境
+└── 真实目录 → npm 包         # 生产环境
+```
+
+**核心优势**：
+- ✅ 包管理器**自动识别 symlink**，无需额外配置
+- ✅ CI/CD 环境**自动从 npm 安装**，确保可复现构建
+- ✅ `package.json` **保持正常版本号**，团队协作无障碍
+
+#### 推荐项目配置
+
+在你的项目 `package.json` 中添加这些脚本：
 
 ```json
 {
+  "scripts": {
+    "dev": "vite",
+    "dev:local": "bun run link:packages && bun run dev",
+    "link:packages": "test -d ../robot-admin-packages/packages/request-core && bun link @robot-admin/request-core || echo '⚠️  Monorepo not found, using npm package'",
+    "unlink:packages": "bun unlink @robot-admin/request-core && bun install --force"
+  },
   "dependencies": {
     "@robot-admin/request-core": "^0.1.0"
   }
 }
 ```
 
-### 本地开发链接
+#### 使用场景
+
+<details>
+<summary><b>场景1：本地开发 + 调试包源码</b></summary>
+
+如果你的项目和 `robot-admin-packages` 在同一台机器：
+
+```bash
+# 方法1：自动化脚本（推荐）
+bun run dev:local
+
+# 方法2：手动链接
+bun run link:packages
+bun run dev
+
+# 效果：
+# ✅ 修改包源码立即生效
+# ✅ 无需重新发布到 npm
+# ✅ 支持 Hot Module Reload
+
+# 验证链接状态
+ls -la node_modules/@robot-admin/request-core
+# 输出：lrwxrwxrwx → /path/to/robot-admin-packages/packages/request-core/
+```
+
+</details>
+
+<details>
+<summary><b>场景2：普通开发（使用 npm 包）</b></summary>
+
+```bash
+# 正常启动（不链接本地包）
+bun run dev
+
+# 效果：
+# ✅ 使用 node_modules 中已安装的 npm 稳定版
+# ✅ 适合不需要调试包源码的日常开发
+```
+
+</details>
+
+<details>
+<summary><b>场景3：切换回 npm 包</b></summary>
+
+```bash
+# 解除链接 + 重新安装
+bun run unlink:packages
+
+# 效果：
+# ✅ 删除 symlink
+# ✅ 从 npm registry 重新下载稳定版
+```
+
+</details>
+
+<details>
+<summary><b>场景4：CI/CD 自动化构建</b></summary>
+
+```yaml
+# .github/workflows/build.yml
+steps:
+  - name: Install dependencies
+    run: bun install  # 自动从 npm 下载
+
+  - name: Build
+    run: bun run build
+```
+
+**关键点**：
+- 🚫 CI 环境**没有 monorepo**，link 命令会优雅失败
+- ✅ `bun install` 自动从 npm 下载稳定版
+- ✅ 构建使用 npm 包，确保可复现
+
+</details>
+
+### ✅ 最佳实践
+
+#### 1. package.json 保持正常版本号
+
+```json
+// ✅ 正确
+"@robot-admin/request-core": "^0.1.0"
+
+// ❌ 错误 - 不要使用相对路径
+"@robot-admin/request-core": "link:../robot-admin-packages/packages/request-core"
+```
+
+#### 2. 本地调试时才链接
+
+```bash
+# 需要修改包源码时
+bun run dev:local
+
+# 日常开发时
+bun run dev
+```
+
+#### 3. 提交前验证 npm 包版本
+
+```bash
+# 1. 解除链接
+bun run unlink:packages
+
+# 2. 验证构建
+bun run build
+bun run type-check
+
+# 3. 确认无误后提交
+git add . && git commit -m "feat: xxx"
+```
+
+#### 4. 发布新版本后更新
+
+```bash
+# 在 monorepo 中发布新版本
+cd robot-admin-packages
+bun run release  # 发布 @robot-admin/request-core@0.1.4
+
+# 在你的项目中更新
+cd your-project
+bun run unlink:packages
+bun update @robot-admin/request-core
+```
+
+### 🔍 调试技巧
+
+```bash
+# 检查当前使用的包类型
+ls -la node_modules/@robot-admin/request-core
+
+# 查看实际版本
+cat node_modules/@robot-admin/request-core/package.json | grep version
+
+# 热更新验证（链接模式）
+cd robot-admin-packages/packages/request-core
+bun run dev  # 监听模式，修改代码自动构建
+```
+
+### 📊 对比总结
+
+| 使用方式 | 命令 | 适用场景 | 包来源 | 优势 |
+|---------|------|---------|--------|------|
+| **本地链接** | `bun run dev:local` | 调试包源码 | Monorepo | 修改立即生效 |
+| **npm 包** | `bun run dev` | 日常开发 | npm registry | 版本稳定 |
+| **CI/CD** | `bun install` | 自动化构建 | npm registry | 可复现构建 |
+
+---
+
+## 🔗 包开发关联（维护者）
+
+## 🔗 包开发关联（维护者）
+
+> 以下内容针对 monorepo 维护者，如果你只是使用包，请看上面的"使用包（消费者指南）"
+
+### Monorepo 与主项目关联
+
+在开发包的同时测试主项目：
 
 ```bash
 # 1. 在包目录创建全局链接
@@ -348,6 +537,12 @@ bun link @robot-admin/request-core
 ls -la node_modules/@robot-admin/
 # 应该看到符号链接指向 monorepo
 ```
+
+**开发流程**：
+1. 在包目录启动监听模式：`bun run dev`
+2. 在主项目启动开发服务器：`bun run dev`
+3. 修改包源码 → 自动构建 → 主项目 HMR 更新
+4. 测试通过后发布新版本
 
 **优势**：
 - ✅ 本地修改实时生效
