@@ -1,0 +1,53 @@
+{
+  "name": "@robot-admin/form-validate",
+  "version": "2.0.0",
+  "description": "企业级表单验证规则库，专为 Naive UI 设计，提供丰富的验证规则和高级功能",
+  "keywords": [
+    "form",
+    "validation",
+    "validator",
+    "naive-ui",
+    "vue",
+    "typescript",
+    "form-validation",
+    "china-locale"
+  ],
+  "author": "ChenYu <ycyplus@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "directory": "packages/form-validate"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "prepublishOnly": "bun run build"
+  },
+  "peerDependencies": {
+    "naive-ui": ">=2.34.0"
+  },
+  "devDependencies": {
+    "naive-ui": "^2.39.0",
+    "typescript": "^5.8.0",
+    "tsup": "^8.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

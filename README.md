@@ -13,6 +13,7 @@
 | 包名 | 版本 | 描述 | npm 链接 |
 |------|------|------|----------|
 | [@robot-admin/request-core](./packages/request-core) | ![npm](https://img.shields.io/npm/v/@robot-admin/request-core) | Axios 封装 + CRUD Composables | [npm](https://www.npmjs.com/package/@robot-admin/request-core) |
+| [@robot-admin/form-validate](./packages/form-validate) | ![npm](https://img.shields.io/npm/v/@robot-admin/form-validate) | 企业级表单验证规则库 | [npm](https://www.npmjs.com/package/@robot-admin/form-validate) |
 
 > 未来所有 `@robot-admin/*` 包都在 `packages/` 目录下统一管理
 
@@ -26,13 +27,35 @@ robot-admin-packages/              # 【容器项目，不发布】
 ├── .changeset/                    # Changesets 版本管理配置
 │   └── config.json               
 ├── packages/                      # 【所有可发布的包】
-│   ├── request-core/             # ✅ 已发布 v0.1.2
+│   ├── request-core/             # ✅ 已发布 v0.1.3
 │   │   ├── src/                  # 源代码
 │   │   ├── dist/                 # 构建产物（不提交到 Git）
 │   │   ├── package.json          # 包配置
 │   │   ├── tsconfig.json         # TypeScript 配置
 │   │   ├── tsup.config.ts        # 构建配置
 │   │   └── README.md             # 包文档
+│   │
+│   ├── form-validate/            # ✅ 已发布 v1.0.0
+│   │   ├── src/                  # 源代码（模块化结构）
+│   │   │   ├── types.ts          # 类型定义
+│   │   │   ├── regex.ts          # 正则表达式库
+│   │   │   ├── utils.ts          # 工具函数
+│   │   │   ├── rules/            # 验证规则
+│   │   │   │   ├── basic.ts      # 基础验证
+│   │   │   │   ├── string.ts     # 字符串验证
+│   │   │   │   ├── number.ts     # 数字验证
+│   │   │   │   ├── array.ts      # 数组验证
+│   │   │   │   ├── date.ts       # 日期验证
+│   │   │   │   ├── format.ts     # 格式验证
+│   │   │   │   └── china.ts      # 中国本地化
+│   │   │   ├── advanced.ts       # 高级功能
+│   │   │   ├── combos.ts         # 预设组合
+│   │   │   └── index.ts          # 主入口
+│   │   ├── dist/                 # 构建产物
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── tsup.config.ts
+│   │   └── README.md
 │   │
 │   └── [未来的包]/               # 如：ui-components, utils 等
 │       ├── src/
