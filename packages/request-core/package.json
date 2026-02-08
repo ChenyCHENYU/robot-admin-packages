@@ -1,0 +1,55 @@
+{
+  "name": "@robot-admin/request-core",
+  "version": "0.1.0",
+  "description": "Axios + 7 plugins + CRUD composables for Vue 3",
+  "type": "module",
+  "keywords": [
+    "vue",
+    "axios",
+    "crud",
+    "composables",
+    "request"
+  ],
+  "author": "ChenYu <ycyplus@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "directory": "packages/request-core"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0",
+    "naive-ui": "^2.38.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.8.0",
+    "tsup": "^8.1.0",
+    "vue": "^3.4.0",
+    "naive-ui": "^2.38.0"
+  }
+}
