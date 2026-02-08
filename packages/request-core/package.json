@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/request-core",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Axios + 7 plugins + CRUD composables for Vue 3",
   "type": "module",
   "keywords": [
@@ -31,6 +31,10 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",

@@ -1,0 +1,21 @@
+#!/bin/bash
+# 配置 npm 自动化令牌发布
+
+echo "=== 配置自动化令牌发布 ==="
+echo ""
+echo "1. 访问 npm 网站生成令牌："
+echo "   https://www.npmjs.com/settings/你的用户名/tokens"
+echo ""
+echo "2. 点击 'Generate New Token' -> 选择 'Automation'"
+echo "   - Automation tokens 不需要 2FA"
+echo "   - 适合 CI/CD 和频繁发布"
+echo ""
+echo "3. 复制生成的令牌"
+echo ""
+echo "4. 在本地配置令牌："
+echo "   npm set //registry.npmjs.org/:_authToken=YOUR_TOKEN_HERE"
+echo ""
+echo "5. 之后发布就不需要每次输入验证码了："
+echo "   npm publish --access public"
+echo ""
+echo "注意: 令牌要保密，不要提交到 Git！"
