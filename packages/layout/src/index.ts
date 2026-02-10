@@ -14,6 +14,9 @@ export { setupLayout } from "./setup";
 // ============ Store ============
 export { createSettingsStore, useSettingsStore } from "./stores/settings";
 
+// ============ Utils ============
+export { adjustColor } from "./stores/settings";
+
 // ============ Types ============
 export type {
   LayoutMode,

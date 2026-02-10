@@ -2,23 +2,15 @@
  * SettingsDrawer - 常量数据
  */
 
-import { THEME_PRESETS } from "../../constants";
+import { THEME_PRESETS, COLOR_SWATCHES } from "../../constants";
 import type { ThemePreset } from "../../types";
 
-// 颜色快速选择
-export const COLOR_SWATCHES = [
-  "#409eff",
-  "#f5222d",
-  "#fa541c",
-  "#faad14",
-  "#52c41a",
-  "#13c2c2",
-  "#2f54eb",
-  "#722ed1",
-];
+// 重新导出（内部使用）
+export { COLOR_SWATCHES, THEME_PRESETS };
+export type { ThemePreset };
 
-// 布局模式选项 - 完整的 6 种布局
-export const LAYOUT_MODES = [
+// 布局模式选项 - 完整的 6 种布局（含 SVG 图标，仅 UI 内部使用）
+export const LAYOUT_MODE_OPTIONS = [
   {
     label: "左侧菜单（默认）",
     value: "side",
@@ -82,9 +74,3 @@ export const LAYOUT_MODES = [
     `,
   },
 ];
-
-// 导出主题预设
-export { THEME_PRESETS };
-
-// 导出类型
-export type { ThemePreset };

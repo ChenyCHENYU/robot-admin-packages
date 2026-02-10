@@ -1,36 +1,82 @@
-# @robot-admin/layout Changelog
+# Changelog
 
-## [2.0.1] - 2026-02-10
+All notable changes to this project will be documented in this file.
 
-### 🐛 Bug Fixes
+## [2.0.2] - 2026-02-11
 
-- **SettingsDrawer**: 修复布局切换时抽屉自动关闭的问题
-  - 原因：布局切换时整个组件树被销毁，导致 `showSettings` 状态重置
-  - 解决：通过 `@click.stop` 阻止事件冒泡，防止触发父组件关闭逻辑
-  - 影响：用户现在可以在布局设置抽屉打开时自由切换布局模式
+### 🗑️ Removed
 
-### 🧹 Code Quality
+- **Dead files**: Removed unused `tsup.config.ts` (actual build uses Vite)
+- **Empty directories**: Removed `composables/`, `core/`, `layouts/` (8 empty directories total)
+- **Unused dependencies**: Removed `vue-router` from peerDependencies and devDependencies (never used in source code)
 
-- 清理调试代码：移除临时的调试信息和注释
-- 移除无效的行内样式绑定：所有视觉效果已统一由 CSS 控制
-- 优化事件处理：简化 `handleLayoutChange` 函数，移除不必要的事件对象传递
+### 🔧 Fixed
 
-### 🎨 UI/UX Improvements
+- **package.json**:
+  - Refined `sideEffects` to `["*.css", "*.scss"]` for better tree-shaking
+  - Removed blocking patterns `"*.vue"` and `"src/index.ts"`
+  
+- **Source code**:
+  - `constants/index.ts`: Removed commented-out code, fixed version from `"1.0.0"` to `"2.0.2"`
+  - `types/index.ts`: Removed unimplemented `storageKey` option from `SettingsStoreOptions`
+  - `stores/settings.ts`: 
+    - Exported `adjustColor` utility function (was private)
+    - Removed redundant `|| false` in collapsed state initialization
+  - `data.ts`: 
+    - Fixed `COLOR_SWATCHES` duplication (now imports from constants)
+    - Renamed `LAYOUT_MODES` to `LAYOUT_MODE_OPTIONS` to avoid naming conflict
 
-- **布局选中反馈**: 优化布局图标和文字的蓝色高亮效果
-  - 使用 `#409EFF` 作为选中状态的主题色
-  - 添加 `!important` 确保样式优先级
-  - 选中状态增加字重（font-weight: 600）
+- **SettingsDrawer component**:
+  - Removed unimplemented `storageKey` prop
+  - Fixed hardcoded timezone `"XIAn"` → `Intl.DateTimeFormat().resolvedOptions().timeZone`
+  - Fixed `handleResetLayout` missing `fixedHeader` and `tagsViewStyle` resets
+  - Fixed `handleImportConfig` to use `$patch` instead of `Object.assign` for proper reactivity
+
+- **Styles (`settings.scss`)**:
+  - Replaced hardcoded `#409EFF` with `var(--primary-color, #409eff)` for theme color support
+  - Replaced hardcoded `rgba(32, 128, 240)` shadows with CSS variable fallbacks
+
+- **Build config**:
+  - Removed unused `globals` from `vite.config.ts` (no UMD output)
+
+### 📖 Documentation
+
+- **README.md**: Fixed multiple inconsistencies with actual code:
+  - `themeMode` default: `'system'` → `'light'`
+  - `transitionType` default: `'fade'` → `'slide'`
+  - `tagsViewHeight` default: `40` → `44`
+  - `showFooter` default: `false` → `true`
+  - Removed non-existent store properties: `enableWatermark`, `watermarkText`, `enableGrayMode`, `enableColorWeakMode`
+  - Removed non-existent methods: `exportSettings()`, `importSettings()`
+  - Removed unimplemented feature: "持久化存储"
+  - Removed all `storageKey` parameter references
+  - Added `adjustColor` utility function documentation
+  - Fixed `ThemeMode` type: `'system'` → `'auto'`
+
+### ✨ Enhanced
+
+- Exported `adjustColor` utility function for external use
+- Improved CSS variable support for theme customization
+
+---
+
+## [2.0.1] - 2026-02-09
+
+### ✨ Added
+
+- Initial v2.0 release with decoupled architecture
+- Complete settings management system
+- SettingsDrawer UI component
+- 6 layout mode presets
+- Theme customization with CSS variables
+- Full TypeScript support
 
 ---
 
 ## [2.0.0] - 2026-02-09
 
-### 🎉 Major Release
+### 🎉 Initial Release
 
-- 初始发布：完整的布局和设置管理系统
-- 支持 6 种布局模式：side、top、mix、mix-top、card-layout、reverse-horizontal-mix
-- 完整的主题管理：主题模式、主题色、圆角、动画等
-- 功能丰富的设置抽屉：外观配置、布局配置、功能配置
-- 基于 Pinia 的状态管理
-- TypeScript 完整类型支持
+- Layout and settings management system
+- Integration with @robot-admin/theme
+- Naive UI components support

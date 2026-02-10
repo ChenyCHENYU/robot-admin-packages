@@ -9,8 +9,7 @@
 - 🧩 **开箱即用** - 提供完整的设置抽屉 UI 组件
 - ⚙️ **丰富配置** - 面包屑、标签页、页脚等多维度配置
 - 🎨 **样式灵活** - 支持 SCSS 源文件或编译后 CSS
-- 💾 **持久化存储** - 自动保存用户配置偏好
-- 🔧 **高度可配置** - 灵活的初始化选项
+-  **高度可配置** - 灵活的初始化选项
 - 🚀 **TypeScript** - 完整的类型支持
 
 ## 📦 安装
@@ -125,7 +124,7 @@ import "@robot-admin/layout/style.css";
     <button @click="visible = true">⚙️ 打开设置</button>
 
     <!-- 设置抽屉 -->
-    <SettingsDrawer v-model:show="visible" storage-key="my-app-settings" />
+    <SettingsDrawer v-model:show="visible" />
   </div>
 </template>
 
@@ -140,7 +139,6 @@ const visible = ref(false);
 #### Props
 
 - `show` - 控制抽屉显示/隐藏（支持 v-model）
-- `storageKey` - localStorage 存储键名（可选，默认 'robot-admin-settings'）
 
 #### 功能模块
 
@@ -188,7 +186,6 @@ const useSettingsStore = createSettingsStore({
     showTagsView: true, // 显示标签页
     fixedHeader: true, // 固定头部
   },
-  storageKey: "my-app-settings", // localStorage 键名
   onThemeModeChange: async (mode) => {
     // 主题模式变化回调（同步到 theme store）
     const themeStore = useThemeStore();
@@ -202,7 +199,6 @@ const useSettingsStore = createSettingsStore({
 ```typescript
 interface SettingsStoreOptions {
   defaults?: Partial<SettingsState>;
-  storageKey?: string;
   onThemeModeChange?: (mode: ThemeMode) => void | Promise<void>;
 }
 ```
@@ -223,10 +219,10 @@ const settingsStore = useSettingsStore();
 
 | 属性               | 类型               | 默认值      | 说明                           |
 | ------------------ | ------------------ | ----------- | ------------------------------ |
-| `themeMode`        | `ThemeMode`        | `'system'`  | 主题模式（light/dark/system）  |
+| `themeMode`        | `ThemeMode`        | `'light'`   | 主题模式（light/dark/auto）   |
 | `primaryColor`     | `string`           | `'#409eff'` | 主题色                         |
 | `borderRadius`     | `BorderRadiusSize` | `'medium'`  | 圆角大小（small/medium/large） |
-| `transitionType`   | `TransitionType`   | `'fade'`    | 页面动画类型                   |
+| `transitionType`   | `TransitionType`   | `'slide'`   | 页面动画类型                   |
 | `enableTransition` | `boolean`          | `true`      | 启用页面动画                   |
 
 #### 布局设置
@@ -238,21 +234,14 @@ const settingsStore = useSettingsStore();
 | `showBreadcrumb`        | `boolean`       | `true`      | 显示面包屑           |
 | `showBreadcrumbIcon`    | `boolean`       | `true`      | 显示面包屑图标       |
 | `showTagsView`          | `boolean`       | `true`      | 显示标签页           |
-| `tagsViewHeight`        | `number`        | `40`        | 标签页高度（px）     |
+| `tagsViewHeight`        | `number`        | `44`        | 标签页高度（px）     |
 | `tagsViewStyle`         | `TagsViewStyle` | `'default'` | 标签页风格           |
-| `showFooter`            | `boolean`       | `false`     | 显示页脚             |
+| `showFooter`            | `boolean`       | `true`      | 显示页脚             |
 | `sidebarWidth`          | `number`        | `220`       | 侧边栏宽度（px）     |
 | `sidebarCollapsedWidth` | `number`        | `64`        | 侧边栏折叠宽度（px） |
 | `headerHeight`          | `number`        | `56`        | 头部高度（px）       |
 
-#### 功能设置
-
-| 属性                  | 类型      | 默认值          | 说明     |
-| --------------------- | --------- | --------------- | -------- |
-| `enableWatermark`     | `boolean` | `false`         | 启用水印 |
-| `watermarkText`       | `string`  | `'Robot Admin'` | 水印文本 |
-| `enableGrayMode`      | `boolean` | `false`         | 灰色模式 |
-| `enableColorWeakMode` | `boolean` | `false`         | 色弱模式 |
+| `enableHotkeys`         | `boolean` | `true`          | 启用快捷键 |
 
 #### 计算属性
 
@@ -298,28 +287,15 @@ settingsStore.resetSettings();
 settingsStore.updateThemeMode("dark");
 ```
 
-#### `exportSettings(): string`
+#### `adjustColor(color: string, amount: number): string`
 
-导出当前配置为 JSON 字符串
-
-```typescript
-const json = settingsStore.exportSettings();
-// 下载或保存...
-```
-
-#### `importSettings(json: string): boolean`
-
-从 JSON 字符串导入配置
+调整颜色亮度（工具函数）
 
 ```typescript
-try {
-  const success = settingsStore.importSettings(jsonString);
-  if (success) {
-    console.log("配置导入成功");
-  }
-} catch (error) {
-  console.error("配置格式错误");
-}
+import { adjustColor } from "@robot-admin/layout";
+
+const hoverColor = adjustColor("#409eff", 10); // 变亮
+const pressedColor = adjustColor("#409eff", -10); // 变暗
 ```
 
 ## 📋 常量
@@ -423,7 +399,7 @@ type BorderRadiusSize = "small" | "medium" | "large";
 type TagsViewStyle = "default" | "card" | "smart";
 
 /** 主题模式（继承自 @robot-admin/theme） */
-type ThemeMode = "light" | "dark" | "system";
+type ThemeMode = "light" | "dark" | "auto";
 
 /** 主题预设 */
 interface ThemePreset {
@@ -454,11 +430,9 @@ interface SettingsState {
   sidebarCollapsedWidth: number;
   headerHeight: number;
 
-  // 功能
-  enableWatermark: boolean;
-  watermarkText: string;
-  enableGrayMode: boolean;
-  enableColorWeakMode: boolean;
+  // 高级
+  enableHotkeys: boolean;
+  version: string;
 }
 ```
 
@@ -567,12 +541,7 @@ export const useSettingsStore = createSettingsStore({
     primaryColor: "#722ed1",
     showTagsView: false,
     fixedHeader: true,
-    enableWatermark: true,
-    watermarkText: "My Company",
   },
-
-  // 自定义存储键名
-  storageKey: "my-company-settings",
 
   // 主题模式变化回调
   onThemeModeChange: async (mode) => {

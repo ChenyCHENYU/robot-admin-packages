@@ -9,9 +9,6 @@ import type {
   PresetColor,
 } from "../types";
 
-// ============ v2.0 新增：注入键 ============
-// export { LAYOUT_CONTEXT_KEY } from "./injection-keys";
-
 // ============ 主题色预设 ============
 export const PRESET_COLORS: PresetColor[] = [
   { name: "拂晓蓝", value: "#409eff" },
@@ -138,7 +135,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
 
   // 高级
   enableHotkeys: true,
-  version: "1.0.0",
+  version: "2.0.2",
 };
 
 // ============ 其他常量 ============

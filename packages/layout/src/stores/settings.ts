@@ -21,7 +21,7 @@ import {
  * @param color - 十六进制颜色值
  * @param amount - 调整量，正数变亮，负数变暗
  */
-function adjustColor(color: string, amount: number): string {
+export function adjustColor(color: string, amount: number): string {
   const num = parseInt(color.replace("#", ""), 16);
   const r = Math.min(255, Math.max(0, (num >> 16) + amount));
   const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amount));
@@ -54,7 +54,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
 
     // 布局设置
     const layoutMode = ref<LayoutMode>(finalDefaults.layoutMode);
-    const collapsed = ref<boolean>(finalDefaults.collapsed || false);
+    const collapsed = ref<boolean>(finalDefaults.collapsed);
     const fixedHeader = ref<boolean>(finalDefaults.fixedHeader);
     const showBreadcrumb = ref<boolean>(finalDefaults.showBreadcrumb);
     const showBreadcrumbIcon = ref<boolean>(finalDefaults.showBreadcrumbIcon);
@@ -178,7 +178,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       enableTransition.value = finalDefaults.enableTransition;
 
       layoutMode.value = finalDefaults.layoutMode;
-      collapsed.value = finalDefaults.collapsed || false;
+      collapsed.value = finalDefaults.collapsed;
       fixedHeader.value = finalDefaults.fixedHeader;
       showBreadcrumb.value = finalDefaults.showBreadcrumb;
       showBreadcrumbIcon.value = finalDefaults.showBreadcrumbIcon;

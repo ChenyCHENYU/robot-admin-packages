@@ -65,7 +65,7 @@
   &:hover {
     border-color: var(--n-color-target);
     transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(32, 128, 240, 0.12);
+    box-shadow: 0 8px 16px var(--primary-color-shadow, rgba(32, 128, 240, 0.12));
 
     &::before {
       opacity: 1;
@@ -83,7 +83,7 @@
   &.active {
     border-color: var(--n-color-target);
     background: var(--n-color-target-light);
-    box-shadow: 0 8px 20px rgba(32, 128, 240, 0.2);
+    box-shadow: 0 8px 20px var(--primary-color-shadow, rgba(32, 128, 240, 0.2));
 
     &::before {
       opacity: 1;
@@ -198,7 +198,7 @@
 
   &:hover:not(.disabled) {
     border-color: var(--n-color-target);
-    box-shadow: 0 8px 16px rgba(32, 128, 240, 0.12);
+    box-shadow: 0 8px 16px var(--primary-color-shadow, rgba(32, 128, 240, 0.12));
     transform: translateY(-4px);
 
     &::before {
@@ -218,19 +218,19 @@
   &.active {
     border-color: var(--n-color-target);
     background: var(--n-color-target-light);
-    box-shadow: 0 8px 20px rgba(32, 128, 240, 0.2);
+    box-shadow: 0 8px 20px var(--primary-color-shadow, rgba(32, 128, 240, 0.2));
 
     &::before {
       opacity: 1;
     }
     
-    // 选中状态：图标和文字都变蓝
+    // 选中状态：图标和文字都变主题色
     .layout-svg {
-      color: #409EFF !important;  // 直接用蓝色值
+      color: var(--primary-color, #409eff) !important;
     }
     
     .layout-label {
-      color: #409EFF !important;  // 直接用蓝色值
+      color: var(--primary-color, #409eff) !important;
       font-weight: 600;
     }
   }

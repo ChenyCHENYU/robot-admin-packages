@@ -21,12 +21,6 @@ export default defineConfig({
     rollupOptions: {
       external: ["vue", "pinia", "naive-ui", "@robot-admin/theme"],
       output: {
-        globals: {
-          vue: "Vue",
-          pinia: "Pinia",
-          "naive-ui": "NaiveUI",
-          "@robot-admin/theme": "RobotAdminTheme",
-        },
         assetFileNames: (assetInfo) => {
           // CSS 文件统一命名为 index.css
           if (assetInfo.name?.endsWith(".css")) {

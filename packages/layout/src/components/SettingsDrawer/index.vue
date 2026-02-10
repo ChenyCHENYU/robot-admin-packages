@@ -118,7 +118,7 @@
             <div class="section-title">布局模式</div>
             <div class="layout-grid">
               <div
-                v-for="mode in LAYOUT_MODES"
+                v-for="mode in LAYOUT_MODE_OPTIONS"
                 :key="mode.value"
                 class="layout-item"
                 :class="{
@@ -357,13 +357,8 @@ import {
 } from "naive-ui";
 import { useSettingsStore } from "../../stores/settings";
 import { DEFAULT_SETTINGS } from "../../constants";
-import { COLOR_SWATCHES, LAYOUT_MODES, THEME_PRESETS } from "./data";
+import { COLOR_SWATCHES, LAYOUT_MODE_OPTIONS, THEME_PRESETS } from "./data";
 import type { ThemePreset } from "../../types";
-
-// Props
-defineProps<{
-  storageKey?: string;
-}>();
 
 // ============ 数据定义 ============
 
@@ -478,7 +473,7 @@ const systemInfo = computed(() => {
     resolution: `${window.screen.width} × ${window.screen.height}`,
     pixelRatio: window.devicePixelRatio + "x",
     language: navigator.language,
-    timezone: "XIAn",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 });
 
@@ -527,14 +522,16 @@ const handleResetAppearance = () => {
  */
 const handleResetLayout = () => {
   settingsStore.layoutMode = DEFAULT_SETTINGS.layoutMode;
+  settingsStore.fixedHeader = DEFAULT_SETTINGS.fixedHeader;
   settingsStore.showBreadcrumb = DEFAULT_SETTINGS.showBreadcrumb;
   settingsStore.showBreadcrumbIcon = DEFAULT_SETTINGS.showBreadcrumbIcon;
   settingsStore.showTagsView = DEFAULT_SETTINGS.showTagsView;
+  settingsStore.tagsViewHeight = DEFAULT_SETTINGS.tagsViewHeight;
+  settingsStore.tagsViewStyle = DEFAULT_SETTINGS.tagsViewStyle;
   settingsStore.showFooter = DEFAULT_SETTINGS.showFooter;
   settingsStore.sidebarWidth = DEFAULT_SETTINGS.sidebarWidth;
   settingsStore.sidebarCollapsedWidth = DEFAULT_SETTINGS.sidebarCollapsedWidth;
   settingsStore.headerHeight = DEFAULT_SETTINGS.headerHeight;
-  settingsStore.tagsViewHeight = DEFAULT_SETTINGS.tagsViewHeight;
   message.success("已恢复布局默认设置");
 };
 
@@ -629,7 +626,7 @@ const handleImportConfig = () => {
 
       // 应用配置
       if (config.settings) {
-        Object.assign(settingsStore, config.settings);
+        settingsStore.$patch(config.settings);
       }
       if (config.gray !== undefined) {
         grayMode.value = config.gray;

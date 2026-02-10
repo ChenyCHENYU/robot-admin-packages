@@ -123,8 +123,6 @@ export interface ThemePreset {
 export interface SettingsStoreOptions {
   /** 默认配置 */
   defaults?: Partial<SettingsState>;
-  /** localStorage 键名 */
-  storageKey?: string;
   /** 主题模式变化回调（用于同步到 theme store） */
   onThemeModeChange?: (mode: ThemeMode) => void | Promise<void>;
 }
