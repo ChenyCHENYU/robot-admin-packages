@@ -125,9 +125,7 @@
                   active: settingsStore.layoutMode === mode.value,
                   disabled: mode.disabled,
                 }"
-                @click="
-                  !mode.disabled && handleLayoutChange($event, mode.value)
-                "
+                @click.stop="handleLayoutChange(mode.value, mode.disabled)"
               >
                 <div class="layout-screenshot">
                   <svg
@@ -490,8 +488,8 @@ onUnmounted(() => {
 });
 
 // 处理布局切换 - 阻止抽屉关闭
-const handleLayoutChange = (e: MouseEvent, value: string) => {
-  e.stopPropagation();
+const handleLayoutChange = (value: string, disabled?: boolean) => {
+  if (disabled) return;
   settingsStore.layoutMode = value as any;
 };
 

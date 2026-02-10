@@ -9,6 +9,9 @@ import type {
   PresetColor,
 } from "../types";
 
+// ============ v2.0 新增：注入键 ============
+// export { LAYOUT_CONTEXT_KEY } from "./injection-keys";
+
 // ============ 主题色预设 ============
 export const PRESET_COLORS: PresetColor[] = [
   { name: "拂晓蓝", value: "#409eff" },
@@ -121,6 +124,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
 
   // 布局
   layoutMode: "side",
+  collapsed: false,
   fixedHeader: true,
   showBreadcrumb: true,
   showBreadcrumbIcon: true,

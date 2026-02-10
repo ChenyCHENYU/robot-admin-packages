@@ -54,6 +54,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
 
     // 布局设置
     const layoutMode = ref<LayoutMode>(finalDefaults.layoutMode);
+    const collapsed = ref<boolean>(finalDefaults.collapsed || false);
     const fixedHeader = ref<boolean>(finalDefaults.fixedHeader);
     const showBreadcrumb = ref<boolean>(finalDefaults.showBreadcrumb);
     const showBreadcrumbIcon = ref<boolean>(finalDefaults.showBreadcrumbIcon);
@@ -94,6 +95,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       transitionType: transitionType.value,
       enableTransition: enableTransition.value,
       layoutMode: layoutMode.value,
+      collapsed: collapsed.value,
       fixedHeader: fixedHeader.value,
       showBreadcrumb: showBreadcrumb.value,
       showBreadcrumbIcon: showBreadcrumbIcon.value,
@@ -176,6 +178,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       enableTransition.value = finalDefaults.enableTransition;
 
       layoutMode.value = finalDefaults.layoutMode;
+      collapsed.value = finalDefaults.collapsed || false;
       fixedHeader.value = finalDefaults.fixedHeader;
       showBreadcrumb.value = finalDefaults.showBreadcrumb;
       showBreadcrumbIcon.value = finalDefaults.showBreadcrumbIcon;
@@ -198,6 +201,13 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       if (onThemeModeChange) {
         await onThemeModeChange(mode);
       }
+    };
+
+    /**
+     * 切换侧边栏折叠状态
+     */
+    const toggleCollapse = () => {
+      collapsed.value = !collapsed.value;
     };
 
     // ============ 监听器 ============
@@ -228,6 +238,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       transitionType,
       enableTransition,
       layoutMode,
+      collapsed,
       fixedHeader,
       showBreadcrumb,
       showBreadcrumbIcon,
@@ -252,6 +263,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       applyPreset,
       resetSettings,
       updateThemeMode,
+      toggleCollapse,
     };
   });
 }

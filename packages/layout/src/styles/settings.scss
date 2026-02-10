@@ -223,14 +223,15 @@
     &::before {
       opacity: 1;
     }
-
-    .layout-label {
-      color: var(--n-color-target);
-      font-weight: 600;
-    }
-
+    
+    // 选中状态：图标和文字都变蓝
     .layout-svg {
-      color: var(--n-color-target);
+      color: #409EFF !important;  // 直接用蓝色值
+    }
+    
+    .layout-label {
+      color: #409EFF !important;  // 直接用蓝色值
+      font-weight: 600;
     }
   }
 
@@ -266,10 +267,14 @@
 .layout-svg {
   width: 64px;
   height: 48px;
-  color: var(--n-text-color-2);
+  color: #999;  // 默认：灰色
   transition: all 0.3s ease;
-}
 
+  // SVG rect 强制继承 color
+  :deep(rect) {
+    fill: currentColor !important;
+  }
+}
 .layout-label {
   font-size: 13px;
   color: var(--n-text-color);

@@ -1,7 +1,7 @@
 {
   "name": "@robot-admin/layout",
-  "version": "0.1.1",
-  "description": "Layout and settings management system for Robot Admin",
+  "version": "2.0.1",
+  "description": "Layout and settings management system for Robot Admin - v2.0 with decoupled architecture",
   "type": "module",
   "keywords": [
     "vue",
@@ -20,14 +20,22 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": [
+    "*.css",
+    "*.scss",
+    "*.vue",
+    "dist/index.css",
+    "src/index.ts"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./style.scss": "./src/styles/settings.scss",
-    "./style.css": "./dist/index.css"
+    "./style": "./dist/index.css",
+    "./css": "./dist/index.css",
+    "./style.scss": "./src/styles/settings.scss"
   },
   "files": [
     "dist",
@@ -47,6 +55,7 @@
   },
   "peerDependencies": {
     "vue": "^3.4.0",
+    "vue-router": "^4.0.0",
     "pinia": "^2.0.0 || ^3.0.0",
     "naive-ui": "^2.38.0",
     "@robot-admin/theme": "^0.1.0"
@@ -62,6 +71,7 @@
     "vite": "^7.0.0",
     "vite-plugin-dts": "^4.3.0",
     "vue": "^3.5.13",
+    "vue-router": "^4.5.0",
     "vue-tsc": "^2.1.6"
   }
 }

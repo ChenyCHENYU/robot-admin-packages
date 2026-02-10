@@ -54,6 +54,9 @@ export interface SettingsState {
   /** 布局模式：左侧/顶部/混合 */
   layoutMode: LayoutMode;
 
+  /** 侧边栏是否折叠 */
+  collapsed: boolean;
+
   /** 固定头部 */
   fixedHeader: boolean;
 
