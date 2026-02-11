@@ -1,0 +1,535 @@
+/**
+ * @robot-admin/layout
+ *
+ * 布局骨架样式 - 纯 CSS 编排，使用 CSS 变量驱动
+ * 不含任何业务色值，所有颜色通过 CSS 变量注入
+ *
+ * CSS 变量依赖（消费方需定义）：
+ *   --app-bg-body      : 页面背景色
+ *   --app-bg-content   : 内容区背景色
+ *   --app-bg-surface   : 卡片/面板背景色
+ *   --app-menu-bg      : 菜单背景色
+ *   --app-text-primary  : 主文字色
+ *   --app-text-secondary: 次文字色
+ *   --primary-color     : 主题色（来自 settings store）
+ *   --sidebar-width     : 侧边栏宽度
+ *   --sidebar-collapsed-width : 折叠宽度
+ *   --header-height     : 头部高度
+ *   --tags-view-height  : 标签页高度
+ *   --border-radius     : 全局圆角
+ */
+
+// ==================== 公共变量 ====================
+$transition-duration: 0.3s;
+$transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
+
+// ==================== 布局容器 ====================
+.layout-container {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+// ==================== C_SideLayout ====================
+.c-side-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+
+  &__sider {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width $transition-duration $transition-easing;
+    background-color: var(--app-menu-bg);
+    z-index: 100;
+
+    &.is-collapsed {
+      width: var(--sidebar-collapsed-width, 64px);
+    }
+  }
+
+  &__logo {
+    flex-shrink: 0;
+  }
+
+  &__menu {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__main {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: 100vh;
+    overflow: hidden;
+    transition: margin-left $transition-duration $transition-easing;
+  }
+
+  &__header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    background-color: var(--app-bg-body);
+    z-index: 90;
+  }
+
+  &__tags {
+    flex-shrink: 0;
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    background-color: var(--app-bg-content);
+    border-radius: var(--border-radius, 8px);
+  }
+
+  &__footer {
+    flex-shrink: 0;
+  }
+}
+
+// ==================== C_TopLayout ====================
+.c-top-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+
+  &__navbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    background-color: var(--app-bg-body);
+    z-index: 100;
+    padding: 0 16px;
+  }
+
+  &__navbar-left {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  &__navbar-center {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  &__navbar-right {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  &__tags {
+    flex-shrink: 0;
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    background-color: var(--app-bg-content);
+  }
+
+  &__footer {
+    flex-shrink: 0;
+  }
+}
+
+// ==================== C_MixLayout ====================
+.c-mix-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+
+  &__first-sider {
+    flex-shrink: 0;
+    width: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--app-menu-bg);
+    z-index: 100;
+  }
+
+  &__logo {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 0;
+  }
+
+  &__first-menu {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__second-menu {
+    position: relative;
+    z-index: 99;
+  }
+
+  &__main {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  &__header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    background-color: var(--app-bg-body);
+  }
+
+  &__tags {
+    flex-shrink: 0;
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    background-color: var(--app-bg-content);
+  }
+
+  &__footer {
+    flex-shrink: 0;
+  }
+}
+
+// ==================== C_MixTopLayout ====================
+.c-mix-top-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+
+  &__first-sider {
+    flex-shrink: 0;
+    width: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--app-menu-bg);
+    z-index: 100;
+  }
+
+  &__logo {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 0;
+  }
+
+  &__first-menu {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  &__navbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    background-color: var(--app-bg-body);
+    padding: 0 16px;
+    z-index: 90;
+  }
+
+  &__navbar-left {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  &__navbar-center {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  &__navbar-right {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  &__tags {
+    flex-shrink: 0;
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    background-color: var(--app-bg-content);
+  }
+
+  &__footer {
+    flex-shrink: 0;
+  }
+}
+
+// ==================== C_ReverseHorizontalMixLayout ====================
+.c-reverse-mix-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+
+  &__navbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    background-color: var(--app-bg-body);
+    padding: 0 16px;
+    z-index: 100;
+  }
+
+  &__navbar-left {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  &__navbar-center {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  &__navbar-right {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  &__tags {
+    flex-shrink: 0;
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  &__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    background-color: var(--app-bg-content);
+  }
+
+  &__sider {
+    flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: var(--app-bg-surface);
+    transition: width $transition-duration $transition-easing;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__footer {
+    flex-shrink: 0;
+  }
+}
+
+// ==================== C_CardLayout ====================
+.c-card-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+
+  &__navbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--app-bg-body);
+    padding: 0 16px;
+    z-index: 100;
+  }
+
+  &__navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__navbar-right {
+    display: flex;
+    align-items: center;
+  }
+
+  &__menu-trigger {
+    display: flex;
+    align-items: center;
+  }
+
+  &__tags {
+    flex-shrink: 0;
+  }
+
+  &__drawer {
+    position: relative;
+    z-index: 99;
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    background-color: var(--app-bg-content);
+  }
+
+  &__footer {
+    flex-shrink: 0;
+  }
+}
+
+// ==================== 页面过渡动画 ====================
+
+// 滑动效果
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all $transition-duration $transition-easing;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+// 淡入效果
+.fade-transform-enter-active,
+.fade-transform-leave-active {
+  transition: all $transition-duration $transition-easing;
+}
+
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: scale(1.05);
+}
+
+// 缩放效果
+.fade-zoom-enter-active,
+.fade-zoom-leave-active {
+  transition: all $transition-duration $transition-easing;
+}
+
+.fade-zoom-enter-from {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.fade-zoom-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+// ==================== Fallback ====================
+.layout-coming-soon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: var(--app-bg-content);
+
+  .coming-soon-content {
+    text-align: center;
+    padding: 40px;
+  }
+
+  .coming-soon-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+  }
+
+  .coming-soon-title {
+    font-size: 18px;
+    color: var(--app-text-secondary);
+  }
+}
+
+// ==================== 主题辅助 ====================
+.dark-theme {
+  color-scheme: dark;
+}
+
+.light-theme {
+  color-scheme: light;
+}

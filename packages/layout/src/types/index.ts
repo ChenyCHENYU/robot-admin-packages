@@ -144,3 +144,7 @@ export interface PresetColor {
   name: string;
   value: string;
 }
+
+// ============ 重新导出菜单类型 ============
+export type { MenuOptions, MenuTag, MenuItemType } from "./menu";
+

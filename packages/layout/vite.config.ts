@@ -19,7 +19,13 @@ export default defineConfig({
       fileName: (format) => `index.${format === "es" ? "js" : "cjs"}`,
     },
     rollupOptions: {
-      external: ["vue", "pinia", "naive-ui", "@robot-admin/theme"],
+      external: [
+        "vue",
+        "vue-router",
+        "pinia",
+        "naive-ui",
+        "@robot-admin/theme",
+      ],
       output: {
         assetFileNames: (assetInfo) => {
           // CSS 文件统一命名为 index.css
