@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.2.0
+
+### 🐛 Bug 修复
+
+- **ReverseHorizontalMixLayout 右侧菜单错位**: 修复右侧菜单显示在底部而非右侧的问题（`.main-area` 添加 `flex-direction: row`）
+- **MixLayout 二级菜单消失**: 修复鼠标离开后二级菜单内容消失的问题（新增 `displayMenuItem` 作为 `hoveredMenuItem` 的 fallback）
+- **MixTopLayout 全局 CSS 泄漏**: 修复 `.main-area`、`.content-layout` 等选择器污染其他布局的问题（嵌套到 `.mix-top-layout-container` 内）
+
+### ✨ 功能优化
+
+- **ResponsiveMenu 字符宽度估算**: 区分 CJK 字符（15px）和 ASCII 字符（8px），顶部菜单文字完整显示不截断
+- **ReverseHorizontalMixLayout 折叠动画**: 用 width 过渡替代 Transition，避免黑色闪烁，动画更流畅（0.35s cubic-bezier）
+- **MixLayout 交互模式**: 从悬停触发改为纯点击模式，点击同一菜单切换展开/折叠，点击不同菜单切换内容不关闭
+
+### 🎨 视觉设计
+
+- **ReverseHorizontalMixLayout 玻璃质感**: 参考搜索组件样式，应用 indigo 渐变玻璃设计（`linear-gradient` + `backdrop-filter` + 顶部高光线）
+- **pure CSS 图标**: 替换所有 UnoCSS 图标（`i-ri:*`）为纯 CSS 实现（dots-icon、grid-icon、hamburger-icon、collapse-arrow），减少外部依赖
+
+### 📦 依赖
+
+- 移除对 UnoCSS 图标的依赖，提升包的独立性
+
+---
+
 ## 2.1.0
 
 ### Minor Changes
