@@ -1,3 +1,9 @@
+<!--
+ * @robot-admin/layout - SettingsDrawer
+ *
+ * 布局配置抽屉
+ * 包含外观/布局/功能三大模块，支持主题预设、布局切换、配置导入导出等
+ -->
 <template>
   <NDrawer
     v-model:show="visible"

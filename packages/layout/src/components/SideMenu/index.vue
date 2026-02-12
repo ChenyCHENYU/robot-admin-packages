@@ -1,9 +1,9 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - SideMenu
  *
- * SideMenu - 右侧二级菜单侧边栏
+ * 右侧二级菜单侧边栏
  * 用于 ReverseHorizontalMixLayout 的右侧二级菜单
--->
+ -->
 <template>
   <template v-if="menus.length > 0">
     <!-- 折叠/展开按钮 -->

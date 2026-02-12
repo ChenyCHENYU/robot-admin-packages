@@ -1,10 +1,10 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - BrandLogo
  *
- * BrandLogo - 品牌 Logo 组件
+ * 品牌 Logo 组件
  * 从 LayoutContext.brand 读取配置，自动渲染 Logo + 品牌名
  * 支持折叠状态、横向/纵向布局
--->
+ -->
 <template>
   <div
     class="brand-logo"

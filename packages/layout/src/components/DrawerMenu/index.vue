@@ -1,9 +1,9 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - DrawerMenu
  *
- * DrawerMenu - 抽屉式网格菜单
+ * 抽屉式网格菜单
  * 用于 CardLayout 的 hover 触发的抽屉式功能导航
--->
+ -->
 <template>
   <div
     class="drawer-menu"

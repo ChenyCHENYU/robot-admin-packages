@@ -1,12 +1,10 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - C_LayoutContainer
  *
- * C_LayoutContainer - 智能布局容器
- * 根据 layoutMode 自动切换 6 种布局骨架
- * 每个骨架组件内置完整的 DOM 结构和 CSS（与原始项目一致）
- * 消费方仅需提供业务组件（菜单、头部、标签页、页脚）
+ * 智能布局容器
+ * 根据 layoutMode 自动切换 6 种布局骨架，消费方仅需提供业务组件
  *
- * 支持的 slot:
+ * Slots:
  *   #logo         - 品牌 Logo 区域（各骨架有内置默认实现）
  *   #menu         - Side 布局的垂直菜单（需消费方提供）
  *   #header       - Side/Mix 布局的完整头部（需消费方提供）
@@ -122,12 +120,12 @@ import { useLayoutContext } from "../../composables/useLayoutContext";
 import "../../styles/layouts.scss";
 
 // 骨架组件
-import SideLayout from "../SideLayout/index.vue";
-import TopLayout from "../TopLayout/index.vue";
-import MixLayout from "../MixLayout/index.vue";
-import MixTopLayout from "../MixTopLayout/index.vue";
-import ReverseHorizontalMixLayout from "../ReverseHorizontalMixLayout/index.vue";
-import CardLayout from "../CardLayout/index.vue";
+import SideLayout from "../layouts/SideLayout/index.vue";
+import TopLayout from "../layouts/TopLayout/index.vue";
+import MixLayout from "../layouts/MixLayout/index.vue";
+import MixTopLayout from "../layouts/MixTopLayout/index.vue";
+import ReverseHorizontalMixLayout from "../layouts/ReverseHorizontalMixLayout/index.vue";
+import CardLayout from "../layouts/CardLayout/index.vue";
 
 defineOptions({ name: "C_LayoutContainer" });
 

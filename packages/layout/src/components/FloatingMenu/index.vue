@@ -1,9 +1,9 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - FloatingMenu
  *
- * FloatingMenu - 悬浮二级菜单面板
+ * 悬浮二级菜单面板
  * 用于 MixLayout 的悬浮二级菜单（点击一级菜单后展开）
--->
+ -->
 <template>
   <Transition name="slide-fade">
     <div

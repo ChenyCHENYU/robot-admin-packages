@@ -1,10 +1,10 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - IconMenu
  *
- * IconMenu - 一级图标菜单
+ * 一级图标菜单
  * 用于 Mix / MixTop 布局的左侧一级菜单栏
  * 显示图标 + 标签，支持激活状态
--->
+ -->
 <template>
   <div class="icon-menu">
     <div

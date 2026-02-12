@@ -1,12 +1,10 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - ResponsiveMenu
  *
- * ResponsiveMenu - 响应式水平菜单
+ * 响应式水平菜单
  * 用于 TopLayout / MixTopLayout / ReverseHorizontalMixLayout 的水平菜单
- * 自动检测容器宽度，溢出项放入 "更多" 下拉菜单
- *
- * 使用 NMenu (naive-ui) 渲染水平菜单
--->
+ * 自动检测容器宽度，溢出项放入“更多”下拉菜单，使用 NMenu (naive-ui) 渲染
+ -->
 <template>
   <div ref="containerRef" class="responsive-menu">
     <div ref="visibleRef" class="responsive-menu__visible">

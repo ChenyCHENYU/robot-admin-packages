@@ -1,10 +1,10 @@
 <!--
- * @robot-admin/layout
+ * @robot-admin/layout - MenuTrigger
  *
- * MenuTrigger - 菜单触发区域
+ * 菜单触发区域
  * 用于 CardLayout 的 hover 触发抽屉式菜单
  * 使用共享的 drawer 控制器避免与 DrawerMenu 定时器竞争
--->
+ -->
 <template>
   <div
     class="menu-trigger"

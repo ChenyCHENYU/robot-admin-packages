@@ -26,12 +26,12 @@ export { default as MenuTrigger } from "./components/MenuTrigger/index.vue";
 export { default as ResponsiveMenu } from "./components/ResponsiveMenu/index.vue";
 
 // ============ 骨架组件（内部使用，高级用户可单独导入） ============
-export { default as SideLayout } from "./components/SideLayout/index.vue";
-export { default as TopLayout } from "./components/TopLayout/index.vue";
-export { default as MixLayout } from "./components/MixLayout/index.vue";
-export { default as MixTopLayout } from "./components/MixTopLayout/index.vue";
-export { default as ReverseHorizontalMixLayout } from "./components/ReverseHorizontalMixLayout/index.vue";
-export { default as CardLayout } from "./components/CardLayout/index.vue";
+export { default as SideLayout } from "./components/layouts/SideLayout/index.vue";
+export { default as TopLayout } from "./components/layouts/TopLayout/index.vue";
+export { default as MixLayout } from "./components/layouts/MixLayout/index.vue";
+export { default as MixTopLayout } from "./components/layouts/MixTopLayout/index.vue";
+export { default as ReverseHorizontalMixLayout } from "./components/layouts/ReverseHorizontalMixLayout/index.vue";
+export { default as CardLayout } from "./components/layouts/CardLayout/index.vue";
 
 // ============ 初始化 ============
 export { setupLayout } from "./setup";
@@ -90,9 +90,9 @@ export {
 } from "./constants";
 
 // ============ 向后兼容别名（deprecated，下个大版本移除） ============
-export { default as C_SideLayout } from "./components/SideLayout/index.vue";
-export { default as C_TopLayout } from "./components/TopLayout/index.vue";
-export { default as C_MixLayout } from "./components/MixLayout/index.vue";
-export { default as C_MixTopLayout } from "./components/MixTopLayout/index.vue";
-export { default as C_ReverseHorizontalMixLayout } from "./components/ReverseHorizontalMixLayout/index.vue";
-export { default as C_CardLayout } from "./components/CardLayout/index.vue";
+export { default as C_SideLayout } from "./components/layouts/SideLayout/index.vue";
+export { default as C_TopLayout } from "./components/layouts/TopLayout/index.vue";
+export { default as C_MixLayout } from "./components/layouts/MixLayout/index.vue";
+export { default as C_MixTopLayout } from "./components/layouts/MixTopLayout/index.vue";
+export { default as C_ReverseHorizontalMixLayout } from "./components/layouts/ReverseHorizontalMixLayout/index.vue";
+export { default as C_CardLayout } from "./components/layouts/CardLayout/index.vue";
