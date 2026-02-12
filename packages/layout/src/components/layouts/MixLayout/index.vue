@@ -53,7 +53,6 @@
             active: menuSplit.activeFirstMenu.value === item.path,
           }"
           @click="menuSplit.handleFirstMenuClick(item)"
-          @mouseenter="menuSplit.hoveredMenuItem.value = item"
         >
           <div class="menu-item-content">
             <component
@@ -77,22 +76,21 @@
         v-if="menuSplit.showSecondMenu.value"
         class="second-level-menu-popup"
         :class="[isDarkMode ? 'dark-theme' : 'light-theme']"
-        @mouseleave="menuSplit.hoveredMenuItem.value = null"
       >
         <div class="second-menu-header">
           <component
             :is="LayoutIcon"
-            v-if="menuSplit.hoveredMenuItem.value?.meta?.icon"
-            :name="menuSplit.hoveredMenuItem.value.meta.icon"
+            v-if="menuSplit.displayMenuItem.value?.meta?.icon"
+            :name="menuSplit.displayMenuItem.value.meta.icon"
             :size="20"
           />
           <span class="menu-title">{{
-            menuSplit.hoveredMenuItem.value?.meta?.title
+            menuSplit.displayMenuItem.value?.meta?.title
           }}</span>
         </div>
         <div class="second-menu-list">
           <div
-            v-for="child in menuSplit.hoveredMenuItem.value?.children || []"
+            v-for="child in menuSplit.displayMenuItem.value?.children || []"
             :key="child.path"
             class="second-menu-item"
             :class="{ active: menuSplit.isMenuItemActive(child.path) }"

@@ -12,7 +12,12 @@
     @mouseleave="handlers.startHide()"
   >
     <div class="menu-trigger__indicator">
-      <i class="i-ri:menu-3-line"></i>
+      <!-- 纯 CSS 三横线菜单图标 -->
+      <span class="hamburger-icon">
+        <span></span>
+        <span></span>
+        <span></span>
+      </span>
     </div>
   </div>
 </template>
@@ -63,5 +68,25 @@ const handlers = inject<DrawerHandlers>(DRAWER_HANDLER_KEY, {
 .menu-trigger__indicator:hover {
   opacity: 1;
   background: rgba(99, 102, 241, 0.08);
+}
+
+/* 纯 CSS 三横线汉堡菜单图标 */
+.hamburger-icon {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 20px;
+  height: 16px;
+  padding: 2px 0;
+}
+
+.hamburger-icon span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: currentColor;
+  border-radius: 1px;
+  opacity: 0.85;
+  transition: all 0.2s ease;
 }
 </style>

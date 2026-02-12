@@ -34,6 +34,8 @@ export interface UseMenuSplitReturn {
   currentSecondMenus: ComputedRef<MenuOptions[]>;
   /** 悬浮的菜单项（MixLayout 使用） */
   hoveredMenuItem: Ref<MenuOptions | null>;
+  /** 实际展示的菜单项（hovered 优先，fallback 到 active） */
+  displayMenuItem: ComputedRef<MenuOptions | null>;
   /** 是否显示悬浮二级菜单（MixLayout 使用） */
   showSecondMenu: Ref<boolean>;
   /** 处理一级菜单点击 */
@@ -66,6 +68,11 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
   const activeFirstMenu = ref<string>("");
   const hoveredMenuItem = ref<MenuOptions | null>(null);
   const showSecondMenu = ref(false);
+
+  /** 当前展示在悬浮面板上的菜单项（优先 hovered，fallback 到 active） */
+  const displayMenuItem = computed<MenuOptions | null>(
+    () => hoveredMenuItem.value || activeFirstMenuItem.value || null,
+  );
 
   // ============ 路径匹配 ============
 
@@ -108,21 +115,21 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
   // ============ 交互处理 ============
 
   const handleFirstMenuClick = (item: MenuOptions) => {
-    activeFirstMenu.value = item.path || "";
-
     if (toValue(floatingSecondMenu)) {
-      // MixLayout: toggle 悬浮二级菜单
+      // MixLayout: 纯点击模式
       if (item.children && item.children.length > 0) {
-        if (showSecondMenu.value && hoveredMenuItem.value?.path === item.path) {
+        if (showSecondMenu.value && activeFirstMenu.value === item.path) {
+          // 点击同一个已展开的菜单 → 关闭
           showSecondMenu.value = false;
-          hoveredMenuItem.value = null;
         } else {
-          hoveredMenuItem.value = item;
+          // 点击另一个或未展开 → 展开/切换
+          activeFirstMenu.value = item.path || "";
           showSecondMenu.value = true;
         }
       } else {
+        // 没有子菜单 → 关闭二级面板并跳转
+        activeFirstMenu.value = item.path || "";
         showSecondMenu.value = false;
-        hoveredMenuItem.value = null;
         if (item.path) router.push(item.path);
       }
     } else {
@@ -144,6 +151,10 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
     const matchedFirstMenu = findActiveTopMenu(menuList);
     if (matchedFirstMenu) {
       activeFirstMenu.value = matchedFirstMenu.path || "";
+      // 悬浮模式下，如果当前一级菜单有子菜单，自动展示二级菜单
+      if (toValue(floatingSecondMenu) && matchedFirstMenu.children?.length) {
+        showSecondMenu.value = true;
+      }
     } else if (menuList.length > 0 && !activeFirstMenu.value) {
       activeFirstMenu.value = menuList[0].path || "";
     }
@@ -170,6 +181,8 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
     activeFirstMenuItem,
     currentSecondMenus,
     hoveredMenuItem,
+    /** 实际在悬浮面板上展示的菜单项（hovered 优先，fallback 到 active） */
+    displayMenuItem,
     showSecondMenu,
     handleFirstMenuClick,
     handleSecondMenuClick,

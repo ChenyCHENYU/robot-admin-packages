@@ -620,77 +620,79 @@
   }
 }
 
-/* ==================== 右侧主区域 ==================== */
-.main-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  /* 不设置背景色，让子元素的背景显示 */
-}
-
-/* 内容布局 */
-.content-layout {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  /* 使用浅色背景，与顶部导航和左侧菜单保持一致 */
-  background: #f4f7f9;
-
-  .dark-theme & {
-    background: #121212;
-  }
-}
-
-.page-content {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-  overflow-x: hidden;
-
-  /* 自定义滚动条 */
-  &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+.mix-top-layout-container {
+  /* ==================== 右侧主区域 ==================== */
+  .main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* 不设置背景色，让子元素的背景显示 */
   }
 
-  &::-webkit-scrollbar-track {
-    background: transparent;
+  /* 内容布局 */
+  .content-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    transition: background 0.3s;
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* 使用浅色背景，与顶部导航和左侧菜单保持一致 */
+    background: #f4f7f9;
 
-    &:hover {
-      background: rgba(0, 0, 0, 0.2);
+    .dark-theme & {
+      background: #121212;
     }
   }
 
-  .dark-theme &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+  .page-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    overflow-x: hidden;
 
-    &:hover {
-      background: rgba(255, 255, 255, 0.2);
+    /* 自定义滚动条 */
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+      transition: background 0.3s;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.2);
+      }
+    }
+
+    .dark-theme &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
     }
   }
-}
 
-/* 标签页区域 */
-.tags-view-container {
-  flex-shrink: 0;
-  background: var(--app-bg-color);
-  border-bottom: 1px solid var(--color-border);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 标签页区域 */
+  .tags-view-container {
+    flex-shrink: 0;
+    background: var(--app-bg-color);
+    border-bottom: 1px solid var(--color-border);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 
 /* ==================== 响应式设计 ==================== */

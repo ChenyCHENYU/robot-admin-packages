@@ -93,27 +93,38 @@
         </template>
       </NLayout>
 
+      <!-- 右侧折叠/展开按钮 - 始终可见 -->
+      <div
+        v-if="menuSplit.currentSecondMenus.value.length > 0"
+        class="sidebar-toggle"
+        :class="[
+          isDarkMode ? 'dark-theme' : 'light-theme',
+          { active: !isCollapsed },
+        ]"
+        @click="toggleCollapse"
+      >
+        <span
+          :class="[
+            'collapse-arrow',
+            'toggle-icon',
+            isCollapsed ? 'collapsed' : 'expanded',
+          ]"
+        >
+          <span class="arrow-line"></span>
+          <span class="arrow-line"></span>
+        </span>
+      </div>
+
       <!-- 右侧：二级菜单侧边栏 -->
       <div
         v-if="menuSplit.currentSecondMenus.value.length > 0"
-        class="right-sidebar"
-        :class="[
-          isDarkMode ? 'dark-theme' : 'light-theme',
-          { collapsed: isCollapsed },
-        ]"
+        class="right-sidebar-wrapper"
+        :class="{ collapsed: isCollapsed }"
       >
-        <!-- 折叠按钮 -->
-        <div class="collapse-trigger" @click="toggleCollapse">
-          <i
-            :class="[
-              'transition-all duration-300 ease-in-out',
-              isCollapsed ? 'i-ri:menu-fold-4-fill' : 'i-ri:menu-fold-3-fill',
-            ]"
-          ></i>
-        </div>
-
-        <!-- 菜单内容 -->
-        <div v-show="!isCollapsed" class="sidebar-content">
+        <div
+          class="right-sidebar"
+          :class="[isDarkMode ? 'dark-theme' : 'light-theme']"
+        >
           <!-- 侧边栏标题 -->
           <div
             class="sidebar-header"

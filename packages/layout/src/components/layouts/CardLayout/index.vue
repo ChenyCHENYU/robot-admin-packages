@@ -28,7 +28,12 @@
         >
           <slot name="menu-trigger">
             <div class="menu-indicator">
-              <i class="i-ri:menu-3-line"></i>
+              <!-- 纯 CSS 三横线菜单图标 -->
+              <span class="hamburger-icon">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
             </div>
           </slot>
         </div>
@@ -92,7 +97,13 @@
         <!-- 菜单头部 -->
         <div class="drawer-header">
           <div class="drawer-title">
-            <i class="i-ri:apps-2-line"></i>
+            <!-- 纯 CSS 网格图标 -->
+            <span class="grid-icon">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
             <span>功能导航</span>
           </div>
         </div>
@@ -267,3 +278,41 @@ onUnmounted(() => {
   if (hideTimer.value) clearTimeout(hideTimer.value);
 });
 </script>
+
+<style scoped lang="scss">
+/* 纯 CSS 网格图标 (2x2) */
+.grid-icon {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2.5px;
+  width: 18px;
+  height: 18px;
+  padding: 1px;
+}
+
+.grid-icon span {
+  background-color: currentColor;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+/* 纯 CSS 三横线汉堡菜单图标 */
+.hamburger-icon {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 20px;
+  height: 16px;
+  padding: 2px 0;
+}
+
+.hamburger-icon span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: currentColor;
+  border-radius: 1px;
+  opacity: 0.85;
+  transition: all 0.2s ease;
+}
+</style>

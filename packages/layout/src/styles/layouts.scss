@@ -15,6 +15,32 @@
  *   --primary-color     : 主题色
  */
 
+// ==================== 🎨 菜单样式自定义变量（可在主项目覆盖）====================
+.layout-container {
+  // 菜单项圆角
+  --menu-border-radius: 10px;
+  
+  // 一级菜单父项激活效果（子菜单展开状态）- 较淡
+  --menu-parent-gradient-start: rgba(99, 102, 241, 0.10);
+  --menu-parent-gradient-end: rgba(139, 92, 246, 0.06);
+  --menu-parent-border-color: rgba(99, 102, 241, 0.45);
+  --menu-parent-border-width: 2px;
+  --menu-parent-shadow: 0 2px 6px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(99, 102, 241, 0.06);
+  
+  // 二级菜单选中效果（当前页面）- 明显更亮，层级清晰
+  --menu-selected-gradient-start: rgba(99, 102, 241, 0.22);
+  --menu-selected-gradient-end: rgba(139, 92, 246, 0.16);
+  --menu-selected-border-color: rgba(99, 102, 241, 0.75);
+  --menu-selected-border-width: 3px;
+  --menu-selected-shadow: 0 2px 12px rgba(99, 102, 241, 0.22), 0 4px 24px rgba(99, 102, 241, 0.15);
+  
+  // 毛玻璃效果强度
+  --menu-parent-blur: 14px;
+  --menu-parent-saturate: 130%;
+  --menu-selected-blur: 16px;
+  --menu-selected-saturate: 135%;
+}
+
 // ==================== 基础布局样式 ====================
 .layout-container {
   height: 100vh;
@@ -178,7 +204,7 @@
     background: linear-gradient(135deg,
       rgba(255, 255, 255, 0.08) 0%,
       rgba(255, 255, 255, 0.04) 100%);
-    border-radius: 8px;
+    border-radius: 10px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: -1;
     box-shadow:
@@ -189,7 +215,7 @@
 
 /* 菜单项内容容器 - 卡片质感 */
 .layout-container .n-menu-item-content {
-  border-radius: 8px;
+  border-radius: var(--menu-border-radius, 10px);
   background: transparent;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -204,7 +230,7 @@
     bottom: 0;
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-left: 2px solid transparent;
-    border-radius: 8px;
+    border-radius: var(--menu-border-radius, 10px);
     pointer-events: none;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -216,7 +242,7 @@
 
   &::before {
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
+    border-radius: 10px;
     box-shadow:
       0 4px 16px rgba(0, 0, 0, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -226,11 +252,11 @@
 .layout-container .n-menu-item:hover .n-menu-item-content {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-radius: 8px;
+  border-radius: 10px;
 
   &::after {
     border-left-color: rgba(99, 102, 241, 0.4);
-    border-radius: 8px;
+    border-radius: 10px;
     box-shadow:
       0 0 15px rgba(99, 102, 241, 0.15),
       inset 0 1px 1px rgba(255, 255, 255, 0.1);
@@ -242,30 +268,35 @@
   color: var(--n-item-icon-color-active-hover);
 }
 
-/* Active/选中状态 - 高级卡片激活效果 */
+/* Active/选中状态 - 二级菜单选中（当前页面）- 略强玻璃质感 */
 .layout-container .n-menu-item--selected,
 .layout-container .n-menu-item-content--selected {
+  background: transparent !important; /* 覆盖 Naive UI 默认背景 */
+  
   &::before {
-    background: linear-gradient(90deg,
-      rgba(99, 102, 241, 0.18) 0%,
-      rgba(139, 92, 246, 0.12) 100%);
-    border-radius: 8px;
+    background: linear-gradient(135deg,
+      var(--menu-selected-gradient-start, rgba(99, 102, 241, 0.22)) 0%,
+      var(--menu-selected-gradient-end, rgba(139, 92, 246, 0.16)) 100%) !important;
+    border-radius: var(--menu-border-radius, 10px);
     box-shadow:
-      0 3px 12px rgba(99, 102, 241, 0.25),
-      inset 0 1px 0 rgba(99, 102, 241, 0.2);
+      var(--menu-selected-shadow, 0 2px 12px rgba(99, 102, 241, 0.22), 0 4px 24px rgba(99, 102, 241, 0.15)),
+      inset 0 1px 2px rgba(99, 102, 241, 0.12),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
 }
 
 .layout-container .n-menu-item--selected .n-menu-item-content,
 .layout-container .n-menu-item-content--selected {
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  background: transparent !important; /* 覆盖 Naive UI 默认背景 */
+  backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
+  -webkit-backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
 
   &::after {
-    border-left: 3px solid rgba(99, 102, 241, 0.8);
+    border-left: var(--menu-selected-border-width, 3px) solid var(--menu-selected-border-color, rgba(99, 102, 241, 0.75));
+    border-radius: var(--menu-border-radius, 10px);
     box-shadow:
-      0 0 20px rgba(99, 102, 241, 0.25),
-      inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      0 0 14px rgba(99, 102, 241, 0.25),
+      inset 0 1px 2px rgba(255, 255, 255, 0.12);
   }
 }
 
@@ -280,21 +311,28 @@
   transform: scale(0.98);
 }
 
-/* 子菜单父项样式 */
+/* 子菜单父项样式 - 一级菜单展开状态（较淡玻璃质感）*/
 .layout-container .n-menu-item-content--child-active {
+  background: transparent !important; /* 覆盖 Naive UI 默认背景 */
+  
   &::before {
-    background: rgba(99, 102, 241, 0.1);
+    background: linear-gradient(135deg,
+      var(--menu-parent-gradient-start, rgba(99, 102, 241, 0.10)) 0%,
+      var(--menu-parent-gradient-end, rgba(139, 92, 246, 0.06)) 100%) !important;
+    border-radius: var(--menu-border-radius, 10px);
     box-shadow:
-      0 2px 12px rgba(99, 102, 241, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      var(--menu-parent-shadow, 0 2px 6px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(99, 102, 241, 0.06)),
+      inset 0 1px 2px rgba(99, 102, 241, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
   &::after {
-    border-left: 2px solid rgba(99, 102, 241, 0.5);
+    border-left: var(--menu-parent-border-width, 2px) solid var(--menu-parent-border-color, rgba(99, 102, 241, 0.45));
+    border-radius: var(--menu-border-radius, 10px);
   }
 
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--menu-parent-blur, 14px)) saturate(var(--menu-parent-saturate, 130%));
+  -webkit-backdrop-filter: blur(var(--menu-parent-blur, 14px)) saturate(var(--menu-parent-saturate, 130%));
 }
 
 /* 一级菜单项对齐 */
@@ -401,23 +439,29 @@
   color: var(--n-item-color-active) !important;
 }
 
-/* 折叠菜单选中状态 - 毛玻璃效果 */
+/* 折叠菜单选中状态 - 使用二级选中效果变量 */
 .layout-container .n-menu.n-menu--collapsed .n-menu-item-content--child-active {
+  background: transparent !important; /* 覆盖 Naive UI 默认背景 */
+  
   &::before {
     background: linear-gradient(135deg,
-      rgba(99, 102, 241, 0.25) 0%,
-      rgba(139, 92, 246, 0.2) 100%);
-    border-radius: 10px;
+      var(--menu-selected-gradient-start, rgba(99, 102, 241, 0.22)) 0%,
+      var(--menu-selected-gradient-end, rgba(139, 92, 246, 0.16)) 100%) !important;
+    border-radius: var(--menu-border-radius, 10px);
     box-shadow:
-      0 8px 24px rgba(99, 102, 241, 0.3),
-      inset 0 1px 1px rgba(255, 255, 255, 0.2);
+      var(--menu-selected-shadow, 0 2px 12px rgba(99, 102, 241, 0.22), 0 4px 24px rgba(99, 102, 241, 0.15)),
+      inset 0 1px 2px rgba(99, 102, 241, 0.12),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
 
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
+  -webkit-backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
 
   &::after {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+    border-radius: var(--menu-border-radius, 10px);
+    box-shadow:
+      0 0 14px rgba(99, 102, 241, 0.25),
+      0 0 20px rgba(99, 102, 241, 0.15);
   }
 }
 

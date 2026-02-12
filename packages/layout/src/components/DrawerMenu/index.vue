@@ -16,7 +16,13 @@
   >
     <div class="drawer-menu__header">
       <div class="drawer-menu__title">
-        <i class="i-ri:apps-2-line"></i>
+        <!-- 纯 CSS 网格图标 -->
+        <span class="grid-icon">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
         <span>功能导航</span>
       </div>
     </div>
@@ -249,5 +255,21 @@ const navigate = (item: MenuOptions) => {
   font-size: 11px;
   font-weight: 600;
   opacity: 0.4;
+}
+
+/* 纯 CSS 网格图标 (2x2) */
+.grid-icon {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2.5px;
+  width: 18px;
+  height: 18px;
+  padding: 1px;
+}
+
+.grid-icon span {
+  background-color: currentColor;
+  border-radius: 2px;
+  opacity: 0.85;
 }
 </style>
