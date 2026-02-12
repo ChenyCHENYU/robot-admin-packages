@@ -1,8 +1,8 @@
 /**
  * @robot-admin/layout
  *
- * 布局骨架样式 - 纯 CSS 编排，使用 CSS 变量驱动
- * 不含任何业务色值，所有颜色通过 CSS 变量注入
+ * 布局全局样式 - 所有布局共享的基础样式
+ * 包含：布局容器、内容区、主题适配、侧边栏基础、菜单毛玻璃效果、折叠菜单、过渡动画
  *
  * CSS 变量依赖（消费方需定义）：
  *   --app-bg-body      : 页面背景色
@@ -11,19 +11,11 @@
  *   --app-menu-bg      : 菜单背景色
  *   --app-text-primary  : 主文字色
  *   --app-text-secondary: 次文字色
- *   --primary-color     : 主题色（来自 settings store）
- *   --sidebar-width     : 侧边栏宽度
- *   --sidebar-collapsed-width : 折叠宽度
- *   --header-height     : 头部高度
- *   --tags-view-height  : 标签页高度
- *   --border-radius     : 全局圆角
+ *   --app-border-color  : 边框色
+ *   --primary-color     : 主题色
  */
 
-// ==================== 公共变量 ====================
-$transition-duration: 0.3s;
-$transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
-
-// ==================== 布局容器 ====================
+// ==================== 基础布局样式 ====================
 .layout-container {
   height: 100vh;
   overflow: hidden;
@@ -31,432 +23,563 @@ $transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
   flex-direction: column;
 }
 
-// ==================== C_SideLayout ====================
-.c-side-layout {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
+// ==================== 内容区域样式 ====================
+.layout-container .content-with-header {
+  margin-top: 100px;
+  height: calc(100vh - 150px);
+}
 
-  &__sider {
-    position: fixed;
+.layout-container .app-content {
+  background-color: var(--app-bg-content);
+}
+
+.layout-container .n-layout-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-x: hidden;
+}
+
+.main-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  border-radius: 8px;
+}
+
+// ==================== 主题相关样式 ====================
+[data-theme='light'] .layout-container .light-theme,
+.layout-container .light-theme {
+  background-color: var(--app-bg-body);
+}
+
+[data-theme='dark'] .layout-container .dark-theme,
+.layout-container .dark-theme {
+  background-color: var(--app-bg-body);
+}
+
+.layout-container.light-mode .n-layout .n-layout-scroll-container {
+  background-color: var(--app-bg-surface);
+  border-radius: 10px;
+}
+
+.layout-container.dark-mode .n-layout .n-layout-scroll-container,
+.layout-container.system-mode .n-layout .n-layout-scroll-container {
+  background-color: var(--app-bg-surface);
+}
+
+// ==================== 侧边栏和菜单样式 ====================
+.layout-sider {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: layout style paint;
+}
+
+.layout-sider.light-theme {
+  background-color: var(--app-menu-bg);
+}
+
+.layout-sider.dark-theme {
+  background-color: var(--app-menu-bg);
+}
+
+.layout-sider .n-scrollbar-rail {
+  width: 0 !important;
+}
+
+.layout-sider .n-scrollbar-content {
+  padding-right: 0 !important;
+}
+
+.layout-container .n-layout-sider {
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.menu-scroll-container {
+  height: calc(100vh - 56px);
+  overflow-y: scroll;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+.layout-container .n-menu.n-menu--vertical {
+  flex: 1;
+  min-height: min-content;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+// ==================== 菜单图标和文字样式 ====================
+.layout-container .n-menu-item-content__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  width: 18px !important;
+  height: 18px !important;
+  margin-right: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 18px !important;
+}
+
+.layout-container .n-menu-item-content__icon .n-icon {
+  width: 18px !important;
+  height: 18px !important;
+  font-size: 18px !important;
+}
+
+.layout-container .n-menu-item-content__icon svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.layout-container .n-menu-item-content-header {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  line-height: 1.5;
+}
+
+.layout-container .n-menu-item-content__arrow {
+  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// ==================== 🎨 毛玻璃质感菜单效果（性能优化版）====================
+
+/* 菜单项基础样式 - 卡片质感默认状态 */
+.layout-container .n-menu-item {
+  border-radius: 0;
+  position: relative;
+  overflow: visible;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+
+  &::before {
+    content: '';
+    position: absolute;
     top: 0;
     left: 0;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    transition: width $transition-duration $transition-easing;
-    background-color: var(--app-menu-bg);
-    z-index: 100;
-
-    &.is-collapsed {
-      width: var(--sidebar-collapsed-width, 64px);
-    }
-  }
-
-  &__logo {
-    flex-shrink: 0;
-  }
-
-  &__menu {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  &__main {
-    position: relative;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    height: 100vh;
-    overflow: hidden;
-    transition: margin-left $transition-duration $transition-easing;
-  }
-
-  &__header {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    background-color: var(--app-bg-body);
-    z-index: 90;
-  }
-
-  &__tags {
-    flex-shrink: 0;
-  }
-
-  &__content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    background-color: var(--app-bg-content);
-    border-radius: var(--border-radius, 8px);
-  }
-
-  &__footer {
-    flex-shrink: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.04) 100%);
+    border-radius: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: -1;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 }
 
-// ==================== C_TopLayout ====================
-.c-top-layout {
+/* 菜单项内容容器 - 卡片质感 */
+.layout-container .n-menu-item-content {
+  border-radius: 8px;
+  background: transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  padding: 10px 16px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 2px solid transparent;
+    border-radius: 8px;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Hover 状态 - 增强卡片效果 */
+.layout-container .n-menu-item:hover {
+  transform: translateX(2px);
+
+  &::before {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+}
+
+.layout-container .n-menu-item:hover .n-menu-item-content {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 8px;
+
+  &::after {
+    border-left-color: rgba(99, 102, 241, 0.4);
+    border-radius: 8px;
+    box-shadow:
+      0 0 15px rgba(99, 102, 241, 0.15),
+      inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  }
+}
+
+.layout-container .n-menu-item:hover .n-menu-item-content__icon {
+  transform: scale(1.08);
+  color: var(--n-item-icon-color-active-hover);
+}
+
+/* Active/选中状态 - 高级卡片激活效果 */
+.layout-container .n-menu-item--selected,
+.layout-container .n-menu-item-content--selected {
+  &::before {
+    background: linear-gradient(90deg,
+      rgba(99, 102, 241, 0.18) 0%,
+      rgba(139, 92, 246, 0.12) 100%);
+    border-radius: 8px;
+    box-shadow:
+      0 3px 12px rgba(99, 102, 241, 0.25),
+      inset 0 1px 0 rgba(99, 102, 241, 0.2);
+  }
+}
+
+.layout-container .n-menu-item--selected .n-menu-item-content,
+.layout-container .n-menu-item-content--selected {
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+
+  &::after {
+    border-left: 3px solid rgba(99, 102, 241, 0.8);
+    box-shadow:
+      0 0 20px rgba(99, 102, 241, 0.25),
+      inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  }
+}
+
+.layout-container .n-menu-item--selected .n-menu-item-content__icon {
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.5));
+  transform: scale(1.05);
+  color: var(--n-item-icon-color-active);
+}
+
+/* Active 按下状态 */
+.layout-container .n-menu-item:active {
+  transform: scale(0.98);
+}
+
+/* 子菜单父项样式 */
+.layout-container .n-menu-item-content--child-active {
+  &::before {
+    background: rgba(99, 102, 241, 0.1);
+    box-shadow:
+      0 2px 12px rgba(99, 102, 241, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  &::after {
+    border-left: 2px solid rgba(99, 102, 241, 0.5);
+  }
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 一级菜单项对齐 */
+.layout-container .n-menu > .n-menu-item,
+.layout-container .n-menu > .n-submenu {
+  margin: 4px 12px;
+}
+
+/* 二级及以下菜单项 */
+.layout-container .n-submenu-children .n-menu-item {
+  margin: 4px 0;
+}
+
+.layout-container .n-submenu-children .n-menu-item-content {
+  padding-left: 46px;
+}
+
+// ==================== 主题优化 ====================
+.dark-theme {
+  color-scheme: dark;
+
+  .layout-container .n-menu-item::before {
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.04) 100%);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .layout-container .n-menu-item:hover::before {
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.08) 100%);
+  }
+}
+
+.light-theme {
+  color-scheme: light;
+
+  .layout-container .n-menu-item::before {
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0.4) 100%);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .layout-container .n-menu-item:hover::before {
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 255, 255, 0.6) 100%);
+  }
+
+  .layout-container .n-menu-item-content::after {
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+}
+
+// ==================== 折叠菜单样式 ====================
+.layout-container .n-menu.n-menu--collapsed {
+  width: 64px !important;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-
-  &__navbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    background-color: var(--app-bg-body);
-    z-index: 100;
-    padding: 0 16px;
-  }
-
-  &__navbar-left {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  &__navbar-center {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  &__navbar-right {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  &__tags {
-    flex-shrink: 0;
-  }
-
-  &__content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    background-color: var(--app-bg-content);
-  }
-
-  &__footer {
-    flex-shrink: 0;
-  }
+  align-items: center;
 }
 
-// ==================== C_MixLayout ====================
-.c-mix-layout {
+.layout-container .n-menu.n-menu--collapsed .n-menu-item-content {
+  justify-content: center !important;
+  padding: 0 !important;
   display: flex;
-  height: 100vh;
-  overflow: hidden;
-
-  &__first-sider {
-    flex-shrink: 0;
-    width: 64px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: var(--app-menu-bg);
-    z-index: 100;
-  }
-
-  &__logo {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 0;
-  }
-
-  &__first-menu {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    width: 100%;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  &__second-menu {
-    position: relative;
-    z-index: 99;
-  }
-
-  &__main {
-    position: relative;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  &__header {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    background-color: var(--app-bg-body);
-  }
-
-  &__tags {
-    flex-shrink: 0;
-  }
-
-  &__content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    background-color: var(--app-bg-content);
-  }
-
-  &__footer {
-    flex-shrink: 0;
-  }
+  align-items: center;
+  width: 62px;
 }
 
-// ==================== C_MixTopLayout ====================
-.c-mix-top-layout {
+.layout-container .n-menu.n-menu--collapsed .n-icon {
+  margin-left: 40px !important;
+  margin-top: 4px !important;
+}
+
+.layout-container .n-menu.n-menu--collapsed .n-menu-item {
+  padding: 0 !important;
   display: flex;
-  height: 100vh;
-  overflow: hidden;
+  justify-content: center;
+  width: 100%;
+}
 
-  &__first-sider {
-    flex-shrink: 0;
-    width: 64px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: var(--app-menu-bg);
-    z-index: 100;
+.layout-container .n-menu.n-menu--collapsed .n-menu-item-content-header {
+  margin: 0 auto;
+  margin-top: -10px;
+  padding: 0;
+}
+
+.layout-container .n-menu.n-menu--collapsed .n-menu-item-content__icon {
+  margin-right: 0;
+}
+
+.layout-container
+  .n-menu.n-menu--collapsed
+    .n-menu-item-content--child-active
+    .n-menu-item-content__icon
+ {
+  color: var(--n-item-color-active) !important;
+}
+
+/* 折叠菜单选中状态 - 毛玻璃效果 */
+.layout-container .n-menu.n-menu--collapsed .n-menu-item-content--child-active {
+  &::before {
+    background: linear-gradient(135deg,
+      rgba(99, 102, 241, 0.25) 0%,
+      rgba(139, 92, 246, 0.2) 100%);
+    border-radius: 10px;
+    box-shadow:
+      0 8px 24px rgba(99, 102, 241, 0.3),
+      inset 0 1px 1px rgba(255, 255, 255, 0.2);
   }
 
-  &__logo {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 0;
-  }
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
 
-  &__first-menu {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    width: 100%;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  &__main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  &__navbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    background-color: var(--app-bg-body);
-    padding: 0 16px;
-    z-index: 90;
-  }
-
-  &__navbar-left {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  &__navbar-center {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  &__navbar-right {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  &__tags {
-    flex-shrink: 0;
-  }
-
-  &__content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    background-color: var(--app-bg-content);
-  }
-
-  &__footer {
-    flex-shrink: 0;
+  &::after {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
   }
 }
 
-// ==================== C_ReverseHorizontalMixLayout ====================
-.c-reverse-mix-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+/* 折叠菜单 Hover 效果 */
+.layout-container .n-menu.n-menu--collapsed .n-menu-item:hover {
+  transform: scale(1.05);
 
-  &__navbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    background-color: var(--app-bg-body);
-    padding: 0 16px;
-    z-index: 100;
-  }
-
-  &__navbar-left {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  &__navbar-center {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  &__navbar-right {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  &__tags {
-    flex-shrink: 0;
-  }
-
-  &__body {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  &__content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    background-color: var(--app-bg-content);
-  }
-
-  &__sider {
-    flex-shrink: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    background-color: var(--app-bg-surface);
-    transition: width $transition-duration $transition-easing;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  &__footer {
-    flex-shrink: 0;
+  &::before {
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 }
 
-// ==================== C_CardLayout ====================
-.c-card-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+/* 折叠菜单图标颜色 */
+.n-menu--collapsed .n-menu-item-content__icon {
+  color: rgba(229, 231, 235, 0.9) !important;
+}
 
-  &__navbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background-color: var(--app-bg-body);
-    padding: 0 16px;
-    z-index: 100;
-  }
+// ==================== 其他辅助样式 ====================
+.layout-container .n-layout {
+  width: 100%;
+  min-width: 0;
+}
 
-  &__navbar-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+.no-horizontal-scroll {
+  overflow-x: hidden !important;
+}
 
-  &__navbar-right {
-    display: flex;
-    align-items: center;
-  }
+// ==================== 子菜单和菜单组毛玻璃效果 ====================
+.layout-container .n-submenu {
+  margin: 4px 0;
+}
 
-  &__menu-trigger {
-    display: flex;
-    align-items: center;
-  }
+.layout-container .n-submenu > .n-menu-item-content {
+  padding: 10px 16px;
+}
 
-  &__tags {
-    flex-shrink: 0;
-  }
+.layout-container .n-submenu-children .n-menu-item {
+  margin: 2px 0;
+  position: relative;
 
-  &__drawer {
-    position: relative;
-    z-index: 99;
-  }
-
-  &__content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    background-color: var(--app-bg-content);
-  }
-
-  &__footer {
-    flex-shrink: 0;
+  &::before {
+    content: none;
   }
 }
 
-// ==================== 页面过渡动画 ====================
+.layout-container .n-submenu-children .n-menu-item-content {
+  padding: 8px 16px 8px 46px;
+  font-size: 13px;
+}
+
+.layout-container .n-submenu-children .n-menu-item-content__icon {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 16px !important;
+  margin-right: 8px;
+}
+
+.layout-container .n-submenu-children .n-menu-item-content__icon .n-icon {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 16px !important;
+}
+
+.layout-container .n-submenu-children .n-menu-item-content__icon svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.layout-container .n-submenu-children .n-menu-item:hover {
+  transform: translateX(2px);
+}
+
+.layout-container .n-submenu-children {
+  background: rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  margin: 2px 0;
+  padding: 4px 0;
+  border-left: 2px solid rgba(99, 102, 241, 0.3);
+}
+
+/* 菜单组标题 */
+.layout-container .n-menu-item-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 12px 16px 6px;
+  opacity: 0.5;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 16px;
+    right: 16px;
+    height: 1px;
+    background: linear-gradient(to right,
+      transparent,
+      rgba(99, 102, 241, 0.2),
+      transparent);
+  }
+}
+
+/* 菜单分割线 */
+.layout-container .n-menu-divider {
+  margin: 8px 16px;
+  height: 1px;
+  background: linear-gradient(to right,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* 加载状态优化 */
+.layout-container .n-menu-item.n-menu-item--loading {
+  &::before {
+    background: linear-gradient(90deg,
+      rgba(99, 102, 241, 0.1) 0%,
+      rgba(139, 92, 246, 0.2) 50%,
+      rgba(99, 102, 241, 0.1) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 禁用状态 */
+.layout-container .n-menu-item.n-menu-item--disabled {
+  opacity: 0.4;
+  filter: grayscale(0.5);
+  cursor: not-allowed;
+
+  &::before {
+    background: rgba(255, 255, 255, 0.01);
+  }
+
+  &:hover {
+    transform: none;
+  }
+}
+
+// ==================== ⚡ 页面切换过渡动画 ====================
 
 // 滑动效果
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: all $transition-duration $transition-easing;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-slide-enter-from {
@@ -472,7 +595,7 @@ $transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
 // 淡入效果
 .fade-transform-enter-active,
 .fade-transform-leave-active {
-  transition: all $transition-duration $transition-easing;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-transform-enter-from {
@@ -488,7 +611,7 @@ $transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
 // 缩放效果
 .fade-zoom-enter-active,
 .fade-zoom-leave-active {
-  transition: all $transition-duration $transition-easing;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-zoom-enter-from {
@@ -501,35 +624,39 @@ $transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
   transform: scale(0.8);
 }
 
-// ==================== Fallback ====================
+// ==================== 🎨 布局开发中提示样式 ====================
+
 .layout-coming-soon {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100vh;
   background-color: var(--app-bg-content);
-
-  .coming-soon-content {
-    text-align: center;
-    padding: 40px;
-  }
-
-  .coming-soon-icon {
-    font-size: 64px;
-    margin-bottom: 16px;
-  }
-
-  .coming-soon-title {
-    font-size: 18px;
-    color: var(--app-text-secondary);
-  }
 }
 
-// ==================== 主题辅助 ====================
-.dark-theme {
-  color-scheme: dark;
+.coming-soon-content {
+  text-align: center;
+  max-width: 400px;
+  padding: 40px;
+  border-radius: 12px;
+  background-color: var(--app-bg-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
-.light-theme {
-  color-scheme: light;
+.coming-soon-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.coming-soon-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--app-text-primary);
+}
+
+.coming-soon-desc {
+  font-size: 16px;
+  color: var(--app-text-secondary);
+  line-height: 1.5;
 }

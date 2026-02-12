@@ -1,78 +1,514 @@
 <!--
- * @robot-admin/layout
- *
- * C_TopLayout - 顶部菜单布局骨架
- * 顶部导航栏 + 下方内容区域
- *
- * Slots:
- *   #logo        - Logo/品牌区域（导航栏左侧）
- *   #menu        - 水平菜单区域（导航栏中间）
- *   #header-extra - 导航栏右侧操作区（用户头像、设置等）
- *   #tags-view   - 标签页区域
- *   #default     - 页面内容（自动包含 RouterView + KeepAlive + Transition）
- *   #footer      - 页脚区域
--->
+ * @robot-admin/layout - TopLayout
+ * 顶部导航布局：Logo+品牌 | 水平菜单 | 操作区 → 标签页 → 内容区 → 页脚
+ * DOM 结构和 CSS 类名与主项目原始代码完全一致
+ -->
 <template>
-  <div class="c-top-layout" :class="themeClass">
+  <div class="top-layout-container">
     <!-- 顶部导航栏 -->
-    <header class="c-top-layout__navbar" :style="navbarStyle">
-      <div class="c-top-layout__navbar-left">
-        <slot name="logo" />
-      </div>
-      <div class="c-top-layout__navbar-center">
-        <slot name="menu" />
-      </div>
-      <div class="c-top-layout__navbar-right">
-        <slot name="header-extra" />
-      </div>
-    </header>
-
-    <!-- 标签页 -->
     <div
-      v-if="ctx.showTagsView.value"
-      class="c-top-layout__tags"
-      :style="tagsStyle"
+      class="top-navbar"
+      :class="[isDarkMode ? 'dark-theme' : 'light-theme']"
+    >
+      <!-- 左侧：Logo 和品牌 -->
+      <div class="navbar-left">
+        <slot name="logo">
+          <div class="logo-container">
+            <div class="logo-glow"></div>
+            <video
+              v-if="brand.logoType === 'video'"
+              :src="brand.logoSrc"
+              :width="brand.logoSize || 36"
+              :height="brand.logoSize || 36"
+              autoplay
+              loop
+              muted
+              playsinline
+              class="logo-video"
+            >
+              您的浏览器不支持 video 标签。
+            </video>
+            <img
+              v-else
+              :src="brand.logoSrc"
+              :width="brand.logoSize || 36"
+              :height="brand.logoSize || 36"
+              class="logo-video"
+            />
+          </div>
+          <div class="brand-name">
+            <span class="brand-title">{{ brand.name }}</span>
+            <span class="brand-subtitle">{{ brand.subtitle }}</span>
+          </div>
+          <div class="navbar-divider"></div>
+        </slot>
+      </div>
+
+      <!-- 中间：水平菜单 -->
+      <div class="navbar-center">
+        <slot name="menu">
+          <ResponsiveMenu :data="menus" />
+        </slot>
+      </div>
+
+      <!-- 右侧：操作区 -->
+      <slot name="header-extra" />
+    </div>
+
+    <!-- 标签页区域 -->
+    <div
+      v-if="showTagsView"
+      class="tags-view-container"
+      :style="{ height: `${tagsViewHeight}px` }"
     >
       <slot name="tags-view" />
     </div>
 
-    <!-- 内容区 -->
-    <main class="c-top-layout__content">
-      <RouterView v-slot="{ Component, route }">
-        <Transition :name="ctx.transitionName.value" mode="out-in">
-          <KeepAlive :include="cachedViews" :max="maxCacheCount">
-            <component :is="Component" :key="route.path" />
-          </KeepAlive>
-        </Transition>
-      </RouterView>
-    </main>
+    <!-- 主内容区域 -->
+    <NLayout>
+      <NLayoutContent class="main-content">
+        <div class="page-content">
+          <RouterView v-slot="{ Component, route }">
+            <Transition :name="transitionName" mode="out-in">
+              <KeepAlive :include="cachedViews" :max="maxCacheCount">
+                <component :is="Component" :key="route.path" />
+              </KeepAlive>
+            </Transition>
+          </RouterView>
+        </div>
+      </NLayoutContent>
 
-    <!-- 页脚 -->
-    <footer v-if="ctx.showFooter.value" class="c-top-layout__footer">
-      <slot name="footer" />
-    </footer>
+      <!-- 页脚 -->
+      <template v-if="showFooter">
+        <slot name="footer" />
+      </template>
+    </NLayout>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useLayoutContext } from "../../composables/useLayoutContext";
+import { NLayout, NLayoutContent } from "naive-ui";
+import {
+  useLayoutContext,
+  DEFAULT_BRAND_CONFIG,
+} from "../../composables/useLayoutContext";
 import { useLayoutCache } from "../../composables/useLayoutCache";
+import ResponsiveMenu from "../ResponsiveMenu/index.vue";
 
 defineOptions({ name: "TopLayout" });
 
 const ctx = useLayoutContext();
 const { cachedViews, maxCacheCount } = useLayoutCache();
 
-const themeClass = computed(() =>
-  ctx.isDark.value ? "dark-theme" : "light-theme",
-);
-
-const navbarStyle = computed(() => ({
-  height: `${ctx.headerHeight.value}px`,
-}));
-
-const tagsStyle = computed(() => ({
-  height: `${ctx.tagsViewHeight.value}px`,
-}));
+const isDarkMode = ctx.isDark;
+const menus = computed(() => ctx.menus.value);
+const showTagsView = computed(() => ctx.showTagsView.value);
+const tagsViewHeight = computed(() => ctx.tagsViewHeight.value);
+const showFooter = computed(() => ctx.showFooter.value);
+const transitionName = computed(() => ctx.transitionName.value);
+const brand = { ...DEFAULT_BRAND_CONFIG, ...ctx.brand };
 </script>
+
+
+
+<style lang="scss">
+// ==================== 顶部导航布局样式 ====================
+
+.top-layout-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--app-bg-body);
+}
+
+// ==================== 顶部导航栏 ====================
+
+.top-navbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.98) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.03),
+    0 1px 2px rgba(0, 0, 0, 0.02);
+  position: relative;
+  z-index: 1000;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(99, 102, 241, 0.2) 50%,
+      transparent
+    );
+  }
+
+  &.dark-theme {
+    background: linear-gradient(
+      135deg,
+      rgba(28, 28, 33, 0.95) 0%,
+      rgba(28, 28, 33, 0.98) 100%
+    );
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.2),
+      0 1px 2px rgba(0, 0, 0, 0.1);
+
+    &::before {
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(99, 102, 241, 0.3) 50%,
+        transparent
+      );
+    }
+  }
+}
+
+// ==================== 左侧区域 ====================
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.logo-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.logo-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.25) 0%,
+    transparent 70%
+  );
+  border-radius: 8px;
+  filter: blur(8px);
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.logo-video {
+  position: relative;
+  z-index: 10;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 12px rgba(99, 102, 241, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    transform: scale(1.05) rotate(2deg);
+    box-shadow:
+      0 6px 16px rgba(99, 102, 241, 0.3),
+      0 3px 6px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.brand-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.brand-subtitle {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--app-text-tertiary);
+  letter-spacing: 2px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.navbar-divider {
+  width: 1px;
+  height: 24px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(99, 102, 241, 0.3) 50%,
+    transparent
+  );
+  margin: 0 8px;
+}
+
+// ==================== 中间菜单区域 ====================
+
+.navbar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 24px;
+
+  // 水平菜单样式优化
+  :deep(.n-menu) {
+    background: transparent !important;
+  }
+
+  :deep(.n-menu-item) {
+    margin: 0 4px;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  :deep(.n-menu-item--selected) {
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 3px;
+      background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+      border-radius: 2px 2px 0 0;
+      box-shadow: 0 -2px 8px rgba(99, 102, 241, 0.3);
+    }
+  }
+
+  :deep(.n-menu-item-content__icon) {
+    font-size: 18px !important;
+    margin-right: 8px;
+  }
+
+  :deep(.n-menu-item--selected .n-menu-item-content__icon) {
+    filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
+  }
+
+  // 子菜单样式
+  :deep(.n-submenu) {
+    margin: 0 4px;
+  }
+
+  :deep(.n-submenu-children) {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    margin-top: 8px;
+  }
+}
+
+// ==================== 标签页区域 ====================
+
+.tags-view-container {
+  flex-shrink: 0;
+  background-color: var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border-color);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// ==================== 主内容区域 ====================
+
+.main-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--app-bg-content);
+}
+
+.page-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  // 自定义滚动条
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    transition: background 0.3s;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  .dark-theme &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  }
+}
+
+// ==================== 响应式设计 ====================
+
+@media (max-width: 1200px) {
+  .navbar-center {
+    padding: 0 16px;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-navbar {
+    padding: 0 16px;
+  }
+
+  .navbar-divider {
+    display: none;
+  }
+
+  .action-buttons {
+    gap: 4px;
+  }
+
+  .page-content {
+    padding: 0 16px 16px;
+  }
+}
+
+
+// ==================== 暗色主题优化 ====================
+
+.dark-theme {
+  .navbar-center {
+    :deep(.n-submenu-children) {
+      background: rgba(28, 28, 33, 0.98);
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.3),
+        0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  .brand-subtitle {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .action-btn span {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .action-btn:hover span {
+    color: #8b5cf6;
+  }
+
+
+  .user-dropdown {
+    color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+// ==================== 页面过渡动画 ====================
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.fade-transform-enter-active,
+.fade-transform-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: scale(1.05);
+}
+
+.fade-zoom-enter-active,
+.fade-zoom-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-zoom-enter-from {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.fade-zoom-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+</style>

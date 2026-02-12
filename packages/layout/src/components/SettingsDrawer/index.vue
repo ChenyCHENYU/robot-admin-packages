@@ -649,5 +649,5 @@ const handleImportConfig = () => {
 </script>
 
 <style scoped lang="scss">
-@import "../../styles/settings.scss";
+@use "../../styles/settings.scss" as *;
 </style>

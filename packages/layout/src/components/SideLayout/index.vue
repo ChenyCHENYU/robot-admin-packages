@@ -3,6 +3,7 @@
  *
  * C_SideLayout - 左侧菜单布局骨架
  * 经典的左侧导航 + 右侧内容布局
+ * 使用 Naive UI 的 NLayout/NLayoutSider 保持与主项目样式一致
  *
  * Slots:
  *   #logo    - Logo/品牌区域（侧边栏顶部）
@@ -13,43 +14,29 @@
  *   #footer  - 页脚区域
 -->
 <template>
-  <div class="c-side-layout" :class="themeClass">
-    <!-- 侧边栏 -->
-    <aside
-      class="c-side-layout__sider"
-      :class="{ 'is-collapsed': collapsed }"
-      :style="siderStyle"
+  <NLayout has-sider>
+    <NLayoutSider
+      bordered
+      collapse-mode="width"
+      :collapsed-width="ctx.sidebarCollapsedWidth.value"
+      :width="ctx.sidebarWidth.value"
+      :native-scrollbar="false"
+      :collapsed="collapsed"
+      @update:collapsed="handleCollapsedUpdate"
+      :class="[
+        'layout-sider',
+        'no-horizontal-scroll',
+        ctx.isDark.value ? 'dark-theme' : 'light-theme',
+      ]"
     >
-      <div class="c-side-layout__logo">
-        <slot name="logo" />
-      </div>
-      <div class="c-side-layout__menu">
-        <slot name="menu" />
-      </div>
-    </aside>
+      <slot name="logo" />
+      <slot name="menu" :collapsed="collapsed" />
+    </NLayoutSider>
 
-    <!-- 主区域 -->
-    <div class="c-side-layout__main" :style="mainStyle">
-      <!-- 头部 -->
-      <header
-        v-if="ctx.fixedHeader.value"
-        class="c-side-layout__header"
-        :style="headerStyle"
-      >
-        <slot name="header" />
-      </header>
+    <NLayout>
+      <slot name="header" />
 
-      <!-- 标签页 -->
-      <div
-        v-if="ctx.showTagsView.value"
-        class="c-side-layout__tags"
-        :style="tagsStyle"
-      >
-        <slot name="tags-view" />
-      </div>
-
-      <!-- 内容区 -->
-      <main class="c-side-layout__content">
+      <NLayoutContent class="content-with-header p16px app-content">
         <RouterView v-slot="{ Component, route }">
           <Transition :name="ctx.transitionName.value" mode="out-in">
             <KeepAlive :include="cachedViews" :max="maxCacheCount">
@@ -57,18 +44,16 @@
             </KeepAlive>
           </Transition>
         </RouterView>
-      </main>
+      </NLayoutContent>
 
-      <!-- 页脚 -->
-      <footer v-if="ctx.showFooter.value" class="c-side-layout__footer">
-        <slot name="footer" />
-      </footer>
-    </div>
-  </div>
+      <slot name="footer" />
+    </NLayout>
+  </NLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { NLayout, NLayoutSider, NLayoutContent } from "naive-ui";
 import { useLayoutContext } from "../../composables/useLayoutContext";
 import { useLayoutCache } from "../../composables/useLayoutCache";
 
@@ -100,34 +85,16 @@ watch(
 
 const collapsed = computed(() => _collapsed.value);
 
-const themeClass = computed(() =>
-  ctx.isDark.value ? "dark-theme" : "light-theme",
-);
+const handleCollapsedUpdate = (val: boolean) => {
+  _collapsed.value = val;
+  emit("update:collapsed", val);
+};
 
-const siderStyle = computed(() => ({
-  width: _collapsed.value
-    ? `${ctx.sidebarCollapsedWidth.value}px`
-    : `${ctx.sidebarWidth.value}px`,
-}));
-
-const mainStyle = computed(() => ({
-  marginLeft: _collapsed.value
-    ? `${ctx.sidebarCollapsedWidth.value}px`
-    : `${ctx.sidebarWidth.value}px`,
-}));
-
-const headerStyle = computed(() => ({
-  height: `${ctx.headerHeight.value}px`,
-}));
-
-const tagsStyle = computed(() => ({
-  height: `${ctx.tagsViewHeight.value}px`,
-}));
-
-// 折叠切换，同时通知父组件
+// 折叠切换
 const toggleCollapse = () => {
-  _collapsed.value = !_collapsed.value;
-  emit("update:collapsed", _collapsed.value);
+  const next = !_collapsed.value;
+  _collapsed.value = next;
+  emit("update:collapsed", next);
 };
 
 defineExpose({

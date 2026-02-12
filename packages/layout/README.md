@@ -500,10 +500,10 @@ interface SettingsState {
 
 ```typescript
 // src/composables/useLayoutBridge.ts
-import { computed } from 'vue';
-import { usePermissionStore } from '@/stores/permission';
-import { useThemeStore } from '@robot-admin/theme';
-import { useSettingsStore } from '@robot-admin/layout';
+import { computed } from "vue";
+import { usePermissionStore } from "@/stores/permission";
+import { useThemeStore } from "@robot-admin/theme";
+import { useSettingsStore } from "@robot-admin/layout";
 
 /**
  * 布局桥接适配器
@@ -517,18 +517,18 @@ export function useLayoutBridge() {
   return {
     // 菜单数据
     menus: computed(() => permissionStore.menus),
-    
+
     // 主题状态
     isDark: computed(() => themeStore.isDark),
-    
+
     // 布局配置
     layoutMode: computed(() => settingsStore.layoutMode),
     sidebarCollapsed: computed(() => permissionStore.sidebarCollapsed),
-    
+
     // 尺寸配置
     sidebarWidth: computed(() => settingsStore.sidebarWidth),
     headerHeight: computed(() => settingsStore.headerHeight),
-    
+
     // 可见性配置
     showBreadcrumb: computed(() => settingsStore.showBreadcrumb),
     showTagsView: computed(() => settingsStore.showTagsView),
@@ -587,15 +587,15 @@ export function useLayoutBridge() {
 </template>
 
 <script setup lang="ts">
-import { C_LayoutContainer } from '@robot-admin/layout';
-import { useLayoutBridge } from '@/composables/useLayoutBridge';
-import { useLayoutCache } from '@/composables/useLayoutCache';
-import AppHeader from './components/AppHeader.vue';
-import AppLogo from './components/AppLogo.vue';
-import AppMenu from './components/AppMenu.vue';
-import AppBreadcrumb from './components/AppBreadcrumb.vue';
-import AppTags from './components/AppTags.vue';
-import AppFooter from './components/AppFooter.vue';
+import { C_LayoutContainer } from "@robot-admin/layout";
+import { useLayoutBridge } from "@/composables/useLayoutBridge";
+import { useLayoutCache } from "@/composables/useLayoutCache";
+import AppHeader from "./components/AppHeader.vue";
+import AppLogo from "./components/AppLogo.vue";
+import AppMenu from "./components/AppMenu.vue";
+import AppBreadcrumb from "./components/AppBreadcrumb.vue";
+import AppTags from "./components/AppTags.vue";
+import AppFooter from "./components/AppFooter.vue";
 
 // 桥接业务数据
 const layoutContext = useLayoutBridge();
@@ -609,13 +609,13 @@ const { cacheList, transitionName } = useLayoutCache();
 
 ```typescript
 // src/main.ts
-import { createApp } from 'vue';
-import { createPinia } from 'pinia';
-import { setupLayout } from '@robot-admin/layout';
-import { useThemeStore } from '@robot-admin/theme';
-import '@robot-admin/layout/style.scss';
-import App from './App.vue';
-import router from './router';
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import { setupLayout } from "@robot-admin/layout";
+import { useThemeStore } from "@robot-admin/theme";
+import "@robot-admin/layout/style.scss";
+import App from "./App.vue";
+import router from "./router";
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -633,14 +633,14 @@ setupLayout(app, {
     await themeStore.setMode(mode);
   },
   defaults: {
-    layoutMode: 'side',
-    primaryColor: '#409eff',
+    layoutMode: "side",
+    primaryColor: "#409eff",
     showTagsView: true,
     fixedHeader: true,
   },
 });
 
-app.mount('#app');
+app.mount("#app");
 ```
 
 #### 4. 添加设置入口
@@ -672,17 +672,23 @@ app.mount('#app');
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { NConfigProvider, NMessageProvider, NButton, NIcon, darkTheme } from 'naive-ui';
-import { Settings as SettingsIcon } from '@vicons/tabler';
-import { SettingsDrawer } from '@robot-admin/layout';
-import { useThemeStore } from '@robot-admin/theme';
-import C_Layout from '@/components/global/C_Layout/index.vue';
+import { ref, computed } from "vue";
+import {
+  NConfigProvider,
+  NMessageProvider,
+  NButton,
+  NIcon,
+  darkTheme,
+} from "naive-ui";
+import { Settings as SettingsIcon } from "@vicons/tabler";
+import { SettingsDrawer } from "@robot-admin/layout";
+import { useThemeStore } from "@robot-admin/theme";
+import C_Layout from "@/components/global/C_Layout/index.vue";
 
 const themeStore = useThemeStore();
 const showSettings = ref(false);
 
-const naiveTheme = computed(() => themeStore.isDark ? darkTheme : undefined);
+const naiveTheme = computed(() => (themeStore.isDark ? darkTheme : undefined));
 </script>
 
 <style>
@@ -857,10 +863,10 @@ const handleLayoutChange = (mode: LayoutMode) => {
 
 ```typescript
 // ✅ 推荐：通过 store 切换（响应式）
-settingsStore.layoutMode = 'mix';
+settingsStore.layoutMode = "mix";
 
 // ❌ 不推荐：直接修改 DOM
-document.querySelector('.layout')?.setAttribute('data-layout', 'mix');
+document.querySelector(".layout")?.setAttribute("data-layout", "mix");
 ```
 
 ### 5. 插槽使用建议
@@ -908,7 +914,7 @@ setupLayout(app);
 // 方案一：清除浏览器缓存后刷新页面
 
 // 方案二：手动触发重新计算
-import { nextTick } from 'vue';
+import { nextTick } from "vue";
 
 const switchLayout = async (mode: LayoutMode) => {
   settingsStore.layoutMode = mode;
@@ -925,13 +931,13 @@ const switchLayout = async (mode: LayoutMode) => {
 
 ```vue
 <script setup>
-import { ref } from 'vue';
-import { SettingsDrawer } from '@robot-admin/layout';
+import { ref } from "vue";
+import { SettingsDrawer } from "@robot-admin/layout";
 
 const visible = ref(false);
 
 // ✅ 检查一：v-model:show 是否正确绑定
-console.log('visible:', visible.value);
+console.log("visible:", visible.value);
 
 // ✅ 检查二：NaiveUI ConfigProvider 是否包裹
 // <NConfigProvider>
@@ -957,9 +963,9 @@ console.log('visible:', visible.value);
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { NConfigProvider, darkTheme } from 'naive-ui';
-import { useThemeStore } from '@robot-admin/theme';
+import { computed } from "vue";
+import { NConfigProvider, darkTheme } from "naive-ui";
+import { useThemeStore } from "@robot-admin/theme";
 
 const themeStore = useThemeStore();
 
@@ -980,9 +986,9 @@ const naiveTheme = computed(() => {
 // tsconfig.json
 {
   "compilerOptions": {
-    "moduleResolution": "bundler",  // ✅ 使用 bundler 模式
+    "moduleResolution": "bundler", // ✅ 使用 bundler 模式
     "types": ["@robot-admin/layout"], // ✅ 显式声明类型包
-    "skipLibCheck": true  // 可选：跳过库文件检查
+    "skipLibCheck": true // 可选：跳过库文件检查
   }
 }
 ```
@@ -999,11 +1005,11 @@ const naiveTheme = computed(() => {
 // useLayoutBridge.ts
 export function useLayoutBridge() {
   const permissionStore = usePermissionStore();
-  
+
   return {
     // ❌ 错误：返回了空数组
     menus: computed(() => []),
-    
+
     // ✅ 正确：从 store 获取菜单
     menus: computed(() => permissionStore.menus),
   };
@@ -1025,10 +1031,10 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {
         // ✅ 确保 SCSS 编译正确
-        additionalData: `@use "@robot-admin/layout/style.scss" as *;`
-      }
-    }
-  }
+        additionalData: `@use "@robot-admin/layout/style.scss" as *;`,
+      },
+    },
+  },
 });
 ```
 
@@ -1040,17 +1046,17 @@ export default defineConfig({
 
 ```typescript
 // main.ts - 确保导入了样式文件
-import '@robot-admin/layout/style.scss';  // ✅ SCSS 源文件
+import "@robot-admin/layout/style.scss"; // ✅ SCSS 源文件
 // 或
-import '@robot-admin/layout/dist/index.css';  // ✅ 编译后的 CSS
+import "@robot-admin/layout/dist/index.css"; // ✅ 编译后的 CSS
 ```
 
 ```json
 // vite.config.ts - 确保 CSS 被正确打包
 {
-  build: {
-    cssCodeSplit: true,  // 代码分割
-    assetsInlineLimit: 4096  // 小于 4kb 内联
+  "build": {
+    "cssCodeSplit": true, // 代码分割
+    "assetsInlineLimit": 4096 // 小于 4kb 内联
   }
 }
 ```
@@ -1060,7 +1066,7 @@ import '@robot-admin/layout/dist/index.css';  // ✅ 编译后的 CSS
 **优化方案**：
 
 ```typescript
-import { debounce } from 'lodash-es';
+import { debounce } from "lodash-es";
 
 // ✅ 防抖处理布局切换
 const switchLayout = debounce((mode: LayoutMode) => {
