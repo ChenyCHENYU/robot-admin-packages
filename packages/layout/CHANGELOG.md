@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- 重构目录结构 + 代码优化
+
+  - **目录重构**: 6 种布局骨架迁入 `components/layouts/` 子目录，层次更清晰
+  - **文件分离**: 每个布局的样式从 `<style>` 标签提取到独立的 `index.scss` 文件
+  - **注释统一**: 所有组件注释标准化为 `@robot-admin/layout - ComponentName` 格式
+  - **文档优化**: 重写 README，精简核心内容、添加目录树、API 参考更清晰
+
 All notable changes to this project will be documented in this file.
 
 ## [2.0.2] - 2026-02-11
@@ -15,24 +26,26 @@ All notable changes to this project will be documented in this file.
 - **package.json**:
   - Refined `sideEffects` to `["*.css", "*.scss"]` for better tree-shaking
   - Removed blocking patterns `"*.vue"` and `"src/index.ts"`
-  
 - **Source code**:
+
   - `constants/index.ts`: Removed commented-out code, fixed version from `"1.0.0"` to `"2.0.2"`
   - `types/index.ts`: Removed unimplemented `storageKey` option from `SettingsStoreOptions`
-  - `stores/settings.ts`: 
+  - `stores/settings.ts`:
     - Exported `adjustColor` utility function (was private)
     - Removed redundant `|| false` in collapsed state initialization
-  - `data.ts`: 
+  - `data.ts`:
     - Fixed `COLOR_SWATCHES` duplication (now imports from constants)
     - Renamed `LAYOUT_MODES` to `LAYOUT_MODE_OPTIONS` to avoid naming conflict
 
 - **SettingsDrawer component**:
+
   - Removed unimplemented `storageKey` prop
   - Fixed hardcoded timezone `"XIAn"` → `Intl.DateTimeFormat().resolvedOptions().timeZone`
   - Fixed `handleResetLayout` missing `fixedHeader` and `tagsViewStyle` resets
   - Fixed `handleImportConfig` to use `$patch` instead of `Object.assign` for proper reactivity
 
 - **Styles (`settings.scss`)**:
+
   - Replaced hardcoded `#409EFF` with `var(--primary-color, #409eff)` for theme color support
   - Replaced hardcoded `rgba(32, 128, 240)` shadows with CSS variable fallbacks
 
