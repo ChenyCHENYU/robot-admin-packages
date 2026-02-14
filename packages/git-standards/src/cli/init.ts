@@ -613,6 +613,7 @@ module.exports = {
         'perf', 'test', 'chore', 'revert', 'build', 'deps',
       ],
     ],
+    'scope-empty': [2, 'never'],
     'subject-case': [0],
   },
 }
