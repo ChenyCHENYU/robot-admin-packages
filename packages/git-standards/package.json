@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/git-standards",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "零配置 Git 标准化工具包 - 集成 Commitizen + Commitlint + ESLint + Prettier + Husky",
   "type": "module",
   "keywords": [
