@@ -1,6 +1,6 @@
 # @robot-admin/git-standards
 
-零配置 · 模块化 · Git 工程化标准工具包
+> **v1.0.1** · 零配置 · 模块化 · Git 工程化标准工具包
 
 集成 Commitizen + Commitlint + Husky + ESLint + Prettier + Oxlint + lint-staged，支持按需选配。
 
@@ -236,6 +236,243 @@ module.exports = {
 | `.editorconfig`        |  -   |  ✔   |  ✔   | 编辑器统一配置          |
 | `.prettierrc.js`       |  -   |  -   |  ✔   | 代码格式化配置          |
 
+### 各文件内容详解
+
+#### `.cz-config.js` — Commitizen 交互式提交配置
+
+定义了 `git cz` 交互式提交的类型、消息模板和作用域。
+
+**生成内容**:
+
+```js
+module.exports = {
+  scopes: [], // 默认空，可自定义添加预设 scope
+  allowEmptyScopes: false, // 不允许空 scope
+  allowCustomScopes: true, // 允许自由输入 scope
+
+  types: [
+    { value: "wip", name: "wip:      🚧 开发中" },
+    { value: "feat", name: "feat:     🎯 新功能" },
+    { value: "fix", name: "fix:      🐛 Bug 修复" },
+    { value: "perf", name: "perf:     ⚡️ 性能优化" },
+    { value: "deps", name: "deps:     📦 依赖更新" },
+    { value: "refactor", name: "refactor: ♻️  重构" },
+    { value: "docs", name: "docs:     📚 文档变更" },
+    { value: "test", name: "test:     🔎 测试相关" },
+    { value: "style", name: "style:    💄 代码样式" },
+    { value: "build", name: "build:    🧳 构建/打包" },
+    { value: "chore", name: "chore:    🔧 其他杂项" },
+    { value: "revert", name: "revert:   🔙 回退" },
+  ],
+
+  messages: {
+    type: "请选择提交类型:",
+    customScope: "请输入修改范围(必填，格式如：模块/子模块):",
+    subject: "请简要描述提交(必填，不加句号):",
+    body: "请输入更详细的说明(可选):\n",
+    footer: 'Footer(可选): 例如 "Closes #123" 或 "Release-As: 1.3.1"\n',
+    confirmCommit: "确认提交以上内容？(y/n/e/h)",
+  },
+
+  skipQuestions: ["body"],
+  allowBreakingChanges: ["feat", "fix", "refactor"],
+  breakingPrefix: "BREAKING CHANGE:",
+  subjectLimit: 88,
+};
+```
+
+---
+
+#### `commitlint.config.js` — 提交信息校验规则
+
+校验 `git commit` 消息是否符合约定式提交规范。
+
+**生成内容**:
+
+```js
+module.exports = {
+  extends: ["@commitlint/config-conventional"],
+  rules: {
+    "type-enum": [
+      2,
+      "always",
+      [
+        "wip",
+        "feat",
+        "fix",
+        "perf",
+        "deps",
+        "refactor",
+        "docs",
+        "test",
+        "style",
+        "build",
+        "chore",
+        "revert",
+      ],
+    ],
+    "type-case": [2, "always", "lower-case"],
+    "subject-empty": [2, "never"],
+    "type-empty": [2, "never"],
+    "subject-full-stop": [0, "never"],
+    "header-max-length": [2, "always", 88],
+  },
+};
+```
+
+---
+
+#### `.husky/commit-msg` — 提交信息校验 Hook
+
+Git commit 时自动触发，校验提交信息格式是否合规。
+
+**生成内容**:
+
+```shell
+bunx --no-install commitlint --edit "$1"
+```
+
+> 执行命令因包管理器不同而异（`bunx` / `npx` / `pnpm exec`）
+
+---
+
+#### `.husky/pre-commit` — 代码质量检查 Hook
+
+Git commit 前自动触发，根据启用功能动态生成。
+
+**极简模式**: 无此文件
+
+**标准模式**（ESLint + lint-staged）:
+
+```shell
+bunx lint-staged
+```
+
+**完整模式**（Oxlint + lint-staged）:
+
+```shell
+bunx oxlint --max-warnings 0
+bunx lint-staged
+```
+
+> 文件会自动设置可执行权限（`chmod 755`），确保在 Git Bash / WSL 环境下正常运行。
+
+---
+
+#### `eslint.config.ts` — ESLint Flat Config
+
+根据框架（Vue/React/Vanilla）、TypeScript、JSDoc 选项动态生成。
+
+**Vue 3 + TypeScript 示例**:
+
+```ts
+import pluginVue from "eslint-plugin-vue";
+import vueTsConfigs from "@vue/eslint-config-typescript";
+import skipFormatting from "@vue/eslint-config-prettier/skip-formatting";
+import oxlint from "eslint-plugin-oxlint"; // 完整模式
+import jsdocPlugin from "eslint-plugin-jsdoc"; // 启用 JSDoc 时
+import { defineConfigWithVueTs } from "@vue/eslint-config-typescript";
+
+export default defineConfigWithVueTs(
+  { name: "app/files-to-lint", files: ["**/*.{ts,mts,tsx,vue}"] },
+  { name: "app/files-to-ignore", ignores: ["**/dist/**", "**/coverage/**"] },
+
+  ...oxlint.configs["flat/recommended"], // Oxlint 基础规则
+  pluginVue.configs["flat/essential"], // Vue 规则
+  vueTsConfigs.recommended, // TS 规则
+
+  {
+    rules: {
+      "no-undef": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "vue/multi-word-component-names": ["error", { ignores: ["index"] }],
+      // ... 更多规则
+    },
+  },
+  skipFormatting,
+);
+```
+
+**核心规则覆盖**: 每种框架预设都包含合理的默认规则，支持直接修改。
+
+---
+
+#### `.editorconfig` — 编辑器统一配置
+
+统一团队成员的编辑器缩进、换行等基础格式。
+
+**生成内容**:
+
+```ini
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+```
+
+---
+
+#### `.prettierrc.js` — Prettier 格式化配置
+
+代码自动格式化规则，仅完整模式生成。
+
+**生成内容**:
+
+```js
+module.exports = {
+  singleQuote: true,
+  semi: false,
+  printWidth: 80,
+  trailingComma: "all",
+  arrowParens: "avoid",
+  endOfLine: "auto",
+};
+```
+
+---
+
+### package.json 自动变更
+
+init 同时更新 `package.json` 中的以下字段：
+
+| 字段                | 极简 | 标准 | 完整 | 内容                           |
+| ------------------- | :--: | :--: | :--: | ------------------------------ |
+| `scripts.cz`        |  ✔   |  ✔   |  ✔   | `"git-cz"`                     |
+| `scripts.prepare`   |  ✔   |  ✔   |  ✔   | `"husky"`                      |
+| `scripts.lint`      |  -   |  ✔   |  ✔   | `"eslint . --fix"` 或含 oxlint |
+| `scripts.format`    |  -   |  -   |  ✔   | `"prettier --write src/"`      |
+| `config.commitizen` |  ✔   |  ✔   |  ✔   | cz-customizable 路径           |
+| `lint-staged`       |  -   |  ✔   |  ✔   | 暂存区检查规则                 |
+
+**lint-staged 配置示例**（完整模式）:
+
+```jsonc
+{
+  "lint-staged": {
+    "src/**/*.{js,jsx,ts,tsx,vue}": [
+      "oxlint --max-warnings 0 --deny-warnings",
+      "eslint --fix --no-cache",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": ["prettier --write"]
+  }
+}
+```
+
 ## Git 提交完整流程
 
 ```
@@ -259,32 +496,6 @@ git commit（由 commitizen 触发）
     │
     ▼
 提交成功 ✅
-```
-
-## package.json 变更
-
-init 会自动更新 `package.json`：
-
-```jsonc
-{
-  "scripts": {
-    "cz": "git-cz", // 始终添加
-    "prepare": "husky", // 始终添加
-    "lint": "oxlint ... && eslint ...", // 仅标准/完整模式
-    "format": "prettier --write src/" // 仅完整模式
-  },
-  "config": {
-    "commitizen": { "path": "node_modules/cz-customizable" }
-  },
-  "lint-staged": {
-    // 仅标准/完整模式
-    "src/**/*.{js,jsx,ts,tsx,vue}": [
-      "oxlint --max-warnings 0 --deny-warnings",
-      "eslint --fix --no-cache",
-      "prettier --write"
-    ]
-  }
-}
 ```
 
 ## Doctor 诊断
@@ -317,6 +528,88 @@ node node_modules/@robot-admin/git-standards/bin/robot-standards.js doctor
   未启用的功能
 
   ○ EditorConfig
+```
+
+## 故障排除 (Troubleshooting)
+
+### Husky Hooks 未执行
+
+**问题现象**: 提交代码时没有触发 lint 检查，直接提交成功
+
+**可能原因**: Git Bash / WSL 环境下，hook 文件缺少执行权限
+
+**解决方案**:
+
+```bash
+# 检查 hook 文件权限
+ls -la .husky/pre-commit .husky/commit-msg
+
+# 如果没有 x 权限（应该显示 -rwxr-xr-x 而非 -rw-r--r--），执行：
+chmod +x .husky/pre-commit .husky/commit-msg
+
+# 验证修复
+ls -la .husky/
+```
+
+**预防措施**: 初始化后立即检查权限
+
+```bash
+# 在 init 完成后执行
+chmod +x .husky/*
+```
+
+### Commitizen 提示 "git-cz command not found"
+
+**解决方案**:
+
+```bash
+# 方式一：使用 npm scripts（推荐）
+npm run cz
+bun run cz
+
+# 方式二：全局安装
+npm install -g commitizen
+```
+
+### lint-staged 报错 "Cannot find module"
+
+**原因**: 依赖安装不完整
+
+**解决方案**:
+
+```bash
+# 重新安装依赖
+rm -rf node_modules
+npm install
+
+# 或使用 doctor 检查缺失的依赖
+node node_modules/@robot-admin/git-standards/bin/robot-standards.js doctor
+```
+
+### ESLint Flat Config 不生效
+
+**原因**: 项目中同时存在旧版 `.eslintrc.*` 文件
+
+**解决方案**:
+
+```bash
+# 删除旧配置文件（保留 eslint.config.ts）
+rm .eslintrc.js .eslintrc.json .eslintrc.yml
+```
+
+### Windows 下 Husky 不工作
+
+**原因**: Git 配置的 core.hooksPath 可能被覆盖
+
+**解决方案**:
+
+```bash
+# 检查 Git 配置
+git config core.hooksPath
+
+# 如果不是 .husky，重置它
+git config --unset core.hooksPath
+npm run prepare  # 重新初始化 husky
 ```
 
 ## License

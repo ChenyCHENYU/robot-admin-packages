@@ -6,7 +6,7 @@
  */
 
 import { resolve } from "node:path";
-import { unlinkSync, existsSync, rmSync } from "node:fs";
+import { unlinkSync, existsSync } from "node:fs";
 import chalk from "chalk";
 import ora from "ora";
 import { execa } from "execa";
@@ -19,6 +19,7 @@ import {
 import { isGitRepository, initGitRepository } from "../utils/git";
 import {
   writeFileContent,
+  writeExecutableFile,
   updatePackageJson,
   readJsonFile,
 } from "../utils/file";
@@ -978,17 +979,22 @@ async function setupHusky(cwd: string, pm: string, features: FeatureSet) {
 
   try {
     const execCmd = getExecCommand(pm as any);
+    // husky init 会执行两件事：
+    // 1. 调用 index.js default export → 创建 .husky/_/ 运行时基础设施 + 设置 core.hooksPath = .husky/_
+    // 2. 创建 .husky/ 目录和默认 pre-commit 脚本
+    //
+    // .husky/_/ 是 Husky v9 的**核心运行时目录**（被 .gitignore 自动排除）：
+    //   - _/h: 调度脚本，负责查找并执行 .husky/<hook-name> 用户脚本
+    //   - _/pre-commit, _/commit-msg 等: 包装脚本，Git 通过 core.hooksPath 实际调用这些
+    //   - 执行链: Git → .husky/_/<hook> → .husky/_/h → .husky/<hook>（用户脚本）
+    //
+    // ⚠️ 切勿删除 .husky/_/ 目录！它不是旧版遗留物，而是 hook 执行的必要基础设施。
+    //    该目录由 prepare 脚本（husky）在每次 install 后自动重建。
     await execa(execCmd, ["husky", "init"], { cwd, stdio: "pipe" });
-
-    // ── 清理 husky v4 遗留的 _ 目录 ──
-    const legacyDir = resolve(cwd, ".husky/_");
-    if (existsSync(legacyDir)) {
-      rmSync(legacyDir, { recursive: true, force: true });
-    }
 
     // ── commit-msg hook（始终创建）──
     const commitMsg = `${execCmd} --no-install commitlint --edit "$1"\n`;
-    await writeFileContent(resolve(cwd, ".husky/commit-msg"), commitMsg);
+    await writeExecutableFile(resolve(cwd, ".husky/commit-msg"), commitMsg);
 
     const hooks: string[] = ["commit-msg"];
 
@@ -1006,7 +1012,7 @@ async function setupHusky(cwd: string, pm: string, features: FeatureSet) {
       } else if (features.eslint) {
         cmds.push(`${execCmd} eslint . --fix`);
       }
-      await writeFileContent(
+      await writeExecutableFile(
         resolve(cwd, ".husky/pre-commit"),
         cmds.join("\n") + "\n",
       );

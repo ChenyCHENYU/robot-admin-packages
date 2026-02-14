@@ -5,7 +5,7 @@
  * Copyright (c) 2026 by CHENY, All Rights Reserved.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, chmodSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 
@@ -35,6 +35,22 @@ export async function writeFileContent(
     await mkdir(dir, { recursive: true });
   }
   await writeFile(filePath, content, "utf-8");
+}
+
+/**
+ * 写入可执行文件（自动设置 chmod 755 执行权限）
+ * 用于 Husky Hook 等需要执行权限的文件
+ */
+export async function writeExecutableFile(
+  filePath: string,
+  content: string,
+): Promise<void> {
+  await writeFileContent(filePath, content);
+  try {
+    chmodSync(filePath, 0o755);
+  } catch {
+    // Windows 环境下 chmod 可能不生效，忽略错误
+  }
 }
 
 /**
