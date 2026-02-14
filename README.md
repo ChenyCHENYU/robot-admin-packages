@@ -16,6 +16,7 @@
 | [@robot-admin/theme](./packages/theme)                 | ![npm](https://img.shields.io/npm/v/@robot-admin/theme)         | 主题切换管理系统（亮色/暗色/跟随系统）               | [npm](https://www.npmjs.com/package/@robot-admin/theme)         |
 | [@robot-admin/request-core](./packages/request-core)   | ![npm](https://img.shields.io/npm/v/@robot-admin/request-core)  | Axios 封装 + 7 插件 + CRUD Composables               | [npm](https://www.npmjs.com/package/@robot-admin/request-core)  |
 | [@robot-admin/form-validate](./packages/form-validate) | ![npm](https://img.shields.io/npm/v/@robot-admin/form-validate) | 企业级表单验证规则库（专为 Naive UI 设计）           | [npm](https://www.npmjs.com/package/@robot-admin/form-validate) |
+| [@robot-admin/git-standards](./packages/git-standards) | ![npm](https://img.shields.io/npm/v/@robot-admin/git-standards) | 零配置 Git 工程化标准工具包（CLI + 4 预设模式）      | [npm](https://www.npmjs.com/package/@robot-admin/git-standards) |
 
 ---
 
@@ -64,7 +65,18 @@ robot-admin-packages/                  # 【容器项目，不发布】
 │   │   └── README.md
 │   │
 │   └── form-validate/                 # ✅ 表单验证规则库
+│   │   ├── src/
+│   │   ├── dist/
+│   │   ├── package.json
+│   │   ├── tsup.config.ts
+│   │   └── README.md
+│   │
+│   └── git-standards/                 # ✅ Git 工程化标准工具包
 │       ├── src/
+│       │   ├── cli/                   #   CLI 命令（init / doctor）
+│       │   ├── configs/               #   lint-staged 配置生成
+│       │   └── utils/                 #   工具函数
+│       ├── bin/                       #   CLI 入口
 │       ├── dist/
 │       ├── package.json
 │       ├── tsup.config.ts

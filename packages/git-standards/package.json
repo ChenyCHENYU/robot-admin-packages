@@ -1,0 +1,71 @@
+{
+  "name": "@robot-admin/git-standards",
+  "version": "1.0.0",
+  "description": "零配置 Git 标准化工具包 - 集成 Commitizen + Commitlint + ESLint + Prettier + Husky",
+  "type": "module",
+  "keywords": [
+    "git",
+    "commit",
+    "commitizen",
+    "commitlint",
+    "eslint",
+    "prettier",
+    "husky",
+    "lint-staged",
+    "standards",
+    "robot-admin"
+  ],
+  "author": "ChenYu <ycyplus@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "directory": "packages/git-standards"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "robot-standards": "./bin/robot-standards.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --fix",
+    "test": "vitest",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@inquirer/prompts": "^7.3.2",
+    "chalk": "^5.4.1",
+    "commander": "^12.1.0",
+    "commitizen": "^4.3.1",
+    "cz-customizable": "^7.2.1",
+    "execa": "^9.5.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "ora": "^8.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "tsup": "^8.3.5",
+    "typescript": "^5.8.0",
+    "vitest": "^2.1.8"
+  }
+}
