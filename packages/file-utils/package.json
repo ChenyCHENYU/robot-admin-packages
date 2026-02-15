@@ -1,0 +1,59 @@
+{
+  "name": "@robot-admin/file-utils",
+  "version": "1.0.0",
+  "description": "文件处理工具集 - Excel/下载/压缩/CSV/JSON/XML/图片处理/大文件分片",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "jszip": "^3.10.1",
+    "file-saver": "^2.0.5"
+  },
+  "peerDependencies": {
+    "vue": ">=3.3.0"
+  },
+  "devDependencies": {
+    "@types/file-saver": "^2.0.7"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "keywords": [
+    "vue3",
+    "excel",
+    "download",
+    "jszip",
+    "file-utils",
+    "csv",
+    "image",
+    "chunk-upload",
+    "file-saver",
+    "xlsx"
+  ],
+  "author": "ChenYu <ycyplus@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChenyCHENYU/robot-admin-packages.git",
+    "directory": "packages/file-utils"
+  }
+}

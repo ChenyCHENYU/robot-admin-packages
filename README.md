@@ -15,6 +15,7 @@
 | [@robot-admin/layout](./packages/layout)               | ![npm](https://img.shields.io/npm/v/@robot-admin/layout)        | 布局和设置管理系统（6 种布局 + 智能容器 + 主题预设） | [npm](https://www.npmjs.com/package/@robot-admin/layout)        |
 | [@robot-admin/theme](./packages/theme)                 | ![npm](https://img.shields.io/npm/v/@robot-admin/theme)         | 主题切换管理系统（亮色/暗色/跟随系统）               | [npm](https://www.npmjs.com/package/@robot-admin/theme)         |
 | [@robot-admin/directives](./packages/directives)       | ![npm](https://img.shields.io/npm/v/@robot-admin/directives)    | Vue3 自定义指令集合（7 个常用指令 + 零依赖）         | [npm](https://www.npmjs.com/package/@robot-admin/directives)    |
+| [@robot-admin/file-utils](./packages/file-utils)       | ![npm](https://img.shields.io/npm/v/@robot-admin/file-utils)    | 文件处理工具集（Excel/下载/压缩/CSV/图片/分片）      | [npm](https://www.npmjs.com/package/@robot-admin/file-utils)    |
 | [@robot-admin/request-core](./packages/request-core)   | ![npm](https://img.shields.io/npm/v/@robot-admin/request-core)  | Axios 封装 + 7 插件 + CRUD Composables               | [npm](https://www.npmjs.com/package/@robot-admin/request-core)  |
 | [@robot-admin/form-validate](./packages/form-validate) | ![npm](https://img.shields.io/npm/v/@robot-admin/form-validate) | 企业级表单验证规则库（专为 Naive UI 设计）           | [npm](https://www.npmjs.com/package/@robot-admin/form-validate) |
 | [@robot-admin/git-standards](./packages/git-standards) | ![npm](https://img.shields.io/npm/v/@robot-admin/git-standards) | 零配置 Git 工程化标准工具包（CLI + 4 预设模式）      | [npm](https://www.npmjs.com/package/@robot-admin/git-standards) |
@@ -67,6 +68,22 @@ robot-admin-packages/                  # 【容器项目，不发布】
 │   │
 │   └── form-validate/                 # ✅ 表单验证规则库
 │   │   ├── src/
+│   │   ├── dist/
+│   │   ├── package.json
+│   │   ├── tsup.config.ts
+│   │   └── README.md
+│   │
+│   ├── file-utils/                    # ✅ 文件处理工具集
+│   │   ├── src/
+│   │   │   ├── excel/                 #   Excel 读写（基于 xlsx）
+│   │   │   ├── download/             #   通用文件下载（20+ 格式）
+│   │   │   ├── zip/                   #   文件压缩（基于 jszip）
+│   │   │   ├── csv/                   #   CSV 解析/生成
+│   │   │   ├── file/                  #   Base64/JSON/XML 处理
+│   │   │   ├── image/                 #   图片压缩/裁剪/格式转换
+│   │   │   ├── chunk/                 #   大文件分片上传/下载
+│   │   │   ├── config.ts              #   全局配置（解耦 UI 框架）
+│   │   │   └── types.ts               #   公共类型
 │   │   ├── dist/
 │   │   ├── package.json
 │   │   ├── tsup.config.ts
