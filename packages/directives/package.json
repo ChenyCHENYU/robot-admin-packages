@@ -1,0 +1,55 @@
+{
+  "name": "@robot-admin/directives",
+  "version": "1.0.0",
+  "description": "Vue3 自定义指令集合 - 复制、防抖、节流、拖拽、长按、权限、水印",
+  "keywords": [
+    "vue3",
+    "directives",
+    "typescript",
+    "copy",
+    "debounce",
+    "throttle",
+    "drag",
+    "longpress",
+    "permission",
+    "watermark"
+  ],
+  "author": "ChenYu <ycyplus@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "directory": "packages/directives"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "prepublishOnly": "bun run build"
+  },
+  "peerDependencies": {
+    "vue": ">=3.3.0"
+  },
+  "devDependencies": {
+    "vue": "^3.5.13",
+    "typescript": "^5.8.0",
+    "tsup": "^8.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
