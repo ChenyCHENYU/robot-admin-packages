@@ -13,6 +13,10 @@ import drag from "./directives/drag";
 import longpress from "./directives/longpress";
 import permission from "./directives/permission";
 import watermark from "./directives/watermark";
+import lazy from "./directives/lazy";
+import loading from "./directives/loading";
+import tooltip from "./directives/tooltip";
+import clickOutside from "./directives/click-outside";
 
 // 指令映射表（未来新增指令加这里）
 const directives: Record<string, Directive> = {
@@ -23,6 +27,10 @@ const directives: Record<string, Directive> = {
   longpress,
   permission,
   watermark,
+  lazy,
+  loading,
+  tooltip,
+  "click-outside": clickOutside,
 };
 
 /**

@@ -11,11 +11,11 @@
 
 ## ✨ 特性
 
-- 🚀 **开箱即用** - 一行代码全局注册 7 个常用指令
+- 🚀 **开箱即用** - 一行代码全局注册 11 个常用指令
 - 🎯 **按需引入** - 支持单指令导入，Tree-shaking 友好
 - 💪 **TypeScript** - 完整类型定义和智能提示
 - 🔌 **零依赖** - 仅依赖 Vue 3.3+
-- 📦 **体积小巧** - 打包后 ~30KB (gzip < 10KB)
+- 📦 **体积小巧** - 打包后 ~45KB (gzip < 14KB)
 - 🎨 **灵活配置** - 简单/高级两种用法
 
 ---
@@ -65,6 +65,11 @@ const searchText = ref("");
 const handleSearch = (text: string) => {
   console.log("搜索:", text);
 };
+const isOpen = ref(true);
+const close = () => {
+  isOpen.value = false;
+};
+const loading = ref(false);
 </script>
 
 <template>
@@ -85,6 +90,20 @@ const handleSearch = (text: string) => {
 
     <!-- 水印内容 -->
     <div v-watermark="'机密文件'" style="height: 300px">敏感内容区域</div>
+
+    <!-- 图片懒加载 -->
+    <img v-lazy="'/images/photo.jpg'" />
+
+    <!-- 局部 Loading -->
+    <div v-loading="loading" style="height: 200px">表格内容</div>
+
+    <!-- Tooltip（溢出自动显示） -->
+    <span v-tooltip.ellipsis="'完整文本'" style="width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+      很长的文本内容
+    </span>
+
+    <!-- 点击外部关闭 -->
+    <div v-click-outside="close" v-if="isOpen">下拉框内容</div>
   </div>
 </template>
 ```
@@ -102,6 +121,10 @@ const handleSearch = (text: string) => {
 | **v-longpress**  | 长按触发         | 删除操作二次确认、长按复制       |
 | **v-permission** | 权限控制         | 按钮/功能的权限显隐              |
 | **v-watermark**  | 水印添加         | 敏感内容防截图、版权保护         |
+| **v-lazy**       | 图片懒加载       | 图片列表、长页面图片性能优化     |
+| **v-loading**    | 局部 Loading      | 表格/卡片/区域加载状态遮罩       |
+| **v-tooltip**    | 轻量级 Tooltip   | 文字溢出提示、图标说明           |
+| **v-click-outside** | 点击外部区域  | 下拉框/Popover 关闭、模态框关闭  |
 
 ---
 
@@ -377,7 +400,213 @@ const handleLongPress = () => {
 
 ---
 
-## � 最佳实践
+### v-lazy - 图片懒加载指令
+
+基于 IntersectionObserver，元素进入可视区域时才加载图片，支持占位图和错误兜底。
+
+**基础用法**
+
+```vue
+<!-- 图片懒加载 -->
+<img v-lazy="imageUrl" />
+
+<!-- 背景图懒加载 -->
+<div v-lazy:background="bannerUrl" />
+```
+
+**高级配置**
+
+```vue
+<img
+  v-lazy="{
+    src: imageUrl,
+    loading: '/placeholder.svg',
+    error: '/fallback.png',
+    rootMargin: '300px 0px',
+  }"
+/>
+```
+
+**参数说明**
+
+| 参数         | 类型     | 默认值      | 说明                        |
+| ------------ | -------- | ----------- | --------------------------- |
+| `src`        | `string` | -           | 图片源地址                  |
+| `loading`    | `string` | 透明 SVG    | 加载中占位图                |
+| `error`      | `string` | 透明 SVG    | 加载失败兜底图              |
+| `rootMargin` | `string` | `200px 0px` | 预加载偏移量                |
+| `threshold`  | `number` | `0`         | 可见面积阈值 0-1            |
+
+**CSS 类名**
+
+| 类名             | 说明          |
+| ---------------- | ------------- |
+| `.v-lazy-loading` | 加载中        |
+| `.v-lazy-loaded`  | 加载完成      |
+| `.v-lazy-error`   | 加载失败      |
+
+---
+
+### v-loading - 局部 Loading 指令
+
+Element Plus 风格的局部加载遮罩，支持自定义文本、最小展示时间和全屏模式。
+
+**基础用法**
+
+```vue
+<!-- 布尔值控制 -->
+<div v-loading="isLoading">
+  <table>...</table>
+</div>
+```
+
+**高级配置**
+
+```vue
+<div
+  v-loading="{
+    value: tableLoading,
+    text: '数据加载中...',
+    background: 'rgba(0, 0, 0, 0.5)',
+    spinnerColor: '#36ad6a',
+    spinnerSize: 40,
+    minDuration: 500,
+  }"
+>
+  内容区域
+</div>
+
+<!-- 全屏 loading -->
+<div v-loading="{ value: globalLoading, fullscreen: true }">
+  页面内容
+</div>
+```
+
+**参数说明**
+
+| 参数           | 类型      | 默认值                     | 说明                       |
+| -------------- | --------- | -------------------------- | -------------------------- |
+| `value`        | `boolean` | `false`                    | 是否显示 loading           |
+| `text`         | `string`  | -                          | 加载提示文本               |
+| `background`   | `string`  | `rgba(255,255,255,0.7)`    | 遮罩背景色                 |
+| `spinnerColor` | `string`  | `#409eff`                  | Spinner 颜色               |
+| `spinnerSize`  | `number`  | `32`                       | Spinner 大小（px）         |
+| `minDuration`  | `number`  | `0`                        | 最小展示时间（ms，防闪烁） |
+| `fullscreen`   | `boolean` | `false`                    | 是否全屏模式               |
+
+---
+
+### v-tooltip - 轻量级 Tooltip 指令
+
+纯 DOM 实现的 tooltip，不依赖组件，支持文字溢出自动触发和方向修饰符。
+
+**基础用法**
+
+```vue
+<!-- 基础提示 -->
+<span v-tooltip="'这是提示文本'">悬停查看</span>
+
+<!-- 指定方向 -->
+<span v-tooltip.bottom="'底部提示'">文字</span>
+<span v-tooltip.left="'左侧提示'">文字</span>
+```
+
+**文字溢出自动触发**
+
+```vue
+<!-- 仅当文字被 ellipsis 截断时才显示 tooltip -->
+<span
+  v-tooltip.ellipsis="'这是一段很长很长的完整文本内容'"
+  style="width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+>
+  这是一段很长很长的完整文本内容
+</span>
+```
+
+**高级配置**
+
+```vue
+<span
+  v-tooltip="{
+    content: '提示内容',
+    placement: 'right',
+    showDelay: 300,
+    hideDelay: 200,
+  }"
+>
+  悬停查看
+</span>
+```
+
+**参数说明**
+
+| 参数        | 类型                                 | 默认值  | 说明                            |
+| ----------- | ------------------------------------ | ------- | ------------------------------- |
+| `content`   | `string`                             | -       | 提示文本内容                    |
+| `placement` | `'top'\|'bottom'\|'left'\|'right'`   | `'top'` | 弹出方向（也可用修饰符指定）    |
+| `showDelay` | `number`                             | `200`   | 显示延迟（ms）                  |
+| `hideDelay` | `number`                             | `100`   | 隐藏延迟（ms）                  |
+| `ellipsis`  | `boolean`                            | `false` | 仅文字溢出时显示（也可用修饰符）|
+| `disabled`  | `boolean`                            | `false` | 是否禁用                        |
+
+**修饰符**
+
+| 修饰符      | 说明                          |
+| ----------- | ----------------------------- |
+| `.top`      | 顶部弹出（默认）             |
+| `.bottom`   | 底部弹出                     |
+| `.left`     | 左侧弹出                     |
+| `.right`    | 右侧弹出                     |
+| `.ellipsis` | 仅文字溢出时显示             |
+
+---
+
+### v-click-outside - 点击外部区域指令
+
+监听元素外部的点击事件，适用于关闭下拉框、Popover、模态框等场景。
+
+**基础用法**
+
+```vue
+<script setup>
+const isOpen = ref(true)
+const handleClose = () => { isOpen.value = false }
+</script>
+
+<div v-click-outside="handleClose" v-if="isOpen">
+  下拉框内容
+</div>
+```
+
+**带条件控制**
+
+```vue
+<div v-click-outside="{ handler: close, enabled: isOpen }">
+  仅在打开时监听外部点击
+</div>
+```
+
+**排除元素**
+
+```vue
+<!-- 点击 .trigger-btn 不会触发关闭 -->
+<button class="trigger-btn" @click="toggle">切换</button>
+<div v-click-outside="{ handler: close, exclude: ['.trigger-btn'] }">
+  内容区域
+</div>
+```
+
+**参数说明**
+
+| 参数      | 类型                                   | 默认值 | 说明                              |
+| --------- | -------------------------------------- | ------ | --------------------------------- |
+| `handler` | `(event: MouseEvent\|TouchEvent)=>void`| -      | 点击外部时的回调函数              |
+| `enabled` | `boolean`                              | `true` | 是否启用监听                      |
+| `exclude` | `string[]`                             | -      | 排除的元素选择器（点击不触发）    |
+
+---
+
+## 👍 最佳实践
 
 ### 1. 指令组合使用
 
@@ -494,6 +723,14 @@ import type {
   PermissionOptions,
   WatermarkOptions,
   WatermarkBinding,
+  LazyOptions,
+  LazyBinding,
+  LoadingOptions,
+  LoadingBinding,
+  TooltipOptions,
+  TooltipBinding,
+  ClickOutsideOptions,
+  ClickOutsideBinding,
 } from "@robot-admin/directives";
 
 // 示例：类型化配置
@@ -625,17 +862,13 @@ bun run build
 
 ### v1.x（当前版本）
 
-- ✅ 7 个核心指令（copy / debounce / throttle / drag / longpress / permission / watermark）
+- ✅ 11 个核心指令（copy / debounce / throttle / drag / longpress / permission / watermark / lazy / loading / tooltip / click-outside）
 - ✅ 完整 TypeScript 支持
 - ✅ 零依赖设计
 
 ### v2.0（规划中）
 
-- [ ] **v-lazy** - 图片懒加载指令
 - [ ] **v-infinite-scroll** - 无限滚动指令
-- [ ] **v-click-outside** - 点击外部区域触发
-- [ ] **v-tooltip** - 轻量级 tooltip 指令
-- [ ] **v-loading** - 加载状态指令
 - [ ] 支持自定义指令配置（全局默认值）
 - [ ] 提供 Vue 模板类型增强（Volar 插件）
 
@@ -669,6 +902,10 @@ declare module "@vue/runtime-core" {
     vLongpress: (typeof import("@robot-admin/directives"))["vLongpress"];
     vPermission: (typeof import("@robot-admin/directives"))["vPermission"];
     vWatermark: (typeof import("@robot-admin/directives"))["vWatermark"];
+    vLazy: (typeof import("@robot-admin/directives"))["vLazy"];
+    vLoading: (typeof import("@robot-admin/directives"))["vLoading"];
+    vTooltip: (typeof import("@robot-admin/directives"))["vTooltip"];
+    vClickOutside: (typeof import("@robot-admin/directives"))["vClickOutside"];
   }
 }
 ```

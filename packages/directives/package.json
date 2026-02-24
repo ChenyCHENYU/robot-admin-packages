@@ -1,7 +1,7 @@
 {
   "name": "@robot-admin/directives",
-  "version": "1.0.0",
-  "description": "Vue3 自定义指令集合 - 复制、防抖、节流、拖拽、长按、权限、水印",
+  "version": "1.1.0",
+  "description": "Vue3 自定义指令集合 - 复制、防抖、节流、拖拽、长按、权限、水印、懒加载、Loading、Tooltip、点击外部",
   "keywords": [
     "vue3",
     "directives",
@@ -12,7 +12,11 @@
     "drag",
     "longpress",
     "permission",
-    "watermark"
+    "watermark",
+    "lazy",
+    "loading",
+    "tooltip",
+    "click-outside"
   ],
   "author": "ChenYu <ycyplus@gmail.com>",
   "license": "MIT",
