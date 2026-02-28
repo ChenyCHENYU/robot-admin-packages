@@ -547,6 +547,17 @@ async function generateConfigFiles(
 
   const generated: string[] = [];
 
+  // 检测目标项目是否是 ESM（"type": "module"）
+  // ESM 项目中 .js 默认按 ESModule 解析，CJS 语法（module.exports）需要 .cjs 扩展名
+  let isESM = false;
+  try {
+    const pkg = await readJsonFile(resolve(cwd, "package.json"));
+    isESM = pkg.type === "module";
+  } catch {
+    // package.json 不存在或解析失败，默认为 CJS
+  }
+  const jsExt = isESM ? ".cjs" : ".js";
+
   try {
     // ── .cz-config.js（始终生成）──
     const czConfig = `/*
@@ -592,8 +603,8 @@ module.exports = {
   subjectLimit: 88,
 }
 `;
-    await writeFileContent(resolve(cwd, ".cz-config.js"), czConfig);
-    generated.push(".cz-config.js");
+    await writeFileContent(resolve(cwd, `.cz-config${jsExt}`), czConfig);
+    generated.push(`.cz-config${jsExt}`);
 
     // ── commitlint.config.js（始终生成）──
     const commitlintConfig = `/*
@@ -619,10 +630,10 @@ module.exports = {
 }
 `;
     await writeFileContent(
-      resolve(cwd, "commitlint.config.js"),
+      resolve(cwd, `commitlint.config${jsExt}`),
       commitlintConfig,
     );
-    generated.push("commitlint.config.js");
+    generated.push(`commitlint.config${jsExt}`);
 
     // ── .prettierrc.js（仅当 prettier 启用）──
     if (features.prettier) {
@@ -649,8 +660,8 @@ module.exports = {
   singleAttributePerLine: true,
 }
 `;
-      await writeFileContent(resolve(cwd, ".prettierrc.js"), prettierConfig);
-      generated.push(".prettierrc.js");
+      await writeFileContent(resolve(cwd, `.prettierrc${jsExt}`), prettierConfig);
+      generated.push(`.prettierrc${jsExt}`);
     }
 
     // ── eslint.config.ts（仅当 eslint 启用）──
@@ -1072,9 +1083,14 @@ async function addPackageScripts(
     }
 
     // commitizen config（始终添加）
-    const czConfig = {
+    // ESM 项目需要指定 .cjs 配置路径，因为 cz-customizable 默认只查找 .cz-config.js
+    const isESM = packageJson.type === "module";
+    const czConfig: Record<string, any> = {
       commitizen: { path: "node_modules/cz-customizable" },
     };
+    if (isESM) {
+      czConfig["cz-customizable"] = { config: ".cz-config.cjs" };
+    }
 
     const updates: Record<string, any> = { scripts, config: czConfig };
 
