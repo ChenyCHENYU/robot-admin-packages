@@ -73,13 +73,13 @@ export const LAYOUT_MODES: LayoutInfo[] = [
     mode: "mix",
     label: "混合菜单",
     description: "顶部 + 侧边混合布局",
-    icon: "i-mdi:page-layout-header-sidebar-left",
+    icon: "i-mdi:view-dashboard-outline",
   },
   {
     mode: "mix-top",
     label: "顶部混合",
     description: "侧边优先的混合布局",
-    icon: "i-mdi:page-layout-sidebar-left-header",
+    icon: "i-mdi:view-dashboard-variant-outline",
   },
   {
     mode: "reverse-horizontal-mix",
