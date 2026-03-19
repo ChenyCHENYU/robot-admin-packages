@@ -49,7 +49,7 @@ robot-admin-packages/                  # 【容器项目，不发布】
 │   │   │   └── types/                 #   类型定义
 │   │   ├── dist/                      #   构建产物
 │   │   ├── package.json
-│   │   ├── vite.config.ts             #   Vite Library 构建配置
+│   │   ├── vite.config.ts             #   Vite 8 Library 构建配置（Rolldown）
 │   │   └── README.md
 │   │
 │   ├── theme/                         # ✅ 主题切换管理系统

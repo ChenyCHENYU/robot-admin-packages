@@ -18,7 +18,8 @@ export default defineConfig({
       formats: ["es", "cjs"],
       fileName: (format) => `index.${format === "es" ? "js" : "cjs"}`,
     },
-    rollupOptions: {
+    // Vite 8: rollupOptions → rolldownOptions
+    rolldownOptions: {
       external: [
         "vue",
         "vue-router",
