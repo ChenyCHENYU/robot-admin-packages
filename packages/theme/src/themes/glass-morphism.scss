@@ -1,200 +1,171 @@
 /**
- * @robot-admin/theme — Glass Morphism 拟态玻璃
+ * @robot-admin/theme — iOS Refined 克制精致风格 * * 设计哲学：真正的 iOS 质感不靠 blur 堆砌，而是靠 * 1. 纯净背景+精致多层阴影 * 2. 大圆角+充足留白 * 3. 微妙的悬停动效（物理感轻抬）— 仅可点击元素 * 4. 玻璃效果仅用于浮层（Modal / Drawer / Popover）
  *
  * 作用域：[data-design-style="glass-morphism"]
  * 影响范围：主内容区 Naive UI 组件 + 组件库 C_* 组件
  * 不影响：菜单（.n-menu / .n-menu-item）由菜单风格系统独立控制
+ * * 所有 --dt-* 变量均可被消费项目覆盖
  */
 
-/* ===========================================
- * Layer 1: 设计风格 CSS 变量（--dt- 命名空间）
- * =========================================== */
+/* =========================================
+ * Layer 1: CSS 变量（--dt- 命名空间）
+ * ========================================= */
 
 [data-design-style="glass-morphism"] {
-  /* 玻璃效果基础参数 */
-  --dt-blur: 16px;
-  --dt-saturate: 180%;
   --dt-radius: 12px;
   --dt-radius-sm: 8px;
   --dt-radius-lg: 16px;
-
-  /* 卡片 */
-  --dt-card-bg: rgba(255, 255, 255, 0.65);
-  --dt-card-border: rgba(200, 200, 200, 0.35);
+  --dt-body-bg: #f2f2f7;
+    --dt-card-border: rgba(0, 0, 0, 0.06);
   --dt-card-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.06),
-    inset 0 1px 1px rgba(255, 255, 255, 0.6);
-
-  /* 按钮 */
-  --dt-btn-bg: rgba(255, 255, 255, 0.5);
-  --dt-btn-border: rgba(200, 200, 200, 0.3);
-
-  /* 输入框 */
-  --dt-input-bg: rgba(255, 255, 255, 0.45);
-  --dt-input-border: rgba(200, 200, 200, 0.3);
-
-  /* 弹窗 / 抽屉 */
-  --dt-overlay-bg: rgba(255, 255, 255, 0.72);
-  --dt-overlay-border: rgba(200, 200, 200, 0.4);
+    0 0.5px 0 0 rgba(0, 0, 0, 0.04),
+      0 1px 3px 0 rgba(0, 0, 0, 0.04),
+      0 4px 12px 0 rgba(0, 0, 0, 0.03);
+      --dt-card-hover-shadow:
+        0 1px 1px 0 rgba(0, 0, 0, 0.04),
+        0 4px 8px 0 rgba(0, 0, 0, 0.06),
+        0 12px 24px 0 rgba(0, 0, 0, 0.06);
+      --dt-overlay-bg: rgba(255, 255, 255, 0.85);
   --dt-overlay-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.1),
-    inset 0 2px 4px rgba(255, 255, 255, 0.7);
-
-  /* 交互效果 */
-  --dt-hover-lift: translateY(-3px);
-  --dt-hover-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-  --dt-transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    0 24px 80px rgba(0, 0, 0, 0.12),
+      0 0 1px rgba(0, 0, 0, 0.1);
+      --dt-overlay-blur: 20px;
+      --dt-overlay-saturate: 180%;
+      --dt-transition: 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --dt-transition-fast: 0.2s ease;
 }
 
-/* 暗色主题变量覆盖 */
 [data-design-style="glass-morphism"][data-theme="dark"] {
-  --dt-card-bg: rgba(255, 255, 255, 0.08);
-  --dt-card-border: rgba(255, 255, 255, 0.12);
+  --dt-body-bg: #1c1c1e;
+    --dt-card-border: rgba(255, 255, 255, 0.08);
   --dt-card-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.25),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
-
-  --dt-btn-bg: rgba(255, 255, 255, 0.06);
-  --dt-btn-border: rgba(255, 255, 255, 0.1);
-
-  --dt-input-bg: rgba(255, 255, 255, 0.05);
-  --dt-input-border: rgba(255, 255, 255, 0.1);
-
-  --dt-overlay-bg: rgba(40, 40, 40, 0.82);
-  --dt-overlay-border: rgba(255, 255, 255, 0.15);
+    0 0.5px 0 0 rgba(255, 255, 255, 0.05),
+      0 1px 3px 0 rgba(0, 0, 0, 0.2),
+      0 4px 12px 0 rgba(0, 0, 0, 0.15);
+      --dt-card-hover-shadow:
+        0 1px 1px 0 rgba(255, 255, 255, 0.05),
+        0 4px 8px 0 rgba(0, 0, 0, 0.25),
+        0 12px 24px 0 rgba(0, 0, 0, 0.2);
+      --dt-overlay-bg: rgba(44, 44, 46, 0.85);
   --dt-overlay-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.4),
-    inset 0 2px 4px rgba(255, 255, 255, 0.08);
-
-  --dt-hover-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    0 24px 80px rgba(0, 0, 0, 0.4),
+      0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-/* ===========================================
- * Layer 2: Naive UI 组件覆盖
- * 注意：不涉及 .n-menu / .n-menu-item 等菜单类
- * =========================================== */
+/* =========================================
+ * Layer 2: 背景
+ * ========================================= */
 
-[data-design-style="glass-morphism"] {
-
-  /* --- NCard --- */
-  .n-card {
-    --n-color: var(--dt-card-bg) !important;
-    --n-border-color: var(--dt-card-border) !important;
-    --n-border-radius: var(--dt-radius) !important;
-    backdrop-filter: blur(var(--dt-blur)) saturate(var(--dt-saturate));
-    -webkit-backdrop-filter: blur(var(--dt-blur)) saturate(var(--dt-saturate));
-    box-shadow: var(--dt-card-shadow) !important;
-    transition: transform var(--dt-transition),
-                box-shadow var(--dt-transition) !important;
-
-    &:hover {
-      transform: var(--dt-hover-lift);
-      box-shadow: var(--dt-hover-shadow) !important;
-    }
-  }
-
-  /* --- NButton — 仅增强效果，不覆盖品牌色 --- */
-  .n-button {
-    --n-border-radius: var(--dt-radius-sm) !important;
-    transition: transform var(--dt-transition),
-                box-shadow var(--dt-transition) !important;
-
-    &:not(.n-button--disabled):hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-    }
-  }
-
-  .n-button--default-type {
-    --n-color: var(--dt-btn-bg) !important;
-    --n-border: 1px solid var(--dt-btn-border) !important;
-    backdrop-filter: blur(8px) saturate(150%);
-    -webkit-backdrop-filter: blur(8px) saturate(150%);
-  }
-
-  /* --- NModal 内嵌 NCard --- */
-  .n-modal .n-card {
-    --n-color: var(--dt-overlay-bg) !important;
-    --n-border-color: var(--dt-overlay-border) !important;
-    --n-border-radius: var(--dt-radius-lg) !important;
-    backdrop-filter: blur(24px) saturate(200%);
-    -webkit-backdrop-filter: blur(24px) saturate(200%);
-    box-shadow: var(--dt-overlay-shadow) !important;
-
-    &:hover {
-      transform: none;
-    }
-  }
-
-  /* --- NDrawer --- */
-  .n-drawer .n-drawer-body-content-wrapper {
-    backdrop-filter: blur(20px) saturate(var(--dt-saturate));
-    -webkit-backdrop-filter: blur(20px) saturate(var(--dt-saturate));
-  }
-
-  /* --- NInput / NSelect / NDatePicker --- */
-  .n-input {
-    --n-color: var(--dt-input-bg) !important;
-    --n-border: 1px solid var(--dt-input-border) !important;
-    --n-border-radius: var(--dt-radius-sm) !important;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition: border-color var(--dt-transition),
-                box-shadow var(--dt-transition) !important;
-  }
-
-  .n-base-selection {
-    --n-border: 1px solid var(--dt-input-border) !important;
-    --n-border-radius: var(--dt-radius-sm) !important;
-    --n-color: var(--dt-input-bg) !important;
-  }
-
-  /* --- NDataTable --- */
-  .n-data-table {
-    --n-border-color: var(--dt-card-border) !important;
-    --n-border-radius: var(--dt-radius) !important;
-    backdrop-filter: blur(12px) saturate(var(--dt-saturate));
-    -webkit-backdrop-filter: blur(12px) saturate(var(--dt-saturate));
-  }
-
-  /* --- NTag --- */
-  .n-tag {
-    --n-border-radius: 6px !important;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-  }
-
-  /* --- NTabs --- */
-  .n-tabs .n-tab-pane {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
+html[data-design-style="glass-morphism"] body {
+  background-color: var(--dt-body-bg) !important;
 }
 
-/* ===========================================
- * Layer 3: 组件库 C_* 组件增强
- * =========================================== */
+/* =========================================
+ * Layer 3: NCard
+ * ========================================= */
 
-[data-design-style="glass-morphism"] {
-  .c-table-wrapper {
-    backdrop-filter: blur(var(--dt-blur)) saturate(var(--dt-saturate));
-    -webkit-backdrop-filter: blur(var(--dt-blur)) saturate(var(--dt-saturate));
-    border: 1px solid var(--dt-card-border);
-    border-radius: var(--dt-radius);
-    box-shadow: var(--dt-card-shadow);
+[data-design-style="glass-morphism"] .n-card {
+  --n-border-radius: var(--dt-radius) !important;
+  --n-border-color: var(--dt-card-border) !important;
+  box-shadow: var(--dt-card-shadow) !important;
     transition: transform var(--dt-transition),
-                box-shadow var(--dt-transition);
+      box-shadow var(--dt-transition) !important;
+}
 
-    &:hover {
-      transform: var(--dt-hover-lift);
-      box-shadow: var(--dt-hover-shadow);
-    }
+[data-design-style="glass-morphism"] .n-card[style*="cursor: pointer"]:hover,
+[data-design-style="glass-morphism"] .n-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--dt-card-hover-shadow) !important;
+  }
+[data-design-style="glass-morphism"] .n-card-header {
+  border-bottom: 1px solid var(--dt-card-border) !important;
+}
+
+[data-design-style="glass-morphism"][data-theme="dark"] .n-card-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* =========================================
+ * Layer 4: 按钮 / 输入
+ * ========================================= */
+
+[data-design-style="glass-morphism"] .n-button {
+  --n-border-radius: var(--dt-radius-sm) !important;
+  transition: transform var(--dt-transition-fast),
+    box-shadow var(--dt-transition-fast),
+    opacity var(--dt-transition-fast) !important;
+}
+[data-design-style="glass-morphism"] .n-button:not(.n-button--disabled):hover {
+  transform: translateY(-1px);
+}
+
+[data-design-style="glass-morphism"] .n-button:not(.n-button--disabled):active {
+  transform: scale(0.97);
+}
+
+[data-design-style="glass-morphism"] .n-input {
+  --n-border-radius: var(--dt-radius-sm) !important;
+}
+
+[data-design-style="glass-morphism"] .n-base-selection {
+  --n-border-radius: var(--dt-radius-sm) !important;
+}
+
+[data-design-style="glass-morphism"] .n-data-table {
+  --n-border-radius: var(--dt-radius) !important;
+}
+
+[data-design-style="glass-morphism"] .n-tag {
+  --n-border-radius: 6px !important;
+}
+
+/* =========================================
+ * Layer 5: 浮层 — 仅此处使用 blur
+ * ========================================= */
+
+[data-design-style="glass-morphism"] .n-modal .n-card {
+  backdrop-filter: blur(var(--dt-overlay-blur)) saturate(var(--dt-overlay-saturate));
+  -webkit-backdrop-filter: blur(var(--dt-overlay-blur)) saturate(var(--dt-overlay-saturate));
+  --n-color: var(--dt-overlay-bg) !important;
+  --n-border-radius: var(--dt-radius-lg) !important;
+  box-shadow: var(--dt-overlay-shadow) !important;
+}
+
+[data-design-style="glass-morphism"] .n-modal .n-card:hover {
+  transform: none;
+}
+
+[data-design-style="glass-morphism"] .n-drawer .n-drawer-body-content-wrapper {
+  backdrop-filter: blur(var(--dt-overlay-blur)) saturate(var(--dt-overlay-saturate));
+  -webkit-backdrop-filter: blur(var(--dt-overlay-blur)) saturate(var(--dt-overlay-saturate));
+}
+
+[data-design-style="glass-morphism"] .n-popover:not(.n-popover--raw) {
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-radius: var(--dt-radius);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 0 1px rgba(0, 0, 0, 0.08) !important;
+}
+[data-design-style="glass-morphism"][data-theme="dark"] .n-popover:not(.n-popover--raw) {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* =========================================
+ * Layer 6: C_* 组件
+ * ========================================= */
+
+[data-design-style="glass-morphism"] .c-table-wrapper {
+  border: 1px solid var(--dt-card-border);
+  border-radius: var(--dt-radius);
+  box-shadow: var(--dt-card-shadow);
+  transition: box-shadow var(--dt-transition);
   }
 
-  .c-action-bar {
-    backdrop-filter: blur(var(--dt-blur)) saturate(var(--dt-saturate));
-    -webkit-backdrop-filter: blur(var(--dt-blur)) saturate(var(--dt-saturate));
-    border: 1px solid var(--dt-card-border);
-    border-radius: var(--dt-radius-sm);
-  }
+[data-design-style="glass-morphism"] .c-action-bar {
+  border: 1px solid var(--dt-card-border);
+  border-radius: var(--dt-radius-sm);
 }
