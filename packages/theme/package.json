@@ -1,12 +1,14 @@
 {
   "name": "@robot-admin/theme",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Theme switching and management system for Robot Admin",
   "type": "module",
   "keywords": [
     "vue",
     "theme",
     "dark-mode",
+    "design-style",
+    "glassmorphism",
     "pinia",
     "view-transition"
   ],
@@ -25,10 +27,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./styles/glass-morphism.css": "./dist/styles/glass-morphism.css",
+    "./styles/corporate-minimal.css": "./dist/styles/corporate-minimal.css",
+    "./styles/dark-tech.css": "./dist/styles/dark-tech.css"
   },
   "files": [
     "dist",
+    "src/themes",
     "README.md"
   ],
   "publishConfig": {
@@ -37,7 +43,9 @@
   },
   "scripts": {
     "dev": "tsup --watch",
-    "build": "tsup",
+    "build": "tsup && bun run build:styles",
+    "build:ts": "tsup",
+    "build:styles": "sass src/themes:dist/styles --style=compressed --no-source-map",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
     "prepublishOnly": "bun run build"
@@ -51,6 +59,7 @@
     "@types/node": "^22.13.9",
     "naive-ui": "^2.41.0",
     "pinia": "^3.0.1",
+    "sass": "^1.86.0",
     "tsup": "^8.3.5",
     "typescript": "~5.8.0",
     "vue": "^3.5.13"

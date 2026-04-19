@@ -1,0 +1,124 @@
+/**
+ * @robot-admin/theme — Corporate Minimal 企业简约
+ *
+ * 作用域：[data-design-style="corporate-minimal"]
+ * 影响范围：主内容区 Naive UI 组件 + 组件库 C_* 组件
+ * 不影响：菜单（.n-menu / .n-menu-item）由菜单风格系统独立控制
+ */
+
+/* ===========================================
+ * Layer 1: 设计风格 CSS 变量（--dt- 命名空间）
+ * =========================================== */
+
+[data-design-style="corporate-minimal"] {
+  /* 基础参数 */
+  --dt-radius: 8px;
+  --dt-radius-sm: 6px;
+  --dt-radius-lg: 10px;
+
+  /* 卡片 */
+  --dt-card-bg: var(--app-bg-content, #ffffff);
+  --dt-card-border: var(--app-border-default, #e5e7eb);
+  --dt-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  /* 按钮 */
+  --dt-btn-border: var(--app-border-default, #e5e7eb);
+
+  /* 输入框 */
+  --dt-input-border: var(--app-border-default, #e5e7eb);
+
+  /* 弹窗 / 抽屉 */
+  --dt-overlay-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  /* 交互效果 — 克制，不浮起 */
+  --dt-hover-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --dt-transition: 0.2s ease;
+}
+
+/* 暗色主题变量覆盖 */
+[data-design-style="corporate-minimal"][data-theme="dark"] {
+  --dt-card-bg: var(--app-bg-content, #1c1c1c);
+  --dt-card-border: var(--app-border-default, rgba(255, 255, 255, 0.15));
+  --dt-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+
+  --dt-btn-border: var(--app-border-default, rgba(255, 255, 255, 0.15));
+
+  --dt-input-border: var(--app-border-default, rgba(255, 255, 255, 0.15));
+
+  --dt-overlay-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+
+  --dt-hover-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ===========================================
+ * Layer 2: Naive UI 组件覆盖
+ * =========================================== */
+
+[data-design-style="corporate-minimal"] {
+
+  /* --- NCard --- */
+  .n-card {
+    --n-border-radius: var(--dt-radius) !important;
+    box-shadow: var(--dt-card-shadow) !important;
+    transition: border-color var(--dt-transition),
+                box-shadow var(--dt-transition) !important;
+
+    &:hover {
+      box-shadow: var(--dt-hover-shadow) !important;
+    }
+  }
+
+  /* --- NButton --- */
+  .n-button {
+    --n-border-radius: var(--dt-radius-sm) !important;
+    transition: all var(--dt-transition) !important;
+  }
+
+  /* --- NModal 内嵌 NCard --- */
+  .n-modal .n-card {
+    --n-border-radius: var(--dt-radius-lg) !important;
+    box-shadow: var(--dt-overlay-shadow) !important;
+  }
+
+  /* --- NInput --- */
+  .n-input {
+    --n-border-radius: var(--dt-radius-sm) !important;
+    transition: border-color var(--dt-transition) !important;
+  }
+
+  .n-base-selection {
+    --n-border-radius: var(--dt-radius-sm) !important;
+  }
+
+  /* --- NDataTable --- */
+  .n-data-table {
+    --n-border-radius: var(--dt-radius) !important;
+  }
+
+  /* --- NTag --- */
+  .n-tag {
+    --n-border-radius: var(--dt-radius-sm) !important;
+  }
+}
+
+/* ===========================================
+ * Layer 3: 组件库 C_* 组件增强
+ * =========================================== */
+
+[data-design-style="corporate-minimal"] {
+  .c-table-wrapper {
+    border: 1px solid var(--dt-card-border);
+    border-radius: var(--dt-radius);
+    box-shadow: var(--dt-card-shadow);
+    transition: box-shadow var(--dt-transition);
+
+    &:hover {
+      box-shadow: var(--dt-hover-shadow);
+    }
+  }
+
+  .c-action-bar {
+    border: 1px solid var(--dt-card-border);
+    border-radius: var(--dt-radius-sm);
+  }
+}

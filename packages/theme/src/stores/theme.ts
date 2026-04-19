@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import type { ThemeMode, ThemeStoreOptions } from "../types";
-import { DEFAULT_THEME_OPTIONS } from "../constants";
+import type { ThemeMode, DesignStyle, ThemeStoreOptions } from "../types";
+import { DEFAULT_THEME_OPTIONS, DESIGN_STYLE_CONFIGS } from "../constants";
 import { useViewTransition } from "../composables/useViewTransition";
 
 /**
@@ -14,6 +14,8 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
     storageKey = DEFAULT_THEME_OPTIONS.storageKey,
     enableTransition = DEFAULT_THEME_OPTIONS.enableTransition,
     transitionDuration = DEFAULT_THEME_OPTIONS.transitionDuration,
+    defaultDesignStyle = DEFAULT_THEME_OPTIONS.defaultDesignStyle,
+    designStyleStorageKey = DEFAULT_THEME_OPTIONS.designStyleStorageKey,
   } = options;
 
   return defineStore("theme", () => {
@@ -39,6 +41,17 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
     /** 系统是否为暗色模式 */
     const systemIsDark = ref(mediaQuery?.matches ?? false);
 
+    // 从 localStorage 读取保存的设计风格
+    const savedDesignStyle =
+      typeof window !== "undefined"
+        ? (localStorage.getItem(designStyleStorageKey) as DesignStyle)
+        : null;
+
+    /** 当前设计风格 */
+    const designStyle = ref<DesignStyle>(
+      savedDesignStyle || defaultDesignStyle,
+    );
+
     // ============ 计算属性 ============
 
     /** 当前是否为暗色模式 */
@@ -49,6 +62,11 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       return mode.value === "dark";
     });
 
+    /** 当前设计风格配置（只读） */
+    const currentDesignStyleConfig = computed(
+      () => DESIGN_STYLE_CONFIGS[designStyle.value],
+    );
+
     // ============ 内部方法 ============
 
     /**
@@ -58,6 +76,10 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       if (typeof document !== "undefined") {
         const themeValue = isDark.value ? "dark" : "light";
         document.documentElement.setAttribute("data-theme", themeValue);
+        document.documentElement.setAttribute(
+          "data-design-style",
+          designStyle.value,
+        );
       }
     };
 
@@ -140,21 +162,68 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       await setMode(newMode);
     };
 
+    /**
+     * 设置设计风格
+     * @param style - 目标设计风格
+     */
+    const setDesignStyle = async (style: DesignStyle) => {
+      const config = DESIGN_STYLE_CONFIGS[style];
+
+      // 更新设计风格状态
+      designStyle.value = style;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(designStyleStorageKey, style);
+      }
+
+      // 自动适配主题模式（例如 dark-tech 仅支持暗色）
+      const resolvedVisual = isDark.value ? "dark" : "light";
+      if (!config.supportedThemeModes.includes(resolvedVisual)) {
+        // 直接更新 mode，由 syncThemeAttr 一次性同步所有变更
+        mode.value = config.supportedThemeModes[0];
+        if (typeof window !== "undefined") {
+          localStorage.setItem(storageKey, mode.value);
+        }
+      }
+
+      // 一次性同步所有变更到 DOM（带过渡动画）
+      if (enableTransition) {
+        await useViewTransition(syncThemeAttr, {
+          duration: transitionDuration,
+        });
+      } else {
+        syncThemeAttr();
+      }
+    };
+
+    /**
+     * 循环切换设计风格
+     */
+    const toggleDesignStyle = async () => {
+      const styles = Object.keys(DESIGN_STYLE_CONFIGS) as DesignStyle[];
+      const currentIndex = styles.indexOf(designStyle.value);
+      const nextIndex = (currentIndex + 1) % styles.length;
+      await setDesignStyle(styles[nextIndex]);
+    };
+
     // ============ 返回 ============
 
     return {
       // State
       mode,
       systemIsDark,
+      designStyle,
 
       // Getters
       isDark,
+      currentDesignStyleConfig,
 
       // Actions
       init,
       setMode,
       toggleMode,
       toggleDark,
+      setDesignStyle,
+      toggleDesignStyle,
     };
   });
 }

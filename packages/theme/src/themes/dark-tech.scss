@@ -1,0 +1,196 @@
+/**
+ * @robot-admin/theme — Dark Tech 深邃科技
+ *
+ * 作用域：[data-design-style="dark-tech"]
+ * 限制：仅支持暗色主题（data-theme="dark"）
+ * 影响范围：主内容区 Naive UI 组件 + 组件库 C_* 组件
+ * 不影响：菜单（.n-menu / .n-menu-item）由菜单风格系统独立控制
+ */
+
+/* ===========================================
+ * Layer 1: 设计风格 CSS 变量（--dt- 命名空间）
+ * =========================================== */
+
+[data-design-style="dark-tech"][data-theme="dark"] {
+  /* 科技配色 */
+  --dt-neon: rgba(56, 189, 248, 1);
+  --dt-neon-dim: rgba(56, 189, 248, 0.5);
+  --dt-neon-glow: rgba(56, 189, 248, 0.15);
+  --dt-neon-subtle: rgba(56, 189, 248, 0.08);
+
+  /* 基础参数 — 锐利几何风格 */
+  --dt-radius: 4px;
+  --dt-radius-sm: 3px;
+  --dt-radius-lg: 6px;
+
+  /* 卡片 */
+  --dt-card-bg: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.85) 0%,
+    rgba(30, 41, 59, 0.65) 100%
+  );
+  --dt-card-border: var(--dt-neon-dim);
+  --dt-card-shadow:
+    0 0 20px var(--dt-neon-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* 按钮 */
+  --dt-btn-bg: rgba(15, 23, 42, 0.7);
+  --dt-btn-border: var(--dt-neon-dim);
+
+  /* 输入框 */
+  --dt-input-bg: rgba(15, 23, 42, 0.6);
+  --dt-input-border: rgba(56, 189, 248, 0.25);
+
+  /* 弹窗 / 抽屉 */
+  --dt-overlay-bg: rgba(15, 23, 42, 0.92);
+  --dt-overlay-border: var(--dt-neon-dim);
+  --dt-overlay-shadow:
+    0 0 40px var(--dt-neon-glow),
+    0 16px 48px rgba(0, 0, 0, 0.5);
+
+  /* 交互效果 */
+  --dt-hover-border: var(--dt-neon);
+  --dt-hover-shadow:
+    0 0 30px var(--dt-neon-glow),
+    0 0 60px rgba(56, 189, 248, 0.08);
+  --dt-transition: 0.3s ease;
+}
+
+/* ===========================================
+ * Layer 2: Naive UI 组件覆盖
+ * =========================================== */
+
+[data-design-style="dark-tech"][data-theme="dark"] {
+
+  /* --- NCard --- */
+  .n-card {
+    --n-color: transparent !important;
+    --n-border-color: var(--dt-card-border) !important;
+    --n-border-radius: var(--dt-radius) !important;
+    background: var(--dt-card-bg) !important;
+    box-shadow: var(--dt-card-shadow) !important;
+    transition: border-color var(--dt-transition),
+                box-shadow var(--dt-transition) !important;
+
+    &:hover {
+      --n-border-color: var(--dt-hover-border) !important;
+      box-shadow: var(--dt-hover-shadow) !important;
+    }
+  }
+
+  /* --- NButton --- */
+  .n-button {
+    --n-border-radius: var(--dt-radius-sm) !important;
+    transition: border-color var(--dt-transition),
+                box-shadow var(--dt-transition) !important;
+  }
+
+  .n-button--default-type {
+    --n-color: var(--dt-btn-bg) !important;
+    --n-border: 1px solid var(--dt-btn-border) !important;
+
+    &:not(.n-button--disabled):hover {
+      --n-border: 1px solid var(--dt-hover-border) !important;
+      box-shadow: 0 0 15px var(--dt-neon-glow);
+    }
+  }
+
+  .n-button--primary-type {
+    box-shadow: 0 0 15px var(--dt-neon-glow);
+
+    &:not(.n-button--disabled):hover {
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.3);
+    }
+  }
+
+  /* --- NModal 内嵌 NCard --- */
+  .n-modal .n-card {
+    --n-color: transparent !important;
+    background: var(--dt-overlay-bg) !important;
+    --n-border-color: var(--dt-overlay-border) !important;
+    --n-border-radius: var(--dt-radius-lg) !important;
+    box-shadow: var(--dt-overlay-shadow) !important;
+
+    &:hover {
+      transform: none;
+    }
+  }
+
+  /* --- NDrawer --- */
+  .n-drawer {
+    .n-drawer-body-content-wrapper {
+      border-left: 1px solid var(--dt-card-border);
+    }
+  }
+
+  /* --- NInput --- */
+  .n-input {
+    --n-color: var(--dt-input-bg) !important;
+    --n-border: 1px solid var(--dt-input-border) !important;
+    --n-border-radius: var(--dt-radius-sm) !important;
+    transition: border-color var(--dt-transition),
+                box-shadow var(--dt-transition) !important;
+
+    &:focus-within {
+      --n-border: 1px solid var(--dt-neon) !important;
+      box-shadow: 0 0 0 2px var(--dt-neon-subtle);
+    }
+  }
+
+  .n-base-selection {
+    --n-border: 1px solid var(--dt-input-border) !important;
+    --n-border-radius: var(--dt-radius-sm) !important;
+    --n-color: var(--dt-input-bg) !important;
+  }
+
+  /* --- NDataTable --- */
+  .n-data-table {
+    --n-border-color: var(--dt-card-border) !important;
+    --n-border-radius: var(--dt-radius) !important;
+
+    .n-data-table-thead {
+      background: rgba(56, 189, 248, 0.05) !important;
+    }
+
+    .n-data-table-tr:hover {
+      background: rgba(56, 189, 248, 0.06) !important;
+    }
+  }
+
+  /* --- NTag --- */
+  .n-tag {
+    --n-border-radius: var(--dt-radius-sm) !important;
+    border: 1px solid var(--dt-neon-subtle) !important;
+  }
+
+  /* --- NTabs --- */
+  .n-tabs .n-tabs-tab--active {
+    text-shadow: 0 0 8px var(--dt-neon-glow);
+  }
+}
+
+/* ===========================================
+ * Layer 3: 组件库 C_* 组件增强
+ * =========================================== */
+
+[data-design-style="dark-tech"][data-theme="dark"] {
+  .c-table-wrapper {
+    background: var(--dt-card-bg);
+    border: 1px solid var(--dt-card-border);
+    border-radius: var(--dt-radius);
+    box-shadow: var(--dt-card-shadow);
+    transition: border-color var(--dt-transition),
+                box-shadow var(--dt-transition);
+
+    &:hover {
+      border-color: var(--dt-hover-border);
+      box-shadow: var(--dt-hover-shadow);
+    }
+  }
+
+  .c-action-bar {
+    border: 1px solid var(--dt-card-border);
+    border-radius: var(--dt-radius-sm);
+  }
+}
