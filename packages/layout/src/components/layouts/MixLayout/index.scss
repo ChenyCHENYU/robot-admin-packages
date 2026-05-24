@@ -577,7 +577,7 @@
       transform: translateX(4px);
       box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
 
-      :deep(.c-icon),
+      .c-icon,
       .item-title {
         color: #6366f1 !important;
       }
@@ -596,7 +596,7 @@
         0 2px 8px rgba(99, 102, 241, 0.15),
         inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 
-      :deep(.c-icon) {
+      .c-icon {
         color: #6366f1 !important;
         filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4)) !important;
       }
@@ -636,7 +636,7 @@
       transform: translateX(4px);
       box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
 
-      :deep(.c-icon),
+      .c-icon,
       .item-title {
         color: #8b5cf6 !important;
       }
@@ -655,7 +655,7 @@
         0 2px 8px rgba(139, 92, 246, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
 
-      :deep(.c-icon) {
+      .c-icon {
         color: #8b5cf6 !important;
         filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.4)) !important;
       }

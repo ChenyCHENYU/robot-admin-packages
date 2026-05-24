@@ -200,19 +200,19 @@
     padding: 0 24px;
 
     /* 覆盖 Naive UI 菜单的默认背景 */
-    :deep(.n-menu) {
+    .n-menu {
       background-color: transparent !important;
     }
 
     /* 菜单项样式优化 */
-    :deep(.n-menu-item) {
+    .n-menu-item {
       margin: 0 4px;
       position: relative;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* 激活状态的菜单项底部指示器 */
-    :deep(.n-menu-item--selected) {
+    .n-menu-item--selected {
       &::after {
         content: '';
         position: absolute;
@@ -228,23 +228,23 @@
     }
 
     /* 菜单项图标样式 */
-    :deep(.n-menu-item-content__icon) {
+    .n-menu-item-content__icon {
       font-size: 18px !important;
       margin-right: 8px;
     }
 
     /* 激活状态的图标添加光效 */
-    :deep(.n-menu-item--selected .n-menu-item-content__icon) {
+    .n-menu-item--selected .n-menu-item-content__icon {
       filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
     }
 
     /* 子菜单样式 */
-    :deep(.n-submenu) {
+    .n-submenu {
       margin: 0 4px;
     }
 
     /* 子菜单下拉面板样式 */
-    :deep(.n-submenu-children) {
+    .n-submenu-children {
       background: rgba(255, 255, 255, 0.98);
       backdrop-filter: blur(20px);
       border-radius: 12px;
@@ -259,7 +259,7 @@
 
   /* 暗色主题下的子菜单样式 */
   &.dark-theme .navbar-center {
-    :deep(.n-submenu-children) {
+    .n-submenu-children {
       background: rgba(28, 28, 33, 0.98);
       border-color: rgba(255, 255, 255, 0.08);
       box-shadow:
