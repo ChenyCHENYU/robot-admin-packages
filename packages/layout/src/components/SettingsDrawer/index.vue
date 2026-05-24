@@ -151,6 +151,20 @@
             </div>
           </div>
 
+          <div
+            class="settings-section menu-expand-section"
+            data-menu-expand-mode="built-in"
+          >
+            <div class="section-title">菜单展开方式</div>
+            <NRadioGroup
+              v-model:value="settingsStore.menuExpandMode"
+              class="menu-expand-group"
+            >
+              <NRadioButton value="inline">传统展开</NRadioButton>
+              <NRadioButton value="panel">右侧面板</NRadioButton>
+            </NRadioGroup>
+          </div>
+
           <!-- 界面元素 -->
           <div class="settings-section">
             <div class="section-title">界面元素</div>
@@ -528,6 +542,7 @@ const handleResetAppearance = () => {
  */
 const handleResetLayout = () => {
   settingsStore.layoutMode = DEFAULT_SETTINGS.layoutMode;
+  settingsStore.menuExpandMode = DEFAULT_SETTINGS.menuExpandMode;
   settingsStore.fixedHeader = DEFAULT_SETTINGS.fixedHeader;
   settingsStore.showBreadcrumb = DEFAULT_SETTINGS.showBreadcrumb;
   settingsStore.showBreadcrumbIcon = DEFAULT_SETTINGS.showBreadcrumbIcon;

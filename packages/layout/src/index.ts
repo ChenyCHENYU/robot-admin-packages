@@ -65,6 +65,7 @@ export type {
 // ============ Types ============
 export type {
   LayoutMode,
+  MenuExpandMode,
   TransitionType,
   BorderRadiusSize,
   TagsViewStyle,

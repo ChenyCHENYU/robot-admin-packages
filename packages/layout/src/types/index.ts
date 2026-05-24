@@ -16,6 +16,13 @@ export type LayoutMode =
   | "card-layout"; // 卡片布局
 
 /**
+ * 菜单展开方式
+ */
+export type MenuExpandMode =
+  | "inline" // 传统内联展开
+  | "panel"; // 右侧面板展开
+
+/**
  * 页面动画类型
  */
 export type TransitionType = "fade" | "slide" | "zoom" | "none";
@@ -53,6 +60,9 @@ export interface SettingsState {
   // ============ 布局设置 ============
   /** 布局模式：左侧/顶部/混合 */
   layoutMode: LayoutMode;
+
+  /** 菜单展开方式：传统内联/右侧面板 */
+  menuExpandMode: MenuExpandMode;
 
   /** 侧边栏是否折叠 */
   collapsed: boolean;
@@ -147,4 +157,3 @@ export interface PresetColor {
 
 // ============ 重新导出菜单类型 ============
 export type { MenuOptions, MenuTag, MenuItemType } from "./menu";
-

@@ -121,6 +121,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
 
   // 布局
   layoutMode: "side",
+  menuExpandMode: "inline",
   collapsed: false,
   fixedHeader: true,
   showBreadcrumb: true,

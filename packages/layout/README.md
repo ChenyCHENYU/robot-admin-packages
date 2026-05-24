@@ -10,6 +10,7 @@
 - 🎨 **6 种布局模式** - 左侧 / 顶部 / 混合 / 顶部混合 / 反转混合 / 卡片布局
 - 🎯 **6 套主题预设** - 科技蓝 / 清新绿 / 商务灰 / 活力橙 / 优雅紫 / 经典红
 - 🧩 **开箱即用** - 提供 SettingsDrawer 设置抽屉，覆盖外观 / 布局 / 功能配置
+- 🧭 **菜单展开方式** - 内置传统展开 / 右侧面板两种菜单展开模式配置
 - 🔌 **插槽系统** - 灵活的 slot 机制，主项目仅关注业务组件
 - 🎨 **CSS 变量同步** - 配置变更自动同步到 CSS 变量，样式实时响应
 - 🚀 **TypeScript** - 完整类型支持
@@ -103,8 +104,6 @@ src/
 
 ```bash
 bun add @robot-admin/layout @robot-admin/theme naive-ui
-# or
-pnpm add @robot-admin/layout @robot-admin/theme naive-ui
 ```
 
 **Peer Dependencies**: `vue ^3.4` · `vue-router ^4.0` · `pinia ^2.0 || ^3.0` · `naive-ui ^2.38` · `@robot-admin/theme ^0.1`
@@ -215,11 +214,13 @@ const settings = useSettingsStore();
 
 // 读取
 settings.layoutMode;       // 'side' | 'top' | 'mix' | ...
+settings.menuExpandMode;   // 'inline' | 'panel'
 settings.primaryColor;     // '#409eff'
 settings.themeMode;        // 'light' | 'dark' | 'auto'
 
 // 修改
 settings.layoutMode = "mix";
+settings.menuExpandMode = "panel";
 settings.updateThemeMode("dark");
 settings.applyPreset(THEME_PRESETS[0]);
 settings.resetSettings();
@@ -232,6 +233,7 @@ settings.resetSettings();
 | `themeMode` | `ThemeMode` | `'light'` | 主题模式 |
 | `primaryColor` | `string` | `'#409eff'` | 主题色 |
 | `layoutMode` | `LayoutMode` | `'side'` | 布局模式 |
+| `menuExpandMode` | `MenuExpandMode` | `'inline'` | 菜单展开方式 |
 | `borderRadius` | `BorderRadiusSize` | `'medium'` | 圆角大小 |
 | `transitionType` | `TransitionType` | `'slide'` | 页面动画 |
 | `fixedHeader` | `boolean` | `true` | 固定头部 |
@@ -280,6 +282,7 @@ settings.resetSettings();
 
 ```typescript
 type LayoutMode = "side" | "top" | "mix" | "mix-top" | "reverse-horizontal-mix" | "card-layout";
+type MenuExpandMode = "inline" | "panel";
 type TransitionType = "fade" | "slide" | "zoom" | "none";
 type BorderRadiusSize = "small" | "medium" | "large";
 type TagsViewStyle = "default" | "card" | "smart";

@@ -9,7 +9,7 @@
 import type { InjectionKey, ComputedRef, Component } from "vue";
 import { inject } from "vue";
 import type { MenuOptions } from "../types/menu";
-import type { LayoutMode } from "../types";
+import type { LayoutMode, MenuExpandMode } from "../types";
 
 /**
  * 品牌配置
@@ -47,6 +47,8 @@ export interface LayoutContext {
   // ============ 布局配置（来自 settings store） ============
   /** 当前布局模式 */
   layoutMode: ComputedRef<LayoutMode>;
+  /** 菜单展开方式 */
+  menuExpandMode?: ComputedRef<MenuExpandMode>;
   /** 侧边栏宽度 (px) */
   sidebarWidth: ComputedRef<number>;
   /** 侧边栏折叠后宽度 (px) */

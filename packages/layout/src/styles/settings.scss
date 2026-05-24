@@ -154,7 +154,8 @@
 
 // 圆角/动画选择
 .radius-group,
-.transition-group {
+.transition-group,
+.menu-expand-group {
   width: 100%;
 
   :deep(.n-radio-button) {
@@ -269,11 +270,10 @@
   height: 48px;
   color: #999;  // 默认：灰色
   transition: all 0.3s ease;
+}
 
-  // SVG rect 强制继承 color
-  :deep(rect) {
-    fill: currentColor !important;
-  }
+:deep(.layout-svg rect) {
+  fill: currentColor !important;
 }
 .layout-label {
   font-size: 13px;

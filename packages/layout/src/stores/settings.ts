@@ -5,6 +5,7 @@ import type {
   SettingsState,
   ThemePreset,
   LayoutMode,
+  MenuExpandMode,
   TransitionType,
   BorderRadiusSize,
   TagsViewStyle,
@@ -54,6 +55,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
 
     // 布局设置
     const layoutMode = ref<LayoutMode>(finalDefaults.layoutMode);
+    const menuExpandMode = ref<MenuExpandMode>(finalDefaults.menuExpandMode);
     const collapsed = ref<boolean>(finalDefaults.collapsed);
     const fixedHeader = ref<boolean>(finalDefaults.fixedHeader);
     const showBreadcrumb = ref<boolean>(finalDefaults.showBreadcrumb);
@@ -95,6 +97,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       transitionType: transitionType.value,
       enableTransition: enableTransition.value,
       layoutMode: layoutMode.value,
+      menuExpandMode: menuExpandMode.value,
       collapsed: collapsed.value,
       fixedHeader: fixedHeader.value,
       showBreadcrumb: showBreadcrumb.value,
@@ -178,6 +181,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       enableTransition.value = finalDefaults.enableTransition;
 
       layoutMode.value = finalDefaults.layoutMode;
+      menuExpandMode.value = finalDefaults.menuExpandMode;
       collapsed.value = finalDefaults.collapsed;
       fixedHeader.value = finalDefaults.fixedHeader;
       showBreadcrumb.value = finalDefaults.showBreadcrumb;
@@ -238,6 +242,7 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       transitionType,
       enableTransition,
       layoutMode,
+      menuExpandMode,
       collapsed,
       fixedHeader,
       showBreadcrumb,
