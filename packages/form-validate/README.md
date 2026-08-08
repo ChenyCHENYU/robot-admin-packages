@@ -476,6 +476,53 @@ const rules = {
 };
 ```
 
+### 🔢 数据库数值契约校验（numeric）
+
+`numeric` 标杆 SQL `DECIMAL(p, s)` 字段契约，一次性校验整数/小数格式、有限性、总位数、小数位数、取值范围。语义为非必填（空值放行），需必填时与 `required` 组合。
+
+```typescript
+import { numeric } from "@robot-admin/form-validate";
+
+// 对标 DECIMAL(11,3)，温度必须 ≥ 0
+const tempRules = {
+  temperature: [
+    numeric({ kind: "decimal", totalDigits: 11, fractionDigits: 3, min: 0 }, "温度"),
+  ],
+};
+
+// 整数 + 范围
+const timesRules = {
+  processTimes: [
+    numeric({ kind: "integer", totalDigits: 11, min: 1 }, "处理次数"),
+  ],
+};
+
+// 开区间（必须严格大于 min）
+const openRules = {
+  value: [
+    numeric({ kind: "decimal", min: 0, max: 100, minExclusive: true }, "值"),
+  ],
+};
+```
+
+### 🧩 非必填校验（optional）
+
+把任意格式规则包装为「可不填」语义：值为空时放行，有值时才校验格式。比手写 `!v || regex.test(v)` 更直观。
+
+```typescript
+import { optional, FormatRules } from "@robot-admin/form-validate";
+
+// 邮箱可不填，填了则校验格式
+const rules = {
+  email: [optional(FormatRules.email("邮箱"))],
+};
+
+// 手机号可不填
+const rules2 = {
+  phone: [optional(FormatRules.mobile("手机号"))],
+};
+```
+
 ---
 
 ## 🌐 正则表达式库

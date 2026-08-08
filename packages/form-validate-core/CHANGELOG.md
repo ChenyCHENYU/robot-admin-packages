@@ -1,5 +1,24 @@
 # @robot-admin/form-validate-core
 
+## 1.0.1
+
+### Patch Changes
+
+- refactor: 内部优化 —— 消除重复逻辑、补充测试、完善文档
+
+  ## 重构（无 API 变更）
+
+  - compareWith / debouncedAsyncCheck 改为委托 core 实现，消除 naive 与 element 版的重复逻辑
+  - mergeTriggers 支持空数组兜底，去除 advanced.ts 中 3 处占位 RuleSpec 代码异味
+
+  ## 测试
+
+  - 新增 vitest 测试套件（63 个用例），覆盖 numeric 五层边界、optional 空值放行、when/some/every 消息透传、compareWith、debouncedAsyncCheck、mergeRules 等
+
+  ## 文档
+
+  - naive README 补充 numeric 数值契约与 optional 非必填校验用法示例
+
 ## 1.0.0
 
 ### Major Changes

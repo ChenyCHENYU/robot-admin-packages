@@ -1,10 +1,17 @@
 /**
  * 高级验证功能
  * 包含条件验证、跨字段比较、防抖异步验证等高级特性
+ *
+ * when / some / every 在 FormItemRule 层组合；compareWith / debouncedAsyncCheck
+ * 委托 core 实现，消除重复逻辑。
  */
 
-import { createRule, debounce } from "./utils";
 import type { FormItemRule } from "naive-ui/es/form";
+import {
+  compareWith as compareWithCore,
+  debouncedAsyncCheck as debouncedAsyncCheckCore,
+} from "@robot-admin/form-validate-core";
+import { toNaiveRule } from "./adapter";
 
 /**
  * 条件验证：根据其他字段值决定是否验证
@@ -60,31 +67,8 @@ export const compareWith = (
   getCompareValue: () => any,
   operator: "gt" | "gte" | "lt" | "lte" | "eq" | "ne",
   message?: string,
-): FormItemRule => {
-  const operators = {
-    gt: (a: number, b: number) => a > b,
-    gte: (a: number, b: number) => a >= b,
-    lt: (a: number, b: number) => a < b,
-    lte: (a: number, b: number) => a <= b,
-    eq: (a: any, b: any) => a === b,
-    ne: (a: any, b: any) => a !== b,
-  };
-
-  const operatorLabels = {
-    gt: "大于",
-    gte: "不小于",
-    lt: "小于",
-    lte: "不大于",
-    eq: "等于",
-    ne: "不等于",
-  };
-
-  return createRule(
-    "blur",
-    (v) => !v || operators[operator](v, getCompareValue()),
-    message || `${field}必须${operatorLabels[operator]}比较值`,
-  );
-};
+): FormItemRule =>
+  toNaiveRule(compareWithCore(field, getCompareValue, operator, message));
 
 /**
  * 防抖异步验证（避免频繁请求）
@@ -109,18 +93,8 @@ export const debouncedAsyncCheck = (
   asyncFn: (v: any) => Promise<boolean>,
   delay: number = 500,
   message?: string,
-): FormItemRule => {
-  const debouncedFn = debounce(asyncFn, delay);
-
-  return {
-    trigger: "input",
-    validator: async (_, value) => {
-      if (!value) return;
-      const isValid = await debouncedFn(value);
-      if (!isValid) throw new Error(message || `${field}验证失败`);
-    },
-  };
-};
+): FormItemRule =>
+  toNaiveRule(debouncedAsyncCheckCore(field, asyncFn, delay, message));
 
 /**
  * 规则 OR 组合：满足其中一个即可

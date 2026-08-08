@@ -174,6 +174,7 @@ export function mergeRules(specs: RuleSpec[]): RuleSpec[] {
 }
 
 export const mergeTriggers = (specs: RuleSpec[]): Trigger | Trigger[] => {
+  if (!specs.length) return ["blur", "input"];
   const set = new Set<Trigger>();
   for (const spec of specs) {
     const t = spec.trigger;

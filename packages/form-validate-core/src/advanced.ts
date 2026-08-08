@@ -45,7 +45,7 @@ export const when = (
 ): RuleSpec => {
   const all = [...thenRules, ...elseRules];
   return {
-    trigger: mergeTriggers(all.length ? all : [{ trigger: ["blur", "input"], validate: () => true, message: "" }]),
+    trigger: mergeTriggers(all),
     message: thenRules[0]?.message ?? "校验不通过",
     validate: async (value): Promise<ValidateResult> => {
       const depValue = getDependencyValue();
@@ -154,7 +154,7 @@ export const some = (
   message: string = "至少满足一个条件",
 ): RuleSpec => {
   return {
-    trigger: mergeTriggers(rules.length ? rules : [{ trigger: ["blur", "input"], validate: () => true, message: "" }]),
+    trigger: mergeTriggers(rules),
     message,
     validate: async (value): Promise<ValidateResult> => {
       for (const rule of rules) {
@@ -179,7 +179,7 @@ export const some = (
  */
 export const every = (rules: RuleSpec[]): RuleSpec => {
   return {
-    trigger: mergeTriggers(rules.length ? rules : [{ trigger: ["blur", "input"], validate: () => true, message: "" }]),
+    trigger: mergeTriggers(rules),
     message: rules[0]?.message ?? "校验不通过",
     validate: async (value): Promise<ValidateResult> => {
       for (const rule of rules) {

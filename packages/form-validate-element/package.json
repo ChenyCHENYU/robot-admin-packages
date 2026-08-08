@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/form-validate-element",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "企业级表单验证规则库，专为 Element Plus 设计（基于 form-validate-core，与 naive-ui 版用法完全一致）",
   "keywords": [
     "form",

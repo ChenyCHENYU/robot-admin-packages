@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/form-validate",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "企业级表单验证规则库，专为 Naive UI 设计，提供丰富的验证规则和高级功能（基于 form-validate-core）",
   "keywords": [
     "form",
