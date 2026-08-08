@@ -1,5 +1,17 @@
 # @robot-admin/form-validate
 
+## 3.4.1
+
+### Patch Changes
+
+- docs: README 补充基础与高级用法示例
+
+  - 新增「场景 2：多规则链式校验」—— 说明数组即链式，含与手写对比
+  - 场景 7（表格批量校验）补充嵌套点路径用法（address.city / items[0].qty）
+  - 进阶区新增「AND/OR/条件组合」统一示例 + 数组 vs every 区别说明
+  - 进阶区新增「动态规则」—— computed 中按业务状态生成规则的示例
+  - 测试数更新 80 → 84
+
 ## 3.4.0
 
 ### Minor Changes

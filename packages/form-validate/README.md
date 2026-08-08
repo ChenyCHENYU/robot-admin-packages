@@ -34,7 +34,7 @@ RuleSpec(源真相) ──┼── toElementRule → ELEMENT_RULES / ELEMENT_CO
 - 🚀 **高级组合** — 条件验证、跨字段比较、OR/AND 组合、防抖异步
 - 🇨🇳 **中国本地化** — 身份证、银行卡、车牌、统一社会信用代码
 - 💪 **TypeScript** — 完整类型推导，Tree-shaking 友好
-- ✅ **80 测试覆盖** — 行为有保障，不靠肉眼
+- ✅ **84 测试覆盖** — 行为有保障，不靠肉眼
 
 ---
 
@@ -100,7 +100,32 @@ RULE_COMBOS.url("链接")            // 必填 + URL 格式
 RULE_COMBOS.confirmPassword("确认密码", () => form.password)
 ```
 
-### 场景 2：非必填，填了才校验格式
+### 场景 2：多规则链式校验（数组即链式）
+
+规则数组本身就是**顺序执行**的链 —— 前一条通过才跑下一条，失败立即停止返回错误。
+不需要额外的 `.chain()` 语法，数组就是最直观的链。
+
+```ts
+import { ELEMENT_RULES } from "@robot-admin/form-validate";
+
+// 密码：先校验非空，通过后再校验长度，再校验强度
+password: [
+  ELEMENT_RULES.required("密码"),
+  ELEMENT_RULES.minLength("密码", 8),
+  ELEMENT_RULES.strongPassword("密码"),
+]
+
+// 工号：先校验非空，再校验长度
+userNo: [
+  ELEMENT_RULES.required("工号"),
+  ELEMENT_RULES.length("工号", 8),
+]
+```
+
+> **与手写对比**：Element 原生写法要重复写 `{ required: true, message: "密码不能为空", trigger: "blur" }`，
+> 这里一行一个语义，且消息自动带字段名。
+
+### 场景 3：非必填，填了才校验格式
 
 ```ts
 import { optional, toNaiveRule, toElementRule, SPEC_RULES } from "@robot-admin/form-validate";
@@ -116,7 +141,7 @@ toElementRule(optional(SPEC_RULES.email("邮箱")))
 
 > `optional` 同样可包装 `numeric`、自定义规则等任意 RuleSpec。
 
-### 场景 3：数据库数值契约（DECIMAL）
+### 场景 4：数据库数值契约（DECIMAL）
 
 ```ts
 import { numeric, toElementRule } from "@robot-admin/form-validate";
@@ -134,7 +159,7 @@ numeric({ kind: "decimal", min: 0, max: 100, minExclusive: true }, "百分比")
 toElementRule(numeric({ kind: "integer", min: 1 }, "处理次数"))
 ```
 
-### 场景 4：跨字段比较（结束日期不早于开始）
+### 场景 5：跨字段比较（结束日期不早于开始）
 
 ```ts
 import { compareWith } from "@robot-admin/form-validate";        // naive
@@ -144,7 +169,7 @@ compareWith("结束日期", () => form.startDate, "gte", "结束日期不能早�
 // 操作符：gt | gte | lt | lte | eq | ne
 ```
 
-### 场景 5：条件验证（类型为公司时才校验公司名称）
+### 场景 6：条件验证（类型为公司时才校验公司名称）
 
 ```ts
 import { when } from "@robot-admin/form-validate";        // naive
@@ -158,25 +183,38 @@ when(
 )
 ```
 
-### 场景 6：表格提交前批量校验
+### 场景 7：表格提交前批量校验（含嵌套路径）
 
 ```ts
-import { validateRows, numeric, SPEC_RULES } from "@robot-admin/form-validate";
+import { validateRows, validateValue, numeric, SPEC_RULES } from "@robot-admin/form-validate";
 
 const ruleMap = {
   steel_code: [SPEC_RULES.required("钢种")],
   work_time:  [numeric({ kind: "integer", min: 1 }, "作业时间")],
 };
 
-// 校验整张表，返回第一行错误
+// 表格多行：校验整张表，返回第一行错误
 const err = await validateRows(detailRows, ruleMap, { startIndex: 1 });
 if (err) {
   ElMessage.error(`第 ${err.rowIndex} 行：${err.message}`);
   return;
 }
+
+// 主从结构：字段名支持点路径嵌套
+const nestedErr = await validateValue(
+  record,
+  {
+    "address.city":    [SPEC_RULES.required("城市")],
+    "items[0].qty":    [numeric({ kind: "integer", min: 1 }, "数量")],
+    "items[1].amount": [numeric({ kind: "decimal", min: 0 }, "金额")],
+  },
+);
 ```
 
-### 场景 7：OR 组合（手机号或邮箱任一）
+> 点路径支持 `'a.b.c'`（对象嵌套）、`'items[0].qty'`（数组索引）、深层组合。
+> 平铺字段（不含 `.` `[` `]`）行为与 `record[key]` 完全一致，零副作用。
+
+### 场景 8：OR 组合（手机号或邮箱任一）
 
 ```ts
 import { some, PRESET_RULES } from "@robot-admin/form-validate";
@@ -259,6 +297,56 @@ some(
 
 ## 🎓 进阶
 
+### 多规则组合：AND / OR / 条件
+
+当数组链式不够用时（需要把多条规则**合并成一条**塞进单个 form-item，或做 OR 逻辑），用组合函数：
+
+```ts
+import { every, some, when, PRESET_RULES } from "@robot-admin/form-validate";
+
+// AND：全部满足（合并成单条规则，失败返回第一个错误）
+every([
+  PRESET_RULES.required("密码"),
+  PRESET_RULES.minLength("密码", 8),
+  PRESET_RULES.strongPassword("密码"),
+])
+
+// OR：满足其一即可
+some(
+  [PRESET_RULES.mobile("联系方式"), PRESET_RULES.email("联系方式")],
+  "请填写手机号或邮箱",
+)
+
+// 条件：只有企业用户才校验统一信用代码
+when(
+  () => form.userType,
+  val => val === "enterprise",
+  [PRESET_RULES.required("统一信用代码"), PRESET_RULES.creditCode("统一信用代码")],
+  [],
+)
+```
+
+> **数组 vs every 的区别**：数组是 form-item 级链式（多条独立规则）；`every` 是把多条合成一条规则。
+> 一般场景用数组即可，需要"合成单条"时（如塞进 `some`/`when` 内部）用 `every`。
+
+### 动态规则（响应式）
+
+规则工厂返回的是普通对象，天然支持在 `computed` / `watch` 中按业务状态动态生成：
+
+```ts
+import { computed } from "vue";
+import { ELEMENT_RULES, numeric, toElementRule } from "@robot-admin/form-validate";
+
+// 根据表单类型动态返回不同规则
+const workTimeRules = computed(() => {
+  if (form.value.type === "overtime") {
+    return [toElementRule(numeric({ kind: "integer", min: 1, max: 10080 }, "加班时长"))];
+  }
+  return [toElementRule(numeric({ kind: "integer", min: 0, max: 480 }, "工时"))];
+});
+// :rules="workTimeRules"
+```
+
 ### 自定义规则
 
 ```ts
@@ -322,7 +410,7 @@ REGEX_PATTERNS.IP / IPV6    // IP 地址
 │   ├── presets.ts     # PRESET_RULES / ELEMENT_RULES / SPEC_RULES
 │   ├── regex.ts       # 正则常量库
 │   └── rules/         # basic / value / format / china（产 RuleSpec）
-└── test/              # 80 个 vitest 用例
+└── test/              # 84 个 vitest 用例
 ```
 
 ---
