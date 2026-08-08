@@ -1,5 +1,20 @@
 # @robot-admin/form-validate
 
+## 3.4.0
+
+### Minor Changes
+
+- feat: validateRecord 支持嵌套点路径校验
+
+  validateRecord / validateRows 的 ruleMap 字段名现支持点路径嵌套：
+
+  - 对象嵌套：'address.city'
+  - 数组索引：'items[0].qty'
+  - 深层组合：'a[0].b.c'
+
+  普通平铺字段（不含 . [ ]）行为与 record[key] 完全一致，零副作用。
+  主从结构表格、嵌套对象表单的提交校验可直接用路径表达，无需展平。
+
 ## 3.3.1
 
 ### Patch Changes

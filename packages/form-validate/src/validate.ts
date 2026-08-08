@@ -11,6 +11,16 @@
 import type { RuleSpec } from "./types";
 
 /**
+ * 按点路径取值（支持 'a.b.c' / 'a[0].b' / 'a[0][1]'）。
+ * 普通键（不含 . [ ]）行为与 obj[key] 完全一致，无副作用。
+ */
+const getPath = (obj: any, path: string): any =>
+  path.split(/[.[\]]/).filter(Boolean).reduce(
+    (acc, key) => (acc == null ? undefined : acc[key]),
+    obj,
+  );
+
+/**
  * 校验单个值：依次执行规则，返回第一条失败消息；全部通过返回 null。
  *
  * @param value 待校验值
@@ -42,13 +52,20 @@ export async function validateValue(
  * 校验一条记录的多个字段。
  *
  * @param record 数据记录
- * @param ruleMap 字段名 → 规则数组（缺失字段视为无规则，跳过）
+ * @param ruleMap 字段名 → 规则数组（缺失字段视为无规则，跳过）。
+ *                字段名支持点路径嵌套：'address.city' / 'items[0].qty'。
  * @returns 第一个失败字段 { field, message }；全部通过返回 null
  *
- * @example
+ * @example 平铺字段
  * const err = await validateRecord(form, {
  *   steel_code: [SPEC_RULES.required('钢种')],
  *   work_time:  [numeric({ kind: 'integer', min: 1 }, '作业时间')],
+ * });
+ *
+ * @example 嵌套字段
+ * const err = await validateRecord(form, {
+ *   'address.city': [SPEC_RULES.required('城市')],
+ *   'items[0].qty': [numeric({ kind: 'integer', min: 1 }, '数量')],
  * });
  * if (err) ElMessage.error(`${err.message}`);
  */
@@ -58,7 +75,7 @@ export async function validateRecord(
 ): Promise<{ field: string; message: string } | null> {
   for (const field of Object.keys(ruleMap)) {
     // eslint-disable-next-line no-await-in-loop
-    const message = await validateValue(record[field], ruleMap[field]);
+    const message = await validateValue(getPath(record, field), ruleMap[field]);
     if (message) return { field, message };
   }
   return null;

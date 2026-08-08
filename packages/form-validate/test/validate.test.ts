@@ -85,6 +85,39 @@ describe("validateRecord", () => {
   it("空 ruleMap 返回 null", async () => {
     expect(await validateRecord({ a: 1 }, {})).toBeNull();
   });
+
+  it("支持点路径嵌套 'a.b.c'", async () => {
+    const err = await validateRecord(
+      { address: { city: "" } },
+      { "address.city": [SPEC_RULES.required("城市")] },
+    );
+    expect(err?.field).toBe("address.city");
+    expect(err?.message).toBe("城市不能为空");
+  });
+
+  it("支持数组索引路径 'items[0].qty'", async () => {
+    const err = await validateRecord(
+      { items: [{ qty: 0 }] },
+      { "items[0].qty": [numeric({ kind: "integer", min: 1 }, "数量")] },
+    );
+    expect(err?.field).toBe("items[0].qty");
+    expect(err?.message).toContain("数量");
+  });
+
+  it("嵌套路径取值为 undefined 时，非必填规则放行", async () => {
+    const err = await validateRecord(
+      { address: {} },
+      { "address.city": [numeric({ kind: "integer", min: 1 }, "城市")] },
+    );
+    expect(err).toBeNull();
+  });
+
+  it("普通键（不含路径）行为与 record[key] 一致", async () => {
+    // 回归：确保 getPath 不破坏平铺字段
+    expect(await validateRecord({ name: "x" }, { name: [SPEC_RULES.required("姓名")] })).toBeNull();
+    const err = await validateRecord({ name: "" }, { name: [SPEC_RULES.required("姓名")] });
+    expect(err).toEqual({ field: "name", message: "姓名不能为空" });
+  });
 });
 
 describe("validateRows", () => {
