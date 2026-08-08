@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/form-validate",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "企业级表单验证规则库，单包同时支持 Naive UI 与 Element Plus",
   "keywords": [
     "form",

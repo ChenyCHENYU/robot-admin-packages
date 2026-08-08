@@ -1,5 +1,17 @@
 # @robot-admin/form-validate
 
+## 3.3.1
+
+### Patch Changes
+
+- docs: 重写 README，结构化按场景速查
+
+  - 从 578 行精简至 240 行，信息密度提升
+  - 新增「30 秒上手」「按场景速查」（7 个高频场景）「API 全景」（表格化）
+  - 补全 Element Plus 用法、批量校验 validateRows 用法、数值契约用法
+  - 新增「从旧版迁移」对照表
+  - 修正 optional 返回 RuleSpec 需经适配器转换的文档准确性
+
 ## 3.3.0
 
 ### Minor Changes
