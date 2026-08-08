@@ -1,24 +1,22 @@
 /**
- * 工具函数模块（naive-ui 版）
+ * 工具函数模块（element-plus 版）
  *
- * createRule/createAsyncRule 委托 core 的 RuleSpec，经 toNaiveRule 产出 FormItemRule。
- * transform/mergeRules 在 FormItemRule 层操作（保留原行为）。
+ * createRule/createAsyncRule 委托 core 的 RuleSpec，经 toElementRule 产出 FormItemRule。
+ * transform/mergeRules 在 FormItemRule 层操作（callback 风格）。
  * debounce/createMessageTemplate 为纯函数，直接 re-export core。
  */
 
-import type { FormItemRule } from "naive-ui/es/form";
+import type { FormItemRule } from "element-plus";
 import {
   debounce as _debounce,
   createMessageTemplate as _createMessageTemplate,
   createRule as createRuleCore,
   createAsyncRule as createAsyncRuleCore,
-  transform as transformCore,
-  mergeRules as mergeRulesCore,
 } from "@robot-admin/form-validate-core";
-import { toNaiveRule } from "./adapter";
+import { toElementRule } from "./adapter";
 
 /**
- * 扩展的表单验证规则类型
+ * 扩展的表单验证规则类型（与 naive 版 API 对齐）
  */
 export type FieldRule = Omit<FormItemRule, "validator"> & {
   validator: NonNullable<FormItemRule["validator"]>;
@@ -39,7 +37,7 @@ export function createRule(
   validateFn: (v: any) => boolean,
   message: string,
 ): FieldRule {
-  return toNaiveRule(
+  return toElementRule(
     createRuleCore(trigger as any, validateFn, message),
   ) as FieldRule;
 }
@@ -52,7 +50,7 @@ export function createAsyncRule(
   validateFn: (v: any) => Promise<boolean>,
   message: string,
 ): FieldRule {
-  return toNaiveRule(
+  return toElementRule(
     createAsyncRuleCore(trigger as any, validateFn, message),
   ) as FieldRule;
 }
@@ -76,7 +74,29 @@ export const customAsyncRule = (
 ) => createAsyncRule(trigger, validateFn, message);
 
 /**
- * 验证前转换值（操作 FormItemRule，保留原行为）
+ * 把一条 FormItemRule 的 validator 执行封装为 Promise
+ */
+const runRule = (
+  rule: FormItemRule,
+  value: any,
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+    rule.validator?.(
+      rule as any,
+      value,
+      (err?: string | Error) => {
+        if (settled) return;
+        settled = true;
+        err ? reject(err) : resolve();
+      },
+      {},
+      {},
+    );
+  });
+
+/**
+ * 验证前转换值（操作 FormItemRule）
  */
 export const transform = (
   transformFn: (v: any) => any,
@@ -84,31 +104,30 @@ export const transform = (
 ): FormItemRule => {
   return {
     ...rule,
-    validator: async (r, value) => {
+    validator: (r, value, callback, source, options) => {
       const transformed = transformFn(value);
-      await rule.validator?.(r, transformed, () => {}, {}, {});
+      rule.validator?.(r, transformed, callback, source, options);
     },
   };
 };
 
 /**
- * 合并多条规则为串行验证（操作 FormItemRule，保留原行为）
+ * 合并多条规则为串行验证（操作 FormItemRule）
  */
 export function mergeRules(rules: FormItemRule[]): FormItemRule[] {
   if (rules.length <= 1) return rules;
 
   return [
     {
-      trigger: ["blur", "input"],
-      validator: async (_, value) => {
-        for (const rule of rules) {
-          try {
+      trigger: ["blur", "change"],
+      validator: (_rule, value, callback) => {
+        const run = async () => {
+          for (const rule of rules) {
             // eslint-disable-next-line no-await-in-loop
-            await rule.validator?.(rule, value, () => {}, {}, {});
-          } catch (error) {
-            throw error;
+            await runRule(rule, value);
           }
-        }
+        };
+        run().then(() => callback(), (err: Error) => callback(err));
       },
     },
   ];

@@ -22,6 +22,8 @@
 - 📦 **Tree-shaking** - 按需引入，优化打包体积
 - 💪 **TypeScript** - 完整的类型定义和类型推导
 - 🎨 **Naive UI 优先** - 完美适配 Naive UI 表单组件
+- 🧩 **跨框架共享** - 基于 [@robot-admin/form-validate-core](../form-validate-core)，与 Element Plus 版（[@robot-admin/form-validate-element](../form-validate-element)）共享同一套校验逻辑，API 一致
+- 🔢 **数据库契约** - 内置 `numeric` 数值精度规则（对标 SQL DECIMAL(p,s)）、`optional` 非必填包装器
 
 ---
 
@@ -31,12 +33,13 @@
 @robot-admin/form-validate/
 ├── src/
 │   ├── index.ts           # 主入口，导出所有模块
-│   ├── regex.ts           # 正则表达式库（22+ 常用正则）
-│   ├── utils.ts           # 核心工具函数（createRule, debounce 等）
+│   ├── adapter.ts         # naive-ui 适配层（RuleSpec → FormItemRule）
+│   ├── regex.ts           # 正则表达式库（re-export core）
+│   ├── utils.ts           # 核心工具函数（委托 core + adapter）
 │   ├── advanced.ts        # 高级功能（when, compareWith, some, every 等）
 │   ├── combos.ts          # 预设规则组合（username, password, email 等）
 │   └── rules/
-│       ├── basic.ts       # 基础验证规则（required, integer, boolean 等）
+│       ├── basic.ts       # 基础验证规则（薄包装，逻辑来自 core）
 │       ├── value.ts       # 值验证规则（字符串、数字、数组、日期）
 │       ├── format.ts      # 格式验证规则（email, mobile, url, ip 等）
 │       └── china.ts       # 中国本地化规则（idCard, bankCard, licensePlate）
@@ -45,6 +48,8 @@
     ├── index.mjs          # ES Module 格式
     └── index.d.ts         # TypeScript 类型声明
 ```
+
+> **架构说明**：自 v3.0.0 起，框架无关的校验逻辑抽离到 `@robot-admin/form-validate-core`，本包为 naive-ui 适配层，行为与历史版本完全一致。
 
 **设计原则：**
 

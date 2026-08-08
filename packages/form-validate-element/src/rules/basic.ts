@@ -1,18 +1,18 @@
 /**
- * 基础验证规则（naive-ui 版）
- * 薄包装层：从 core 引入框架无关逻辑，经 toNaiveRule 转换为 FormItemRule。
+ * 基础验证规则（element-plus 版）
+ * 薄包装层：从 core 引入框架无关逻辑，经 toElementRule 转换为 FormItemRule。
  */
 
-import { toNaiveRule } from "../adapter";
+import { toElementRule } from "../adapter";
 import {
   BasicRules,
   type RuleSpec,
 } from "@robot-admin/form-validate-core";
-import type { FormItemRule } from "naive-ui/es/form";
+import type { FormItemRule } from "element-plus";
 
 type SpecFactory = (...args: any[]) => RuleSpec;
 const wrap = <F extends SpecFactory>(f: F) =>
-  ((...args: any[]): FormItemRule => toNaiveRule(f(...args))) as F;
+  ((...args: any[]): FormItemRule => toElementRule(f(...args))) as F;
 
 export const required = wrap(BasicRules.required);
 export const integer = wrap(BasicRules.integer);

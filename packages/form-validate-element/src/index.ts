@@ -1,14 +1,19 @@
 /**
- * @robot-admin/form-validate
- * 企业级表单验证规则库，专为 Naive UI 设计
+ * @robot-admin/form-validate-element
+ * 企业级表单验证规则库，专为 Element Plus 设计
+ *
+ * 与 naive-ui 版（@robot-admin/form-validate）API 完全一致，用法一一对应。
+ * 产出的规则为 element-plus FormItemRule，可直接用于：
+ * - <el-form-item :rules>（BaseForm / 原生 el-form）
+ * - 表格内嵌编辑（advance-table column.meta.rules / jh-grid column.rules）
  */
 
-import type { FormItemRule } from "naive-ui/es/form";
+import type { FormItemRule } from "element-plus";
 
 // ==================== 类型定义 ====================
 
 /**
- * 扩展的表单验证规则类型
+ * 扩展的表单验证规则类型（与 naive 版 API 对齐）
  */
 export type FieldRule = Omit<FormItemRule, "validator"> & {
   validator: NonNullable<FormItemRule["validator"]>;
@@ -16,8 +21,11 @@ export type FieldRule = Omit<FormItemRule, "validator"> & {
 
 export type { FormItemRule };
 
+// ==================== adapter（供手动转换 RuleSpec） ====================
+export { toElementRule, toElementRules } from "./adapter";
+
 // ==================== 正则表达式库 ====================
-export { REGEX_PATTERNS } from "./regex";
+export { REGEX_PATTERNS } from "@robot-admin/form-validate-core";
 
 // ==================== 工具函数 ====================
 export {
@@ -39,14 +47,14 @@ export * as FormatRules from "./rules/format";
 export * as ChinaRules from "./rules/china";
 
 // ==================== 数据库数值契约 ====================
-import { toNaiveRule } from "./adapter";
+import { toElementRule } from "./adapter";
 import { numeric as numericCore, type NumericContract } from "@robot-admin/form-validate-core";
 
 /**
  * 数据库数值契约验证（对标 SQL DECIMAL(p, s)）
  */
 export const numeric = (contract: NumericContract, field?: string): FormItemRule =>
-  toNaiveRule(numericCore(contract, field));
+  toElementRule(numericCore(contract, field));
 export type { NumericContract };
 
 // ==================== 高级验证功能 ====================
@@ -70,7 +78,7 @@ import * as ChinaRules from "./rules/china";
 
 /**
  * PRESET_RULES - 整合所有验证规则的命名空间
- * 提供统一的规则访问接口，保持向后兼容
+ * 提供统一的规则访问接口，用法与 naive-ui 版完全一致。
  */
 export const PRESET_RULES = {
   // 基础规则
