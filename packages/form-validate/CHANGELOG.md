@@ -1,5 +1,33 @@
 # @robot-admin/form-validate
 
+## 3.2.0
+
+### Minor Changes
+
+- feat: 收敛为单包，内置 Element Plus 适配，废弃 core/element 独立包
+
+  ## 破坏性变更（包结构）
+
+  - 废弃 `@robot-admin/form-validate-core` 和 `@robot-admin/form-validate-element` 两个独立包
+  - 收敛为 `@robot-admin/form-validate` 单包，零 UI 框架依赖（不再声明 naive-ui/element-plus peerDep）
+
+  ## 新增能力
+
+  - 内置 `toElementRule` / `toElementRules` 适配器，RuleSpec 可一键转 Element Plus 规则
+  - 新增 `ELEMENT_RULES` 预设（element-plus 版）、`ELEMENT_COMBOS` 组合
+  - 新增 `whenElement` / `compareWithElement` / `someElement` / `everyElement` 等 element 版高级功能
+  - 新增 `createSpec` / `whenSpec` 等框架无关 API，以及 `SPEC_RULES` 预设
+
+  ## 向后兼容
+
+  - `PRESET_RULES` / `RULE_COMBOS` / `createRule` / `when` ... 等全部 naive API 保持不变
+  - `FieldRule` 类型别名保留
+
+  ## 技术改进
+
+  - rules 全部产出框架无关 RuleSpec，naive/element 预设仅末尾适配器包装，零逻辑重复
+  - 63 个 vitest 用例覆盖
+
 ## 3.0.1
 
 ### Patch Changes

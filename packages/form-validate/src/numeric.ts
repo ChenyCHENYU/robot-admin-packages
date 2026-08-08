@@ -1,11 +1,8 @@
 /**
  * 数据库数值契约验证
  *
- * 从企业级生产系统中提炼的通用规则：对标 SQL DECIMAL(p, s) 字段契约，
- * 校验整数/小数格式、有限性、总位数、小数位数、取值范围。
- *
- * 语义为「非必填」：值为空（null/undefined/纯空格）时直接放行。
- * 需要必填时与 required 组合使用。
+ * 对标 SQL DECIMAL(p, s) 字段契约，校验整数/小数格式、有限性、总位数、
+ * 小数位数、取值范围。语义为「非必填」：值为空时直接放行。
  */
 
 import type { RuleSpec, ValidateResult } from "./types";
@@ -48,14 +45,10 @@ const digitCounts = (text: string) => {
 };
 
 /**
- * 创建数据库数值契约验证规则。
- *
- * @param contract 数值契约
- * @param field 字段名（用于错误消息）
+ * 创建数据库数值契约验证规则（RuleSpec）。
  *
  * @example
  * numeric({ kind: 'decimal', totalDigits: 11, fractionDigits: 3, min: 0 }, '温度')
- * numeric({ kind: 'integer', totalDigits: 11, min: 1 }, '处理次数')
  */
 export function numeric(
   contract: NumericContract,

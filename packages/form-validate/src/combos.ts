@@ -1,77 +1,114 @@
 /**
  * 预设规则组合
- * 常用验证规则的组合，开箱即用
+ * - RULE_COMBOS：返回 RuleSpec[]（框架无关，需自行 toNaiveRules/toElementRules）
+ * - NAIVE_COMBOS：返回 NaiveRule[]（向后兼容）
+ * - ELEMENT_COMBOS：返回 ElementRule[]
  */
 
-import * as BasicRules from "./rules/basic";
-import * as FormatRules from "./rules/format";
-import * as ChinaRules from "./rules/china";
+import * as BasicSpecs from "./rules/basic";
+import * as FormatSpecs from "./rules/format";
+import * as ChinaSpecs from "./rules/china";
+import { numeric, type NumericContract } from "./numeric";
+import { toElementRule, toNaiveRule } from "./adapter";
+import type { ElementRule, NaiveRule, RuleSpec } from "./types";
+
+const wrapAll = <T extends Record<string, (...a: any[]) => RuleSpec>>(
+  specs: T,
+  adapt: (s: RuleSpec) => any,
+) => {
+  const out: Record<string, (...a: any[]) => any> = {};
+  for (const key of Object.keys(specs)) {
+    out[key] = (...args: any[]) => adapt(specs[key](...args));
+  }
+  return out as { [K in keyof T]: (...a: Parameters<T[K]>) => ReturnType<T[K]> extends RuleSpec ? any : any };
+};
 
 /**
- * 常用规则组合库
+ * 框架无关规则命名空间（RuleSpec）
  */
-export const RULE_COMBOS = {
-  /**
-   * 用户名规则组合（必填 + 格式）
-   */
-  username: (field: string = "用户名") => [
-    BasicRules.required(field),
-    FormatRules.username(field),
-  ],
+export const BASIC_SPECS = BasicSpecs;
+export const FORMAT_SPECS = FormatSpecs;
+export const CHINA_SPECS = ChinaSpecs;
 
-  /**
-   * 密码规则组合（必填 + 强密码）
-   */
-  password: (field: string = "密码") => [
-    BasicRules.required(field),
-    FormatRules.strongPassword(field),
+/**
+ * naive-ui 预设组合（向后兼容，返回 NaiveRule[]）
+ */
+export const NAIVE_COMBOS = {
+  username: (field: string = "用户名"): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(FormatSpecs.username(field)),
   ],
-
-  /**
-   * 邮箱规则组合（必填 + 格式）
-   */
-  email: (field: string = "邮箱") => [
-    BasicRules.required(field),
-    FormatRules.email(field),
+  password: (field: string = "密码"): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(FormatSpecs.strongPassword(field)),
   ],
-
-  /**
-   * 手机号规则组合（必填 + 格式）
-   */
-  mobile: (field: string = "手机号") => [
-    BasicRules.required(field),
-    FormatRules.mobile(field),
+  email: (field: string = "邮箱"): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(FormatSpecs.email(field)),
   ],
-
-  /**
-   * 确认密码规则组合（必填 + 一致性）
-   */
-  confirmPassword: (field: string, getOriginalValue: () => any) => [
-    BasicRules.required(field),
-    FormatRules.confirmPassword(field, getOriginalValue),
+  mobile: (field: string = "手机号"): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(FormatSpecs.mobile(field)),
   ],
-
-  /**
-   * 身份证号规则组合（必填 + 格式）
-   */
-  idCard: (field: string = "身份证号") => [
-    BasicRules.required(field),
-    ChinaRules.idCard(field),
+  confirmPassword: (field: string, getOriginalValue: () => any): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(FormatSpecs.confirmPassword(field, getOriginalValue)),
   ],
-
-  /**
-   * 银行卡号规则组合（必填 + 格式）
-   */
-  bankCard: (field: string = "银行卡号") => [
-    BasicRules.required(field),
-    ChinaRules.bankCard(field),
+  idCard: (field: string = "身份证号"): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(ChinaSpecs.idCard(field)),
   ],
-
-  /**
-   * URL规则组合（必填 + 格式）
-   */
-  url: (field: string = "链接") => [
-    BasicRules.required(field),
-    FormatRules.url(field),
+  bankCard: (field: string = "银行卡号"): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(ChinaSpecs.bankCard(field)),
+  ],
+  url: (field: string = "链接"): NaiveRule[] => [
+    toNaiveRule(BasicSpecs.required(field)),
+    toNaiveRule(FormatSpecs.url(field)),
   ],
 };
+
+/**
+ * element-plus 预设组合（返回 ElementRule[]）
+ */
+export const ELEMENT_COMBOS = {
+  username: (field: string = "用户名"): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(FormatSpecs.username(field)),
+  ],
+  password: (field: string = "密码"): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(FormatSpecs.strongPassword(field)),
+  ],
+  email: (field: string = "邮箱"): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(FormatSpecs.email(field)),
+  ],
+  mobile: (field: string = "手机号"): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(FormatSpecs.mobile(field)),
+  ],
+  confirmPassword: (field: string, getOriginalValue: () => any): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(FormatSpecs.confirmPassword(field, getOriginalValue)),
+  ],
+  idCard: (field: string = "身份证号"): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(ChinaSpecs.idCard(field)),
+  ],
+  bankCard: (field: string = "银行卡号"): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(ChinaSpecs.bankCard(field)),
+  ],
+  url: (field: string = "链接"): ElementRule[] => [
+    toElementRule(BasicSpecs.required(field)),
+    toElementRule(FormatSpecs.url(field)),
+  ],
+};
+
+/**
+ * @deprecated 历史别名，等同 NAIVE_COMBOS。保留以向后兼容。
+ */
+export const RULE_COMBOS = NAIVE_COMBOS;
+
+export type { NumericContract };

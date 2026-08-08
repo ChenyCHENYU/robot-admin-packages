@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>企业级表单验证规则库</b><br>
-  专为 Naive UI 设计，提供丰富的验证规则和高级功能
+  单包同时支持 Naive UI 与 Element Plus，一套规则逻辑两套适配输出
 </p>
 
 <p align="center">
@@ -21,8 +21,8 @@
 - 🇨🇳 **中国本地化** - 身份证、银行卡、车牌号等专属验证
 - 📦 **Tree-shaking** - 按需引入，优化打包体积
 - 💪 **TypeScript** - 完整的类型定义和类型推导
-- 🎨 **Naive UI 优先** - 完美适配 Naive UI 表单组件
-- 🧩 **跨框架共享** - 基于 [@robot-admin/form-validate-core](../form-validate-core)，与 Element Plus 版（[@robot-admin/form-validate-element](../form-validate-element)）共享同一套校验逻辑，API 一致
+- 🎨 **Naive UI 优先** - 默认导出适配 Naive UI 表单组件
+- 🧩 **单包双框架** - 内置 `toElementRule` 适配器，同一套规则逻辑可直接用于 Element Plus，无需额外包
 - 🔢 **数据库契约** - 内置 `numeric` 数值精度规则（对标 SQL DECIMAL(p,s)）、`optional` 非必填包装器
 
 ---
@@ -33,13 +33,16 @@
 @robot-admin/form-validate/
 ├── src/
 │   ├── index.ts           # 主入口，导出所有模块
-│   ├── adapter.ts         # naive-ui 适配层（RuleSpec → FormItemRule）
-│   ├── regex.ts           # 正则表达式库（re-export core）
-│   ├── utils.ts           # 核心工具函数（委托 core + adapter）
-│   ├── advanced.ts        # 高级功能（when, compareWith, some, every 等）
-│   ├── combos.ts          # 预设规则组合（username, password, email 等）
+│   ├── types.ts           # 类型定义（RuleSpec / NaiveRule / ElementRule）
+│   ├── adapter.ts         # 双适配器（toNaiveRule / toElementRule）
+│   ├── regex.ts           # 正则表达式库（40+ 常用正则）
+│   ├── utils.ts           # 核心工具（createSpec / createRule / optional 等）
+│   ├── numeric.ts         # 数据库数值契约（DECIMAL(p,s)）
+│   ├── advanced.ts        # 高级功能（when / compareWith / some / every 等）
+│   ├── combos.ts          # 预设规则组合（RULE_COMBOS / ELEMENT_COMBOS）
+│   ├── presets.ts         # 整合预设（PRESET_RULES / ELEMENT_RULES）
 │   └── rules/
-│       ├── basic.ts       # 基础验证规则（薄包装，逻辑来自 core）
+│       ├── basic.ts       # 基础验证规则（产 RuleSpec）
 │       ├── value.ts       # 值验证规则（字符串、数字、数组、日期）
 │       ├── format.ts      # 格式验证规则（email, mobile, url, ip 等）
 │       └── china.ts       # 中国本地化规则（idCard, bankCard, licensePlate）
@@ -49,7 +52,8 @@
     └── index.d.ts         # TypeScript 类型声明
 ```
 
-> **架构说明**：自 v3.0.0 起，框架无关的校验逻辑抽离到 `@robot-admin/form-validate-core`，本包为 naive-ui 适配层，行为与历史版本完全一致。
+> **架构说明**：所有规则逻辑产出框架无关的 `RuleSpec`，再通过 `toNaiveRule` / `toElementRule`
+> 适配为各框架规则对象。`PRESET_RULES`（naive）与 `ELEMENT_RULES`（element-plus）共享同一份规则工厂，零逻辑重复。
 
 **设计原则：**
 

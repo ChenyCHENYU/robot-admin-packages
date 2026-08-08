@@ -1,20 +1,23 @@
 /**
  * @robot-admin/form-validate
- * 企业级表单验证规则库，专为 Naive UI 设计
+ * 企业级表单验证规则库 —— 单包同时支持 Naive UI 与 Element Plus
+ *
+ * 设计：所有规则逻辑产出框架无关的 RuleSpec（一份源真相），
+ * 通过 toNaiveRule / toElementRule 适配为各框架规则。
+ *
+ * - naive-ui 用户：PRESET_RULES / RULE_COMBOS / createRule / when ...（向后兼容）
+ * - element-plus 用户：ELEMENT_RULES / ELEMENT_COMBOS / toElementRule / whenElement ...
  */
-
-import type { FormItemRule } from "naive-ui/es/form";
 
 // ==================== 类型定义 ====================
-
-/**
- * 扩展的表单验证规则类型
- */
-export type FieldRule = Omit<FormItemRule, "validator"> & {
-  validator: NonNullable<FormItemRule["validator"]>;
-};
-
-export type { FormItemRule };
+export type {
+  RuleSpec,
+  NaiveRule,
+  ElementRule,
+  Trigger,
+  ValidateResult,
+  FieldRule,
+} from "./types";
 
 // ==================== 正则表达式库 ====================
 export { REGEX_PATTERNS } from "./regex";
@@ -23,64 +26,69 @@ export { REGEX_PATTERNS } from "./regex";
 export {
   debounce,
   createMessageTemplate,
+  isBlank,
+  createSpec,
+  createAsyncSpec,
+  mergeTriggers,
+  optional,
+  transform,
+  mergeSpecs,
+  // 向后兼容（返回 NaiveRule）
   createRule,
   createAsyncRule,
-  transform,
   customRule,
   customAsyncRule,
   mergeRules,
-  _mergeRules, // 向后兼容
+  _mergeRules,
 } from "./utils";
 
-// ==================== 基础验证规则 ====================
+// ==================== 适配器 ====================
+export {
+  runSpec,
+  toNaiveRule,
+  toNaiveRules,
+  toElementRule,
+  toElementRules,
+} from "./adapter";
+
+// ==================== 规则工厂（框架无关 RuleSpec） ====================
 export * as BasicRules from "./rules/basic";
 export * as ValueRules from "./rules/value";
 export * as FormatRules from "./rules/format";
 export * as ChinaRules from "./rules/china";
 
 // ==================== 数据库数值契约 ====================
-import { toNaiveRule } from "./adapter";
-import { numeric as numericCore, type NumericContract } from "@robot-admin/form-validate-core";
-
-/**
- * 数据库数值契约验证（对标 SQL DECIMAL(p, s)）
- */
-export const numeric = (contract: NumericContract, field?: string): FormItemRule =>
-  toNaiveRule(numericCore(contract, field));
-export type { NumericContract };
+export { numeric } from "./numeric";
+export type { NumericContract } from "./numeric";
 
 // ==================== 高级验证功能 ====================
 export {
+  // 框架无关
+  whenSpec,
+  compareWithSpec,
+  debouncedAsyncCheckSpec,
+  someSpec,
+  everySpec,
+  // naive 版（向后兼容）
   when,
   compareWith,
   debouncedAsyncCheck,
   some,
   every,
+  // element 版
+  whenElement,
+  compareWithElement,
+  debouncedAsyncCheckElement,
+  someElement,
+  everyElement,
 } from "./advanced";
 
 // ==================== 预设规则组合 ====================
-export { RULE_COMBOS } from "./combos";
+export {
+  RULE_COMBOS,
+  NAIVE_COMBOS,
+  ELEMENT_COMBOS,
+} from "./combos";
 
 // ==================== 整合的预设规则对象 ====================
-
-import * as BasicRules from "./rules/basic";
-import * as ValueRules from "./rules/value";
-import * as FormatRules from "./rules/format";
-import * as ChinaRules from "./rules/china";
-
-/**
- * PRESET_RULES - 整合所有验证规则的命名空间
- * 提供统一的规则访问接口，保持向后兼容
- */
-export const PRESET_RULES = {
-  // 基础规则
-  ...BasicRules,
-  // 值验证规则（字符串、数字、数组、日期）
-  ...ValueRules,
-  // 格式规则
-  ...FormatRules,
-  // 中国本地化规则
-  ...ChinaRules,
-  // 数据库数值契约
-  numeric,
-};
+export { SPEC_RULES, PRESET_RULES, ELEMENT_RULES } from "./presets";
