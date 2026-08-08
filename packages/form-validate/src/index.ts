@@ -61,6 +61,9 @@ export * as ChinaRules from "./rules/china";
 export { numeric } from "./numeric";
 export type { NumericContract } from "./numeric";
 
+// ==================== 批量校验工具（提交前 / 表格场景） ====================
+export { validateValue, validateRecord, validateRows } from "./validate";
+
 // ==================== 高级验证功能 ====================
 export {
   // 框架无关

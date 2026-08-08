@@ -1,5 +1,28 @@
 # @robot-admin/form-validate
 
+## 3.3.0
+
+### Minor Changes
+
+- feat: 新增批量校验工具 validateValue / validateRecord / validateRows
+
+  ## 新增能力
+
+  - `validateValue(value, rules)` —— 校验单个值，返回第一条失败消息（null 表示通过）
+  - `validateRecord(record, ruleMap)` —— 校验一条记录的多字段，返回 { field, message }
+  - `validateRows(rows, ruleMap)` —— 表格提交场景，校验多行，返回 { rowIndex, field, message }
+
+  ## 价值
+
+  让「表格提交前批量校验」与「表单实时校验」共用同一份 RuleSpec，
+  消除业务侧手写遍历逻辑（如 validateSteelRecord / validateRows）。
+  同一套规则定义既可经 toElementRules 喂给 el-form/表格列实时校验，
+  也可经 validateRows 在提交时做兜底，零逻辑重复。
+
+  ## 测试
+
+  新增 17 个用例（总计 80），覆盖空规则、异步规则、消息透传、缺失字段、表格多行、startIndex 偏移等。
+
 ## 3.2.0
 
 ### Minor Changes
