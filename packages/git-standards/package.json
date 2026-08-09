@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/git-standards",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "零配置 Git 标准化工具包 - 集成 Commitizen + Commitlint + ESLint + Prettier + Husky",
   "type": "module",
   "keywords": [
@@ -41,12 +41,17 @@
     "README.md",
     "CHANGELOG.md"
   ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --fix",
-    "test": "vitest",
+    "test": "vitest run tests",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {

@@ -20,38 +20,94 @@ export interface CSVOptions {
 
 // ==================== 内部工具函数 ====================
 
-/**
- * @description 解析 CSV 行（处理引号字段）
- */
-function parseCSVLine(line: string, delimiter: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (inQuotes) {
-      if (char === '"' && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (char === '"') {
-        inQuotes = false;
-      } else {
-        current += char;
-      }
-    } else {
-      if (char === '"') {
-        inQuotes = true;
-      } else if (char === delimiter) {
-        result.push(current.trim());
-        current = "";
-      } else {
-        current += char;
-      }
-    }
+function validateDelimiter(delimiter: string): void {
+  if (!delimiter || /["\r\n]/.test(delimiter)) {
+    throw new RangeError("CSV 分隔符不能为空，且不能包含引号或换行符");
   }
-  result.push(current.trim());
-  return result;
+}
+
+/**
+ * @description 按 RFC 4180 解析完整 CSV 文档（支持引号字段内换行）
+ */
+function parseCSVRecords(content: string, delimiter: string): string[][] {
+  validateDelimiter(delimiter);
+  if (content.length === 0) return [];
+
+  const records: string[][] = [];
+  let record: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  let afterQuote = false;
+  let recordStarted = false;
+
+  const finishField = () => {
+    record.push(field);
+    field = "";
+    afterQuote = false;
+  };
+  const finishRecord = () => {
+    finishField();
+    records.push(record);
+    record = [];
+    recordStarted = false;
+  };
+
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (content[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+          afterQuote = true;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (content.startsWith(delimiter, i)) {
+      finishField();
+      recordStarted = true;
+      i += delimiter.length - 1;
+      continue;
+    }
+
+    if (char === "\r" || char === "\n") {
+      finishRecord();
+      if (char === "\r" && content[i + 1] === "\n") i++;
+      continue;
+    }
+
+    if (afterQuote) {
+      // 兼容常见导出器在闭合引号后、分隔符前插入的空白。
+      if (char === " " || char === "\t") continue;
+      throw new SyntaxError(`CSV 第 ${i + 1} 个字符处存在非法的引号后内容`);
+    }
+
+    if (char === '"') {
+      if (field.length > 0) {
+        throw new SyntaxError(`CSV 第 ${i + 1} 个字符处存在未转义的引号`);
+      }
+      inQuotes = true;
+      recordStarted = true;
+      continue;
+    }
+
+    field += char;
+    recordStarted = true;
+  }
+
+  if (inQuotes) throw new SyntaxError("CSV 存在未闭合的引号字段");
+  if (recordStarted || record.length > 0 || field.length > 0 || afterQuote) {
+    finishRecord();
+  }
+
+  return records;
 }
 
 /**
@@ -99,28 +155,34 @@ export function useCSV() {
   ): Record<string, any>[] => {
     const { delimiter = ",", skipEmptyLines = true } = options;
 
-    // 移除 BOM
+    validateDelimiter(delimiter);
+
+    // 只移除文档开头的 UTF-8 BOM
     const cleanContent = content.replace(/^\uFEFF/, "");
-    let lines = cleanContent.split(/\r?\n/);
+    let records = parseCSVRecords(cleanContent, delimiter);
 
     if (skipEmptyLines) {
-      lines = lines.filter((line) => line.trim() !== "");
+      records = records.filter(
+        (record) => !(record.length === 1 && record[0].trim() === ""),
+      );
     }
 
-    if (lines.length === 0) return [];
+    if (records.length === 0) return [];
 
     const headers =
       options.headers ||
-      parseCSVLine(lines[0], delimiter).map((h) =>
-        h.replace(/^"|"$/g, "").trim(),
-      );
+      records[0].map((header) => header.trim());
+    const duplicateHeader = headers.find(
+      (header, index) => headers.indexOf(header) !== index,
+    );
+    if (duplicateHeader !== undefined) {
+      throw new SyntaxError(`CSV 存在重复表头: ${duplicateHeader}`);
+    }
     const startIndex = options.headers ? 0 : 1;
 
-    return lines
+    return records
       .slice(startIndex)
-      .filter((line) => line.trim())
-      .map((line) => {
-        const values = parseCSVLine(line, delimiter);
+      .map((values) => {
         const obj: Record<string, any> = {};
         headers.forEach((h, i) => {
           obj[h] = values[i] !== undefined ? values[i] : "";
@@ -139,6 +201,7 @@ export function useCSV() {
     if (!data.length) return "";
 
     const { delimiter = "," } = options;
+    validateDelimiter(delimiter);
     const headers = options.headers || Object.keys(data[0]);
 
     const rows = [
@@ -149,7 +212,7 @@ export function useCSV() {
           .join(delimiter),
       ),
     ];
-    return rows.join("\n");
+    return rows.join("\r\n");
   };
 
   /**

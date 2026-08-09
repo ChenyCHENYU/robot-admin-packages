@@ -14,7 +14,8 @@ import type {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
-import { createAxiosInstance, setGlobalAxiosInstance } from "./axios/request";
+import { createAxiosInstance } from "./axios/request";
+import { setGlobalAxiosInstance } from "./axios/service";
 
 /**
  * 全局配置存储
@@ -140,7 +141,7 @@ export interface RequestCoreConfig {
  * 创建 Request Core 实例
  *
  * @description
- * 初始化 axios 实例并注册 7 个内置插件（cache、retry、dedupe、cancel、request、response、reLogin）
+ * 初始化 axios 实例并注册 6 个内置插件；reLogin 通过显式共享 Promise 协调
  * 返回 Vue 插件对象和 axios 实例
  *
  * @param config Request Core 配置
@@ -149,7 +150,13 @@ export interface RequestCoreConfig {
  * @example
  * ```ts
  * // main.ts
- * import { createRequestCore, onReLoginSuccess } from '@robot-admin/request-core'
+ * import {
+ *   createRequestCore,
+ *   getReLoginPromise,
+ *   waitForReLogin,
+ *   onReLoginSuccess,
+ *   onReLoginCancel,
+ * } from '@robot-admin/request-core'
  * import { useUserStore } from '@/stores/user'
  *
  * const requestCore = createRequestCore({
@@ -178,11 +185,14 @@ export interface RequestCoreConfig {
  *     // 响应错误拦截：处理 401
  *     responseError: async (error) => {
  *       if (error.response?.status === 401) {
- *         // 触发重新登录逻辑
+ *         const shouldStartLogin = !getReLoginPromise()
+ *         const waiting = waitForReLogin()
  *         const userStore = useUserStore()
- *         await userStore.reLogin()
- *         onReLoginSuccess() // 通知所有等待的请求继续
- *         return Promise.reject(error)
+ *         if (shouldStartLogin) {
+ *           userStore.reLogin().then(onReLoginSuccess, onReLoginCancel)
+ *         }
+ *         await waiting
+ *         return requestCore.axiosInstance.request(error.config)
  *       }
  *       return Promise.reject(error)
  *     }

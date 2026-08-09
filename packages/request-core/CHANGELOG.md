@@ -1,5 +1,16 @@
 # @robot-admin/request-core
 
+## 0.2.0
+
+### Minor Changes
+
+- Share one AbortController across caller signals, dedupe and route cancellation, and fix stale-request cleanup races.
+- Retry only idempotent HTTP methods by default, add configurable method allowlists and ±25% jitter, and make backoff cancellation leak-free.
+- Include authorization, tenant and user headers in default cache/dedupe keys to prevent cross-identity reuse.
+- Implement shared re-login promises with explicit success/cancel settlement for concurrent 401 responses.
+- Add `@robot-admin/request-core/axios` and `/crud` subpath exports, and make Axios a peer dependency to avoid duplicate-instance cancellation issues.
+- Add regression tests for cancellation, concurrency, retry safety, cache identity and re-login coordination.
+
 ## 0.1.3
 
 ### Patch Changes

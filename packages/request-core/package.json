@@ -1,7 +1,7 @@
 {
   "name": "@robot-admin/request-core",
-  "version": "0.1.3",
-  "description": "Axios + 7 plugins + CRUD composables for Vue 3",
+  "version": "0.2.0",
+  "description": "Axios request orchestration + CRUD composables for Vue 3",
   "type": "module",
   "keywords": [
     "vue",
@@ -25,12 +25,23 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./axios": {
+      "types": "./dist/axios.d.ts",
+      "import": "./dist/axios.js",
+      "require": "./dist/axios.cjs"
+    },
+    "./crud": {
+      "types": "./dist/crud.d.ts",
+      "import": "./dist/crud.js",
+      "require": "./dist/crud.cjs"
     }
   },
   "files": [
     "dist",
     "README.md"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -38,22 +49,30 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "vitest run tests",
     "type-check": "tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "peerDependencies": {
     "vue": "^3.4.0",
-    "naive-ui": "^2.38.0"
-  },
-  "dependencies": {
+    "naive-ui": "^2.38.0",
     "axios": "^1.7.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    },
+    "naive-ui": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "typescript": "^5.8.0",
     "tsup": "^8.1.0",
     "vue": "^3.4.0",
-    "naive-ui": "^2.38.0"
+    "naive-ui": "^2.38.0",
+    "axios": "^1.7.0"
   }
 }

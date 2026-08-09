@@ -32,6 +32,7 @@ export type ClickOutsideBinding =
 interface ElType extends HTMLElement {
   _clickOutsideHandler?: (event: MouseEvent | TouchEvent) => void;
   _clickOutsideOptions?: ClickOutsideOptions;
+  _clickOutsideTimer?: ReturnType<typeof setTimeout>;
 }
 
 /**
@@ -73,18 +74,22 @@ function bindListener(el: ElType, options: ClickOutsideOptions): void {
   if (!options.enabled) return;
 
   const handler = (event: Event) => {
+    const currentOptions = el._clickOutsideOptions;
+    if (!currentOptions?.enabled) return;
     const target = event.target as Node | null;
     // 点击发生在元素内部 → 不触发
     if (!target || el.contains(target)) return;
     // 在排除列表中 → 不触发
-    if (isExcluded(target, options.exclude)) return;
-    options.handler(event as MouseEvent | TouchEvent);
+    if (isExcluded(target, currentOptions.exclude)) return;
+    currentOptions.handler(event as MouseEvent | TouchEvent);
   };
 
   el._clickOutsideHandler = handler as ElType["_clickOutsideHandler"];
 
   // 使用捕获阶段 + 延迟绑定（避免挂载当帧的点击事件被误捕获）
-  setTimeout(() => {
+  // 记录定时器句柄，卸载时可清理，防止"同 tick 卸载导致监听泄漏"
+  el._clickOutsideTimer = setTimeout(() => {
+    el._clickOutsideTimer = undefined;
     document.addEventListener("mousedown", handler);
     document.addEventListener("touchstart", handler, { passive: true });
   }, 0);
@@ -96,6 +101,11 @@ function bindListener(el: ElType, options: ClickOutsideOptions): void {
  * ! @return void
  */
 function unbindListener(el: ElType): void {
+  // 若延迟绑定尚未执行（同 tick 卸载），取消定时器避免泄漏监听
+  if (el._clickOutsideTimer !== undefined) {
+    clearTimeout(el._clickOutsideTimer);
+    el._clickOutsideTimer = undefined;
+  }
   if (el._clickOutsideHandler) {
     document.removeEventListener("mousedown", el._clickOutsideHandler);
     document.removeEventListener("touchstart", el._clickOutsideHandler);
@@ -145,12 +155,11 @@ const clickOutsideDirective: Directive<
     const options = parseOptions(binding.value);
     const prev = el._clickOutsideOptions;
 
-    // 仅在 enabled 状态或 handler 变化时重新绑定
-    if (
-      options.enabled !== prev?.enabled ||
-      options.handler !== prev?.handler
-    ) {
+    // enabled 切换时才变更监听；handler/exclude 由闭包实时读取最新配置
+    if (options.enabled !== prev?.enabled) {
       bindListener(el, options);
+    } else {
+      el._clickOutsideOptions = options;
     }
   },
 

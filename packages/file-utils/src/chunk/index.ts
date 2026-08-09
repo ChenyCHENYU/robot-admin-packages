@@ -48,6 +48,7 @@ export type ChunkUploadFn = (
   index: number,
   total: number,
   hash: string,
+  signal: AbortSignal,
 ) => Promise<any>;
 
 /** 分片合并回调函数 */
@@ -78,16 +79,26 @@ async function calculateFileHash(file: File): Promise<string> {
     );
   }
 
-  // 合并数据
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
-  const combined = new Uint8Array(totalLength);
+  // 合并首尾块，并预留 8 字节将文件大小真正纳入 SHA-256 输入
+  const contentLength = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+  const combined = new Uint8Array(contentLength + 8);
   let offset = 0;
   for (const chunk of chunks) {
     combined.set(new Uint8Array(chunk), offset);
     offset += chunk.byteLength;
   }
 
-  // 使用 SubtleCrypto 计算 SHA-256
+  new DataView(combined.buffer).setBigUint64(
+    contentLength,
+    BigInt(file.size),
+    false,
+  );
+
+  // 使用 SubtleCrypto 计算 SHA-256；非安全上下文（http 非 localhost）需调用方降级处理
+  if (typeof crypto === "undefined" || !crypto.subtle?.digest) {
+    throw new Error("当前环境不支持 crypto.subtle（需 HTTPS 或 localhost）");
+  }
+  // 文件大小已写入 combined 尾部，因此返回值仍保持标准 64 位十六进制 SHA-256 格式
   const hashBuffer = await crypto.subtle.digest("SHA-256", combined);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -99,23 +110,55 @@ async function calculateFileHash(file: File): Promise<string> {
 async function executeWithConcurrency(
   tasks: Array<() => Promise<void>>,
   concurrent: number,
+  onError?: (error: unknown) => void,
 ): Promise<void> {
-  const results: Promise<void>[] = [];
-  const executing: Set<Promise<void>> = new Set();
+  let nextTaskIndex = 0;
+  let hasError = false;
+  let firstError: unknown;
 
-  for (const task of tasks) {
-    const p = task().then(() => {
-      executing.delete(p);
-    });
-    results.push(p);
-    executing.add(p);
+  const worker = async () => {
+    while (!hasError) {
+      const taskIndex = nextTaskIndex++;
+      if (taskIndex >= tasks.length) return;
 
-    if (executing.size >= concurrent) {
-      await Promise.race(executing);
+      try {
+        await tasks[taskIndex]();
+      } catch (error) {
+        if (!hasError) {
+          hasError = true;
+          firstError = error;
+          onError?.(error);
+        }
+      }
     }
-  }
+  };
 
-  await Promise.all(results);
+  const workerCount = Math.min(concurrent, tasks.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+  if (hasError) throw firstError;
+}
+
+function assertPositiveInteger(value: number, name: string): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new RangeError(`${name} 必须是大于 0 的整数`);
+  }
+}
+
+function waitForRetry(ms: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false);
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 // ==================== 分片上传 ====================
@@ -151,6 +194,13 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
     retries = 3,
   } = options;
 
+  assertPositiveInteger(chunkSize, "chunkSize");
+  assertPositiveInteger(concurrent, "concurrent");
+  assertPositiveInteger(retries, "retries");
+
+  let activeController: AbortController | null = null;
+  let uploadInProgress = false;
+
   const state = ref<ChunkUploadState>({
     progress: 0,
     uploading: false,
@@ -165,8 +215,15 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
     uploadFn: ChunkUploadFn,
     mergeFn?: ChunkMergeFn,
   ): Promise<void> => {
+    if (uploadInProgress) {
+      throw new Error("已有分片上传任务正在执行");
+    }
+
+    uploadInProgress = true;
+    const controller = new AbortController();
+    activeController = controller;
+    const { signal } = controller;
     const totalChunks = Math.ceil(file.size / chunkSize);
-    const hash = await calculateFileHash(file);
 
     state.value = {
       progress: 0,
@@ -177,58 +234,68 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
       aborted: false,
     };
 
-    const startTime = Date.now();
-    let completedChunks = 0;
-
-    // 创建分片任务
-    const tasks: Array<() => Promise<void>> = [];
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, file.size);
-      const chunk = file.slice(start, end);
-
-      tasks.push(async () => {
-        if (state.value.aborted) return;
-
-        let attempt = 0;
-        while (attempt < retries) {
-          try {
-            await uploadFn(chunk, i, totalChunks, hash);
-            completedChunks++;
-            state.value.currentChunk = completedChunks;
-            state.value.progress = Math.round(
-              (completedChunks / totalChunks) * 100,
-            );
-
-            const elapsed = (Date.now() - startTime) / 1000;
-            state.value.speed =
-              elapsed > 0 ? (completedChunks * chunkSize) / elapsed : 0;
-            break;
-          } catch (err) {
-            attempt++;
-            if (attempt >= retries) throw err;
-            // 等待后重试
-            await new Promise((r) => setTimeout(r, 1000 * attempt));
-          }
-        }
-      });
-    }
-
     try {
+      const hash = await calculateFileHash(file);
+      if (signal.aborted) return;
+
+      const startTime = Date.now();
+      let completedChunks = 0;
+      let uploadedBytes = 0;
+
+      // 创建分片任务
+      const tasks: Array<() => Promise<void>> = [];
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end);
+
+        tasks.push(async () => {
+          if (signal.aborted) return;
+
+          let attempt = 0;
+          while (attempt < retries && !signal.aborted) {
+            try {
+              await uploadFn(chunk, i, totalChunks, hash, signal);
+              if (signal.aborted) return;
+
+              completedChunks++;
+              uploadedBytes += chunk.size;
+              state.value.currentChunk = completedChunks;
+              state.value.progress = Math.round(
+                (completedChunks / totalChunks) * 100,
+              );
+
+              const elapsed = (Date.now() - startTime) / 1000;
+              state.value.speed = elapsed > 0 ? uploadedBytes / elapsed : 0;
+              return;
+            } catch (err) {
+              if (signal.aborted) return;
+              attempt++;
+              if (attempt >= retries) throw err;
+              if (!(await waitForRetry(1000 * attempt, signal))) return;
+            }
+          }
+        });
+      }
+
       // 并发上传
-      await executeWithConcurrency(tasks, concurrent);
+      await executeWithConcurrency(tasks, concurrent, (error) => {
+        controller.abort(error);
+      });
 
       // 合并分片
-      if (mergeFn && !state.value.aborted) {
+      if (mergeFn && !signal.aborted) {
         await mergeFn(file.name, totalChunks, hash);
       }
 
-      state.value.progress = 100;
+      if (!signal.aborted) state.value.progress = 100;
     } catch (err) {
       if (!state.value.aborted) {
         throw err;
       }
     } finally {
+      if (activeController === controller) activeController = null;
+      uploadInProgress = false;
       state.value.uploading = false;
     }
   };
@@ -236,6 +303,7 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
   const abort = () => {
     state.value.aborted = true;
     state.value.uploading = false;
+    activeController?.abort(new Error("分片上传已中止"));
   };
 
   return {

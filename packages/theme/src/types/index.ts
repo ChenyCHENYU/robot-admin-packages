@@ -34,7 +34,7 @@ export interface DesignStyleConfig {
   /** 风格描述 */
   description: string;
   /** 支持的视觉模式（light / dark），用于兼容性校验 */
-  supportedThemeModes: ThemeMode[];
+  supportedThemeModes: Array<"light" | "dark">;
   /** 推荐搭配的菜单风格标识（供消费方参考，不强制） */
   recommendedMenuTheme: string;
 }
@@ -53,6 +53,6 @@ export interface ThemeStoreOptions {
   designStyleStorageKey?: string;
   /** 是否启用 View Transition API */
   enableTransition?: boolean;
-  /** 过渡动画时长（毫秒） */
-  transitionDuration?: number;
+  /** Pinia Store 唯一标识（默认 "theme"，多实例自定义时需区分避免冲突） */
+  id?: string;
 }

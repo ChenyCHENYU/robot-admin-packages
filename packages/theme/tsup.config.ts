@@ -9,5 +9,6 @@ export default defineConfig({
   sourcemap: true,
   external: ["vue", "pinia", "naive-ui"],
   treeshake: true,
+  target: "es2020",
   minify: false,
 });

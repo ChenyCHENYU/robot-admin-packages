@@ -96,6 +96,12 @@
   }
 }
 
+.preset-card:focus-visible,
+.layout-item:focus-visible {
+  outline: 2px solid var(--n-color-target);
+  outline-offset: 2px;
+}
+
 .preset-icon {
   font-size: 36px;
   margin-bottom: 10px;

@@ -14,6 +14,7 @@ import type {
   DedupeConfig,
   EnhancedAbortController,
 } from "../types";
+import { ensureSharedAbortController } from "../utils/abort";
 import { generateRequestKey, normalizeConfig } from "../utils/helpers";
 
 /**
@@ -37,6 +38,9 @@ const DEFAULT_DEDUPE_CONFIG: Required<DedupeConfig> = {
  * - 避免重复请求造成的资源浪费
  */
 const pendingRequests = new Map<string, EnhancedAbortController>();
+const CLEANUP_INTERVAL = 30000;
+const REQUEST_TIMEOUT = 5 * 60 * 1000;
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
  * 清理超时的请求
@@ -53,11 +57,9 @@ const pendingRequests = new Map<string, EnhancedAbortController>();
  */
 function cleanupExpiredRequests(): void {
   const now = Date.now();
-  const TIMEOUT = 5 * 60 * 1000; // 5分钟
-
   Array.from(pendingRequests.entries()).forEach(([key, controller]) => {
     const startTime = controller._startTime || now;
-    if (now - startTime > TIMEOUT) {
+    if (now - startTime > REQUEST_TIMEOUT) {
       try {
         controller.abort();
       } catch (error) {
@@ -66,11 +68,34 @@ function cleanupExpiredRequests(): void {
       pendingRequests.delete(key);
     }
   });
+
+  stopCleanupTimerIfIdle();
 }
 
-// 每 30 秒清理一次，仅在浏览器环境中执行
-if (typeof window !== "undefined") {
-  setInterval(cleanupExpiredRequests, 30000);
+function startCleanupTimer(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(cleanupExpiredRequests, CLEANUP_INTERVAL);
+  (cleanupTimer as any).unref?.();
+}
+
+function stopCleanupTimerIfIdle(): void {
+  if (pendingRequests.size === 0 && cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
+}
+
+function removePendingRequest(config: EnhancedAxiosRequestConfig): void {
+  const requestKey = config.__requestKey;
+  const controller = config.__abortController;
+  if (
+    requestKey &&
+    controller &&
+    pendingRequests.get(requestKey) === controller
+  ) {
+    pendingRequests.delete(requestKey);
+  }
+  stopCleanupTimerIfIdle();
 }
 
 /**
@@ -126,17 +151,12 @@ function onRequest(
     pendingRequests.delete(requestKey);
   }
 
-  // 如果已经有 signal（来自 cancel 插件），就不创建新的
-  // 避免重复的 AbortController，确保 signal 的唯一性
-  if (config.signal) {
-    return config;
-  }
+  const controller = ensureSharedAbortController(enhancedConfig);
+  if (!controller) return config;
 
-  // 创建新的 AbortController
-  const controller = new AbortController() as EnhancedAbortController;
-  controller._startTime = Date.now();
-  config.signal = controller.signal;
+  enhancedConfig.__requestKey = requestKey;
   pendingRequests.set(requestKey, controller);
+  startCleanupTimer();
 
   return config;
 }
@@ -154,17 +174,7 @@ function onRequest(
  */
 function onResponse(response: any): any {
   const config = response.config as EnhancedAxiosRequestConfig;
-  const dedupeConfig = normalizeConfig(
-    config.dedupe,
-    DEFAULT_DEDUPE_CONFIG,
-  ) as Required<DedupeConfig>;
-
-  if (dedupeConfig.enabled) {
-    const keyGenerator =
-      dedupeConfig.keyGenerator || DEFAULT_DEDUPE_CONFIG.keyGenerator;
-    const requestKey = keyGenerator(config);
-    pendingRequests.delete(requestKey);
-  }
+  removePendingRequest(config);
 
   return response;
 }
@@ -184,17 +194,7 @@ function onResponseError(error: any): Promise<never> {
   const config = error.config as EnhancedAxiosRequestConfig;
 
   if (config) {
-    const dedupeConfig = normalizeConfig(
-      config.dedupe,
-      DEFAULT_DEDUPE_CONFIG,
-    ) as Required<DedupeConfig>;
-
-    if (dedupeConfig.enabled) {
-      const keyGenerator =
-        dedupeConfig.keyGenerator || DEFAULT_DEDUPE_CONFIG.keyGenerator;
-      const requestKey = keyGenerator(config);
-      pendingRequests.delete(requestKey);
-    }
+    removePendingRequest(config);
   }
 
   return Promise.reject(error);
@@ -237,24 +237,7 @@ export function cancelAllPendingRequests(): void {
     }
   });
   pendingRequests.clear();
-}
-
-/**
- * 页面卸载时清理请求
- *
- * 生命周期管理：
- * - beforeunload 事件触发时清理所有请求
- * - 避免页面卸载后继续发送请求
- * - 防止内存泄漏
- *
- * 浏览器兼容性：
- * - 检查 window 对象存在性
- * - 仅在浏览器环境中执行
- */
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", () => {
-    cancelAllPendingRequests();
-  });
+  stopCleanupTimerIfIdle();
 }
 
 /**

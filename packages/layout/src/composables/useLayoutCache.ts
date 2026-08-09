@@ -5,16 +5,16 @@
  * 从主项目提取的通用 composable，零业务依赖
  */
 
-import { ref, watch } from "vue";
+import { onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 /** KeepAlive 缓存选项 */
 export interface LayoutCacheOptions {
   /** 最大缓存数量，默认 20 */
   maxCacheCount?: number;
-  /** 是否在开发模式下输出日志，默认 true */
+  /** 是否输出缓存调试日志，默认 false */
   enableDevLog?: boolean;
-  /** 是否暴露调试方法到 window，默认 true */
+  /** 是否暴露调试方法到 window，默认 false */
   exposeToWindow?: boolean;
 }
 
@@ -42,17 +42,13 @@ export interface LayoutCacheOptions {
 export function useLayoutCache(options: LayoutCacheOptions = {}) {
   const {
     maxCacheCount: maxCount = 20,
-    enableDevLog = true,
-    exposeToWindow: expose = true,
+    enableDevLog = false,
+    exposeToWindow: expose = false,
   } = options;
 
   const route = useRoute();
   const cachedViews = ref<string[]>([]);
   const maxCacheCount = ref(maxCount);
-
-  const isDev =
-    typeof import.meta !== "undefined" &&
-    (import.meta as any).env?.DEV === true;
 
   /**
    * 判断页面是否应该被缓存
@@ -73,7 +69,7 @@ export function useLayoutCache(options: LayoutCacheOptions = {}) {
         cachedViews.value.shift();
       }
 
-      if (isDev && enableDevLog) {
+      if (enableDevLog) {
         console.debug(
           `[KeepAlive] ✅ 缓存: ${name} (${cachedViews.value.length}/${maxCacheCount.value})`,
         );
@@ -86,7 +82,7 @@ export function useLayoutCache(options: LayoutCacheOptions = {}) {
     const index = cachedViews.value.indexOf(name);
     if (index > -1) {
       cachedViews.value.splice(index, 1);
-      if (isDev && enableDevLog) {
+      if (enableDevLog) {
         console.debug(`[KeepAlive] ❌ 移除: ${name}`);
       }
     }
@@ -95,16 +91,29 @@ export function useLayoutCache(options: LayoutCacheOptions = {}) {
   /** 清空所有缓存 */
   const clearAllCache = () => {
     cachedViews.value = [];
-    if (isDev && enableDevLog) {
+    if (enableDevLog) {
       console.debug("[KeepAlive] 🗑️ 清空所有缓存");
     }
   };
 
   // 暴露调试方法到 window
-  if (isDev && expose && typeof window !== "undefined") {
+  const getCachedViews = () => cachedViews.value;
+  if (expose && typeof window !== "undefined") {
     (window as any).__clearCache__ = clearAllCache;
     (window as any).__removeCache__ = removeCache;
-    (window as any).__getCachedViews__ = () => cachedViews.value;
+    (window as any).__getCachedViews__ = getCachedViews;
+
+    onUnmounted(() => {
+      if ((window as any).__clearCache__ === clearAllCache) {
+        delete (window as any).__clearCache__;
+      }
+      if ((window as any).__removeCache__ === removeCache) {
+        delete (window as any).__removeCache__;
+      }
+      if ((window as any).__getCachedViews__ === getCachedViews) {
+        delete (window as any).__getCachedViews__;
+      }
+    });
   }
 
   // 监听路由变化，动态管理缓存

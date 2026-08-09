@@ -9,7 +9,6 @@ export const DEFAULT_THEME_OPTIONS = {
   storageKey: "theme-mode",
   designStyleStorageKey: "robot-admin-design-style",
   enableTransition: true,
-  transitionDuration: 500,
 };
 
 /**

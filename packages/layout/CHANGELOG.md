@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3.2
+
+### Patch Changes
+
+- Validate imported settings at runtime, support short hex colors safely, and preserve invalid color input instead of silently turning it black.
+- Use route-segment-aware menu matching so `/users` no longer activates `/users-admin`.
+- Disable cache debug logging and global window helpers by default; add configurable Settings Store ids.
+- Standardize the automatic theme value on `system` and roll back settings if asynchronous theme synchronization fails.
+- Improve menu/drawer keyboard navigation, focus restoration and ARIA state; guard browser and Canvas APIs for SSR or unsupported environments.
+- Synchronize the exported version constant with package version 2.3.2 and add regression tests for the critical settings and routing contracts.
+
 ## 2.2.0
 
 ### 🐛 Bug 修复

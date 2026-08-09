@@ -43,6 +43,17 @@ export type ImageFormat = "png" | "jpeg" | "webp";
 // ==================== 内部工具函数 ====================
 
 /**
+ * @description 安全获取 Canvas 2D 上下文（getContext 可能返回 null）
+ */
+function get2DContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("无法获取 Canvas 2D 上下文（环境不支持或上下文数量超限）");
+  }
+  return ctx;
+}
+
+/**
  * @description 从 File/Blob 加载 HTMLImageElement
  */
 function loadImage(source: File | Blob): Promise<HTMLImageElement> {
@@ -132,7 +143,7 @@ export function useImage() {
     canvas.width = width;
     canvas.height = height;
 
-    const ctx = canvas.getContext("2d")!;
+    const ctx = get2DContext(canvas);
     ctx.drawImage(img, 0, 0, width, height);
 
     return canvasToBlob(canvas, type, quality);
@@ -151,7 +162,7 @@ export function useImage() {
     canvas.width = options.width;
     canvas.height = options.height;
 
-    const ctx = canvas.getContext("2d")!;
+    const ctx = get2DContext(canvas);
     ctx.drawImage(
       img,
       options.x,
@@ -180,7 +191,7 @@ export function useImage() {
     canvas.width = img.width;
     canvas.height = img.height;
 
-    const ctx = canvas.getContext("2d")!;
+    const ctx = get2DContext(canvas);
     ctx.drawImage(img, 0, 0);
 
     const mimeType = `image/${format}`;
@@ -204,7 +215,7 @@ export function useImage() {
     canvas.width = width;
     canvas.height = targetHeight;
 
-    const ctx = canvas.getContext("2d")!;
+    const ctx = get2DContext(canvas);
     ctx.drawImage(img, 0, 0, width, targetHeight);
 
     return canvasToBlob(canvas, "image/png");

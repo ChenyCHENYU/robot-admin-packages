@@ -9,11 +9,16 @@
  */
 
 import axios, { type AxiosInstance, type AxiosRequestConfig } from "axios";
-import type { EnhancedAxiosRequestConfig } from "./types";
 import { setupPlugins, resolveReLogin, rejectReLogin } from "./plugins";
-
-// 全局 axios 实例（用于兼容）
-let globalService: AxiosInstance | null = null;
+export {
+  setGlobalAxiosInstance,
+  getGlobalAxiosInstance,
+  getData,
+  postData,
+  putData,
+  deleteData,
+} from "./service";
+export { default } from "./service";
 
 /**
  * 创建 axios 实例
@@ -44,92 +49,9 @@ export function createAxiosInstance(
   return instance;
 }
 
-/**
- * 设置全局 axios 实例
- */
-export function setGlobalAxiosInstance(instance: AxiosInstance) {
-  globalService = instance;
-}
-
-/**
- * 获取全局 axios 实例
- */
-export function getGlobalAxiosInstance(): AxiosInstance {
-  if (!globalService) {
-    throw new Error(
-      "Axios instance not initialized. Please call createRequestCore() first.",
-    );
-  }
-  return globalService;
-}
-
-// 兼容旧代码：默认导出全局实例的 getter
-export default new Proxy({} as AxiosInstance, {
-  get(target, prop) {
-    return getGlobalAxiosInstance()[prop as keyof AxiosInstance];
-  },
-});
-
-// ================= 快捷请求方式 =================
-
-/**
- * GET 请求
- * @param url 请求地址
- * @param config 请求配置（可选），支持插件配置
- */
-export const getData = async <T = any>(
-  url: string,
-  config?: EnhancedAxiosRequestConfig,
-): Promise<T> => {
-  const res = await getGlobalAxiosInstance().get(url, config);
-  return res.data;
-};
-
-/**
- * POST 请求
- * @param url 请求地址
- * @param data 请求体数据（可选）
- * @param config 请求配置（可选），支持插件配置
- */
-export const postData = async <T = any>(
-  url: string,
-  data?: any,
-  config?: EnhancedAxiosRequestConfig,
-): Promise<T> => {
-  const res = await getGlobalAxiosInstance().post(url, data, config);
-  return res.data;
-};
-
-/**
- * PUT 请求
- * @param url 请求地址
- * @param data 请求体数据（可选）
- * @param config 请求配置（可选），支持插件配置
- */
-export const putData = async <T = any>(
-  url: string,
-  data?: any,
-  config?: EnhancedAxiosRequestConfig,
-): Promise<T> => {
-  const res = await getGlobalAxiosInstance().put(url, data, config);
-  return res.data;
-};
-
-/**
- * DELETE 请求
- * @param url 请求地址
- * @param config 请求配置（可选），支持插件配置
- */
-export const deleteData = async <T = any>(
-  url: string,
-  config?: EnhancedAxiosRequestConfig,
-): Promise<T> => {
-  const res = await getGlobalAxiosInstance().delete(url, config);
-  return res.data;
-};
-
 // ================= 导出插件工具函数 =================
 export {
+  waitForReLogin,
   getReLoginPromise,
   cancelAllPendingRequests,
   getPendingRequestCount,

@@ -41,7 +41,4 @@ export function setupDirectives(app: App): void {
   Object.entries(directives).forEach(([name, directive]) => {
     app.directive(name, directive);
   });
-  console.log(
-    `✅ @robot-admin/directives 已注册 ${Object.keys(directives).length} 个指令`,
-  );
 }

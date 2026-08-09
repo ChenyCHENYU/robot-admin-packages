@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/layout",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Layout and settings management system for Robot Admin - v2.0 with decoupled architecture",
   "type": "module",
   "keywords": [
@@ -48,7 +48,8 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vue-tsc --noEmit && vite build",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "vitest run tests",
     "type-check": "vue-tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
@@ -57,7 +58,7 @@
     "vue-router": "^4.0.0",
     "pinia": "^2.0.0 || ^3.0.0",
     "naive-ui": "^2.38.0",
-    "@robot-admin/theme": "^0.1.0"
+    "@robot-admin/theme": "^0.3.0 || ^0.4.0"
   },
   "devDependencies": {
     "@robot-admin/theme": "workspace:*",

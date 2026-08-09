@@ -14,6 +14,7 @@ import type {
   CancelConfig,
   EnhancedAbortController,
 } from "../types";
+import { ensureSharedAbortController } from "../utils/abort";
 import { normalizeConfig } from "../utils/helpers";
 
 /**
@@ -52,7 +53,7 @@ let requestId = 0;
 const CLEANUP_INTERVAL = 30000; // 30 秒
 const REQUEST_TIMEOUT = 300000; // 5 分钟
 
-let cleanupTimer: NodeJS.Timeout | null = null;
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
  * 清理超时的请求
@@ -86,6 +87,7 @@ function cleanupExpiredRequests(): void {
 
   // 移除超时的请求
   expiredKeys.forEach((key) => cancelableRequests.delete(key));
+  stopCleanupTimerIfIdle();
 }
 
 /**
@@ -96,11 +98,10 @@ function cleanupExpiredRequests(): void {
  * - 设置新的定时器进行定期清理
  */
 function startCleanupTimer(): void {
-  if (cleanupTimer) {
-    clearInterval(cleanupTimer);
-  }
+  if (cleanupTimer) return;
 
   cleanupTimer = setInterval(cleanupExpiredRequests, CLEANUP_INTERVAL);
+  (cleanupTimer as any).unref?.();
 }
 
 /**
@@ -115,6 +116,10 @@ function stopCleanupTimer(): void {
     clearInterval(cleanupTimer);
     cleanupTimer = null;
   }
+}
+
+function stopCleanupTimerIfIdle(): void {
+  if (cancelableRequests.size === 0) stopCleanupTimer();
 }
 
 /**
@@ -153,12 +158,6 @@ function isInWhitelist(url: string, whitelist: RegExp[]): boolean {
 function onRequest(
   config: InternalAxiosRequestConfig,
 ): InternalAxiosRequestConfig {
-  // 检查 AbortController 兼容性
-  if (typeof AbortController === "undefined") {
-    console.warn("AbortController is not supported in this environment");
-    return config;
-  }
-
   const enhancedConfig = config as EnhancedAxiosRequestConfig;
   const cancelConfig = normalizeConfig(
     enhancedConfig.cancel,
@@ -182,16 +181,14 @@ function onRequest(
     return config;
   }
 
-  // 创建取消控制器
-  const controller = new AbortController() as EnhancedAbortController;
+  const activeController = ensureSharedAbortController(enhancedConfig);
+  if (!activeController) return config;
+
   const id = `request_${++requestId}`;
+  enhancedConfig.__cancelId = id;
 
-  // 记录请求开始时间，用于超时管理
-  controller._startTime = Date.now();
-  config.signal = controller.signal;
-  (config as any).__cancelId = id;
-
-  cancelableRequests.set(id, controller);
+  cancelableRequests.set(id, activeController);
+  startCleanupTimer();
 
   return config;
 }
@@ -212,6 +209,7 @@ function onResponse(response: any): any {
 
   if (cancelId) {
     cancelableRequests.delete(cancelId);
+    stopCleanupTimerIfIdle();
   }
 
   return response;
@@ -233,6 +231,7 @@ function onResponseError(error: any): Promise<never> {
 
   if (cancelId) {
     cancelableRequests.delete(cancelId);
+    stopCleanupTimerIfIdle();
   }
 
   return Promise.reject(error);
@@ -274,28 +273,7 @@ export function cancelAllRequests(): void {
     }
   });
   cancelableRequests.clear();
-}
-
-/**
- * 页面卸载时清理请求
- *
- * 生命周期管理：
- * - beforeunload 事件触发时清理所有请求
- * - 避免页面卸载后继续发送请求
- * - 清理定时器防止内存泄漏
- *
- * 浏览器兼容性：
- * - 检查 window 对象存在性
- * - 仅在浏览器环境中执行
- */
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", () => {
-    cancelAllRequests();
-    stopCleanupTimer();
-  });
-
-  // 启动清理定时器
-  startCleanupTimer();
+  stopCleanupTimer();
 }
 
 /**

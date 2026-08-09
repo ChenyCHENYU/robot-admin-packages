@@ -317,9 +317,9 @@ const watermarkDirective: Directive<
     // 初始化水印
     updateWatermark(el, options)
 
-    // 使用ResizeObserver监听尺寸变化
+    // 使用ResizeObserver监听尺寸变化（读取最新的 options，避免闭包过期）
     const resizeObserver = new ResizeObserver(() => {
-      updateWatermark(el, options)
+      updateWatermark(el, el._watermarkOptions || options)
     })
 
     resizeObserver.observe(el)

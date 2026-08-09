@@ -13,7 +13,7 @@
 ## 📦 安装使用
 
 ```typescript
-import { useTableCrud } from '@/composables/useTableCrud'
+import { useTableCrud } from '@robot-admin/request-core/crud'
 ```
 
 ## 🚀 快速开始
@@ -299,7 +299,7 @@ await table.batchRemove(selectedRows)
 
 ```typescript
 // data.ts - 配置文件
-import type { UseTableCrudConfig } from '@/composables/useTableCrud'
+import type { UseTableCrudConfig } from '@robot-admin/request-core/crud'
 
 interface Employee {
   id: number
@@ -353,7 +353,7 @@ export const employeeTableConfig: UseTableCrudConfig<Employee> = {
 ```vue
 <!-- index.vue - 使用组件 -->
 <script setup lang="ts">
-import { useTableCrud } from '@/composables/useTableCrud'
+import { useTableCrud } from '@robot-admin/request-core/crud'
 import { employeeTableConfig } from './data'
 
 // 初始化（自动加载数据）
@@ -388,7 +388,7 @@ const handleBatchDelete = async () => {
 </template>
 ```
 
-更多示例：[`src/views/demo/10-table`](../../../views/demo/10-table)
+更多示例：[Robot_Admin 表格演示](https://github.com/ChenyCHENYU/Robot_Admin/tree/main/src/views/demo/10-table)
 
 ## ❓ 常见问题
 
@@ -558,9 +558,9 @@ const table = useTableCrud({
 | 代码量     | 多个工厂函数  | 一行搞定     |
 | 类型体操   | 需要定义 Deps | 自动推导     |
 
-## 📝 更新日志
+## 📝 设计历史
 
-### v1.0.0 (2026-02-06)
+### 初始版本（2026-02-06）
 
 - ✨ 初始版本
 - ✨ 完整替代 usePageCrud

@@ -21,6 +21,20 @@ export interface XMLOptions {
 // ==================== 内部工具函数 ====================
 
 /**
+ * 校验并清洗 XML 标签名。
+ * XML 元素名必须以字母或下划线开头，后续可为字母/数字/._-。
+ * 非法 key（来自不可信输入）会破坏 XML 结构甚至造成注入，此处回退为安全标签名。
+ */
+function sanitizeTagName(name: string): string {
+  if (/^[A-Za-z_][\w.\-]*$/.test(name)) {
+    return name;
+  }
+  // 非法标签名：用 _ 前缀转义为合法形式，保留信息但避免破坏 XML
+  const escaped = String(name).replace(/[^\w.\-]/g, "_");
+  return `_${escaped || "item"}`;
+}
+
+/**
  * @description 将对象转换为 XML 字符串
  */
 function objectToXML(
@@ -30,6 +44,8 @@ function objectToXML(
   indent: number,
 ): string {
   const pad = " ".repeat(level * indent);
+  // 标签名需校验，防止来自不可信输入的注入
+  const safeTagName = sanitizeTagName(tagName);
 
   if (Array.isArray(obj)) {
     return obj
@@ -41,10 +57,10 @@ function objectToXML(
     const children = Object.entries(obj)
       .map(([key, value]) => objectToXML(value, key, level + 1, indent))
       .join("\n");
-    return `${pad}<${tagName}>\n${children}\n${pad}</${tagName}>`;
+    return `${pad}<${safeTagName}>\n${children}\n${pad}</${safeTagName}>`;
   }
 
-  return `${pad}<${tagName}>${escapeXML(String(obj))}</${tagName}>`;
+  return `${pad}<${safeTagName}>${escapeXML(String(obj))}</${safeTagName}>`;
 }
 
 /**
@@ -104,10 +120,16 @@ export function useFile() {
     fileName: string,
     mimeType?: string,
   ): File => {
-    const arr = base64.split(",");
-    const mime =
-      mimeType || arr[0]?.match(/:(.*?);/)?.[1] || "application/octet-stream";
-    const bstr = atob(arr.length > 1 ? arr[1] : arr[0]);
+    let bstr: string;
+    let mime: string;
+    try {
+      const arr = base64.split(",");
+      mime =
+        mimeType || arr[0]?.match(/:(.*?);/)?.[1] || "application/octet-stream";
+      bstr = atob(arr.length > 1 ? arr[1] : arr[0]);
+    } catch {
+      throw new Error("无效的 Base64 数据，无法还原为文件");
+    }
     const u8arr = new Uint8Array(bstr.length);
 
     for (let i = 0; i < bstr.length; i++) {
@@ -160,7 +182,13 @@ export function useFile() {
    * @description 读取文件为 JSON 对象
    */
   const readAsJSON = <T = any>(file: File): Promise<T> => {
-    return file.text().then((text) => JSON.parse(text));
+    return file.text().then((text) => {
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new Error(`文件内容不是合法的 JSON: ${file.name}`);
+      }
+    });
   };
 
   /**

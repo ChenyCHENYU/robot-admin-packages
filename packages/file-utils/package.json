@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/file-utils",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "文件处理工具集 - Excel/下载/压缩/CSV/JSON/XML/图片处理/大文件分片",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -17,9 +17,11 @@
     "dist",
     "README.md"
   ],
+  "sideEffects": false,
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
+    "test": "vitest run tests",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {

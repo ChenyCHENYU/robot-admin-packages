@@ -13,11 +13,11 @@
  * @robot-admin/request-core
  *
  * @description
- * 统一请求核心库，整合 axios 封装（7 个插件）+ useTableCrud composable
+ * 统一请求核心库，整合 axios 封装（6 个插件）+ useTableCrud composable
  *
  * ## 核心功能
  *
- * ### 1. Axios 封装（7 个内置插件）
+ * ### 1. Axios 封装（6 个内置插件）
  * - **cache**: 请求缓存（内存缓存，支持 TTL）
  * - **retry**: 请求重试（指数退避）
  * - **dedupe**: 请求去重（AbortController）
@@ -129,6 +129,8 @@ export {
   postData,
   putData,
   deleteData,
+  waitForReLogin,
+  getReLoginPromise,
   onReLoginSuccess,
   onReLoginCancel,
   // 插件工具函数

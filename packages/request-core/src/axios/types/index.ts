@@ -44,8 +44,12 @@ export interface RetryConfig {
   delay?: number;
   /** 是否使用指数退避（默认 true） */
   exponentialBackoff?: boolean;
+  /** 是否启用随机抖动（默认 true），避免重试风暴 */
+  jitter?: boolean;
   /** 可重试的 HTTP 状态码 */
   retryableStatusCodes?: number[];
+  /** 允许重试的 HTTP 方法（默认仅幂等方法，避免对非幂等 POST/PUT/DELETE 重复执行副作用） */
+  retryableMethods?: string[];
 }
 
 /**
@@ -78,7 +82,13 @@ export interface EnhancedAxiosRequestConfig extends AxiosRequestConfig {
   __requestKey?: string;
   /** 内部标记：是否来自缓存 */
   __fromCache?: boolean;
-  /** 内部标记：是否被 cancel 插件管理 */
+  /** 内部标记：共享的 AbortController（dedupe 与 cancel 复用，避免 signal 互相覆盖） */
+  __abortController?: EnhancedAbortController;
+  /** 内部标记：调用方原始 AbortSignal，用于在最终响应阶段恢复配置 */
+  __externalSignal?: AxiosRequestConfig["signal"];
+  /** 内部标记：移除外部 AbortSignal 桥接监听器 */
+  __abortCleanup?: () => void;
+  /** 内部标记：是否被 cancel 插件管理（保留兼容） */
   __managedByCancel?: boolean;
   /** 内部标记：是否正在处理 401 错误 */
   __handling401?: boolean;

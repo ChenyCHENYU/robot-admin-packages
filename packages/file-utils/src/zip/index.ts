@@ -93,12 +93,50 @@ export function useJSZip() {
 
   const createZip = () => new JSZip();
 
+  const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+
+  const sanitizeZipSegment = (segment: string): string => {
+    let safe = segment
+      .replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_")
+      .replace(/[. ]+$/g, "")
+      .trim();
+    if (!safe) safe = "unnamed";
+    if (WINDOWS_RESERVED_NAME.test(safe)) safe = `_${safe}`;
+    return safe.slice(0, 255);
+  };
+
+  /**
+   * 清洗 zip 内文件路径，防止 zip-slip（解压时穿越目录）和非法路径。
+   * - 统一为正斜杠
+   * - 去除盘符 / 前导斜杠 / .. 父级引用
+   */
+  const sanitizeZipPath = (rawPath: string): string => {
+    let path = String(rawPath).replace(/\\/g, "/");
+    path = path.replace(/^[A-Za-z]:/, "").replace(/^\/+/, "");
+
+    const segments: string[] = [];
+    for (const rawSegment of path.split("/")) {
+      if (!rawSegment || rawSegment === ".") continue;
+      if (rawSegment === "..") {
+        segments.pop();
+        continue;
+      }
+      segments.push(sanitizeZipSegment(rawSegment));
+    }
+
+    return segments.join("/") || "unnamed";
+  };
+
   const addFile = (zip: JSZip, fileName: string, content: string | Blob) => {
-    zip.file(fileName, content);
+    const safePath = sanitizeZipPath(fileName);
+    if (zip.file(safePath)) {
+      throw new Error(`ZIP 内存在重复文件路径: ${safePath}`);
+    }
+    zip.file(safePath, content);
   };
 
   const createFolder = (zip: JSZip, folderName: string) =>
-    zip.folder(folderName)!;
+    zip.folder(sanitizeZipPath(folderName))!;
 
   const updateProgress = (progress: number, fileName = "") => {
     state.value.progress = progress;
@@ -107,7 +145,7 @@ export function useJSZip() {
 
   const downloadZip = async (zip: JSZip, fileName: string) => {
     const blob = await zip.generateAsync({ type: "blob" });
-    saveAs(blob, fileName);
+    saveAs(blob, sanitizeZipPath(fileName).replace(/\//g, "_"));
   };
 
   const showResult = (result: ExportResult) => {
@@ -156,11 +194,12 @@ export function useJSZip() {
         success: false,
         fileName: "",
         fileCount: 0,
-        message: `导出失败: ${(error as Error).message}`,
+        message: `导出失败: ${error instanceof Error ? error.message : String(error)}`,
       };
 
       showResult(result);
-      return result;
+      // 重新抛出，保证调用方可通过 try/catch 捕获失败（此前被静默吞掉）
+      throw error;
     }
   };
 

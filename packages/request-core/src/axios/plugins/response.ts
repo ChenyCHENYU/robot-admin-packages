@@ -8,12 +8,22 @@
  * Copyright (c) 2026 by CHENY, All Rights Reserved ���.
  */
 
-import type { AxiosInstance } from "axios";
+import type { AxiosInstance, AxiosResponse } from "axios";
+import type { EnhancedAxiosRequestConfig } from "../types";
+import { cleanupAbortContext } from "../utils/abort";
 
 /**
  * 设置响应插件（预留，具体逻辑由用户通过 interceptors 配置）
  */
 export function setupResponsePlugin(instance: AxiosInstance): void {
-  // 不做任何处理，由用户通过 createRequestCore 的 interceptors 配置
-  // 例如：业务码判断、401 处理、错误提示等
+  instance.interceptors.response.use(
+    (response: AxiosResponse) => {
+      cleanupAbortContext(response.config as EnhancedAxiosRequestConfig);
+      return response;
+    },
+    (error: any) => {
+      cleanupAbortContext(error?.config as EnhancedAxiosRequestConfig);
+      return Promise.reject(error);
+    },
+  );
 }

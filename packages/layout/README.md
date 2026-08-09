@@ -2,6 +2,11 @@
 
 > 布局和设置管理系统 - 为 Robot Admin 提供完整的布局配置管理能力（含 UI 组件）
 
+[![npm version](https://img.shields.io/npm/v/@robot-admin/layout.svg)](https://www.npmjs.com/package/@robot-admin/layout)
+[![license](https://img.shields.io/npm/l/@robot-admin/layout.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
+
+当前版本：`2.3.2`。
+
 ---
 
 ## ✨ 特性
@@ -13,6 +18,8 @@
 - 🧭 **菜单展开方式** - 内置传统展开 / 右侧面板两种菜单展开模式配置
 - 🔌 **插槽系统** - 灵活的 slot 机制，主项目仅关注业务组件
 - 🎨 **CSS 变量同步** - 配置变更自动同步到 CSS 变量，样式实时响应
+- ♿ **键盘与焦点可访问性** - 抽屉/菜单支持 Escape、方向键、焦点恢复与语义属性
+- 🛡️ **安全设置导入** - 对枚举、布尔值、数值范围与主题色进行运行时校验
 - 🚀 **TypeScript** - 完整类型支持
 
 ---
@@ -106,7 +113,7 @@ src/
 bun add @robot-admin/layout @robot-admin/theme naive-ui
 ```
 
-**Peer Dependencies**: `vue ^3.4` · `vue-router ^4.0` · `pinia ^2.0 || ^3.0` · `naive-ui ^2.38` · `@robot-admin/theme ^0.1`
+**Peer Dependencies**: `vue ^3.4` · `vue-router ^4.0` · `pinia ^2.0 || ^3.0` · `naive-ui ^2.38` · `@robot-admin/theme ^0.3 || ^0.4`
 
 ---
 
@@ -216,7 +223,7 @@ const settings = useSettingsStore();
 settings.layoutMode;       // 'side' | 'top' | 'mix' | ...
 settings.menuExpandMode;   // 'inline' | 'panel'
 settings.primaryColor;     // '#409eff'
-settings.themeMode;        // 'light' | 'dark' | 'auto'
+settings.themeMode;        // 'light' | 'dark' | 'system'
 
 // 修改
 settings.layoutMode = "mix";
@@ -286,10 +293,11 @@ type MenuExpandMode = "inline" | "panel";
 type TransitionType = "fade" | "slide" | "zoom" | "none";
 type BorderRadiusSize = "small" | "medium" | "large";
 type TagsViewStyle = "default" | "card" | "smart";
-type ThemeMode = "light" | "dark" | "auto";
+type ThemeMode = "light" | "dark" | "system";
 
 interface ThemePreset { name: string; icon: string; primaryColor: string; }
 interface SettingsStoreOptions {
+  id?: string;
   defaults?: Partial<SettingsState>;
   onThemeModeChange?: (mode: ThemeMode) => void | Promise<void>;
 }
@@ -305,6 +313,8 @@ interface SettingsStoreOptions {
 import { createSettingsStore } from "@robot-admin/layout";
 
 export const useSettingsStore = createSettingsStore({
+  // 多实例或微前端中必须保证唯一；单实例可省略
+  id: "workspace-settings",
   defaults: { layoutMode: "mix", primaryColor: "#722ed1" },
   onThemeModeChange: async (mode) => {
     const themeStore = useThemeStore();
@@ -312,6 +322,30 @@ export const useSettingsStore = createSettingsStore({
   },
 });
 ```
+
+### 校验外部设置
+
+从文件、URL 或远端接口加载的设置属于不可信输入，写入 Store 前应先校验：
+
+```typescript
+import { sanitizeSettingsPatch, useSettingsStore } from "@robot-admin/layout";
+
+const imported = JSON.parse(await file.text());
+const safePatch = sanitizeSettingsPatch(imported.settings);
+const settings = useSettingsStore();
+
+if (safePatch.themeMode !== undefined) {
+  await settings.updateThemeMode(safePatch.themeMode);
+  delete safePatch.themeMode;
+}
+settings.$patch(safePatch);
+```
+
+未知字段会被忽略以便向前兼容；已知字段类型错误、越界值、非法主题色或旧的
+`themeMode: "auto"` 会抛出明确错误。设置抽屉内置的导入功能已执行同一校验。
+
+`useLayoutCache()` 默认不会输出开发日志，也不会向 `window` 暴露调试函数；仅在
+受控的本地开发场景显式设置 `enableDevLog` / `exposeToWindow`。
 
 ### 单独使用布局骨架
 

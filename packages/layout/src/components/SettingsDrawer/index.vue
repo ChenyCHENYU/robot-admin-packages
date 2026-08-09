@@ -9,8 +9,8 @@
     v-model:show="visible"
     :width="380"
     placement="right"
-    :trap-focus="false"
-    :block-scroll="false"
+    :trap-focus="true"
+    :block-scroll="true"
   >
     <NDrawerContent title="⚙️ 布局配置" closable>
       <NTabs v-model:value="activeTab" animated class="settings-tabs">
@@ -24,7 +24,12 @@
                 :key="preset.name"
                 class="preset-card"
                 :class="{ active: isCurrentPreset(preset) }"
+                role="button"
+                tabindex="0"
+                :aria-pressed="isCurrentPreset(preset)"
                 @click="handleApplyPreset(preset)"
+                @keydown.enter="handleApplyPreset(preset)"
+                @keydown.space.prevent="handleApplyPreset(preset)"
               >
                 <div class="preset-icon">{{ preset.icon }}</div>
                 <div class="preset-name">{{ preset.name }}</div>
@@ -42,8 +47,9 @@
           <div class="settings-section">
             <div class="section-title">主题模式</div>
             <NRadioGroup
-              v-model:value="settingsStore.themeMode"
+              :value="settingsStore.themeMode"
               class="mode-group"
+              @update:value="handleThemeModeChange"
             >
               <NRadioButton value="light">
                 <span class="i-mdi:white-balance-sunny mr-1"></span>
@@ -53,7 +59,7 @@
                 <span class="i-mdi:moon-waning-crescent mr-1"></span>
                 深色
               </NRadioButton>
-              <NRadioButton value="auto">
+              <NRadioButton value="system">
                 <span class="i-mdi:theme-light-dark mr-1"></span>
                 自动
               </NRadioButton>
@@ -131,7 +137,15 @@
                   active: settingsStore.layoutMode === mode.value,
                   disabled: mode.disabled,
                 }"
+                role="button"
+                :tabindex="mode.disabled ? -1 : 0"
+                :aria-disabled="mode.disabled"
+                :aria-pressed="settingsStore.layoutMode === mode.value"
                 @click.stop="handleLayoutChange(mode.value, mode.disabled)"
+                @keydown.enter.stop="handleLayoutChange(mode.value, mode.disabled)"
+                @keydown.space.stop.prevent="
+                  handleLayoutChange(mode.value, mode.disabled)
+                "
               >
                 <div class="layout-screenshot">
                   <svg
@@ -375,10 +389,14 @@ import {
   useMessage,
   useDialog,
 } from "naive-ui";
-import { useSettingsStore } from "../../stores/settings";
+import {
+  sanitizeSettingsPatch,
+  useSettingsStore,
+} from "../../stores/settings";
 import { DEFAULT_SETTINGS } from "../../constants";
 import { COLOR_SWATCHES, LAYOUT_MODE_OPTIONS, THEME_PRESETS } from "./data";
 import type { ThemePreset } from "../../types";
+import type { ThemeMode } from "@robot-admin/theme";
 
 // ============ 数据定义 ============
 
@@ -407,7 +425,11 @@ const createWatermark = (text: string) => {
 
   // 创建 canvas
   const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    message.error("当前浏览器无法创建水印画布");
+    return;
+  }
   canvas.width = 200;
   canvas.height = 150;
 
@@ -470,6 +492,17 @@ watch(watermarkText, (val) => {
 
 // 获取系统信息
 const systemInfo = computed(() => {
+  if (typeof navigator === "undefined" || typeof window === "undefined") {
+    return {
+      browser: "Unknown",
+      os: "Unknown",
+      resolution: "Unknown",
+      pixelRatio: "Unknown",
+      language: "Unknown",
+      timezone: "Unknown",
+    };
+  }
+
   const ua = navigator.userAgent;
   let browser = "Unknown";
   let os = "Unknown";
@@ -523,6 +556,14 @@ const isCurrentPreset = (preset: ThemePreset) => {
 const handleApplyPreset = (preset: ThemePreset) => {
   settingsStore.applyPreset(preset);
   message.success(`已应用「${preset.name}」主题方案`);
+};
+
+const handleThemeModeChange = async (mode: ThemeMode) => {
+  try {
+    await settingsStore.updateThemeMode(mode);
+  } catch {
+    message.error("主题模式切换失败");
+  }
 };
 
 /**
@@ -643,21 +684,48 @@ const handleImportConfig = () => {
 
     try {
       const text = await file.text();
-      const config = JSON.parse(text);
+      const config: unknown = JSON.parse(text);
+      if (!config || typeof config !== "object" || Array.isArray(config)) {
+        throw new TypeError("配置文件根节点必须是对象");
+      }
+      const imported = config as Record<string, unknown>;
 
       // 应用配置
-      if (config.settings) {
-        settingsStore.$patch(config.settings);
+      if (imported.settings !== undefined) {
+        const settingsPatch = sanitizeSettingsPatch(imported.settings);
+        if (settingsPatch.themeMode !== undefined) {
+          await settingsStore.updateThemeMode(settingsPatch.themeMode);
+          delete settingsPatch.themeMode;
+        }
+        settingsStore.$patch(settingsPatch);
       }
-      if (config.gray !== undefined) {
-        grayMode.value = config.gray;
+      if (imported.gray !== undefined) {
+        if (typeof imported.gray !== "boolean") throw new TypeError("gray");
+        grayMode.value = imported.gray;
       }
-      if (config.colorWeak !== undefined) {
-        colorWeakMode.value = config.colorWeak;
+      if (imported.colorWeak !== undefined) {
+        if (typeof imported.colorWeak !== "boolean")
+          throw new TypeError("colorWeak");
+        colorWeakMode.value = imported.colorWeak;
       }
-      if (config.watermark) {
-        watermarkEnabled.value = config.watermark.enabled;
-        watermarkText.value = config.watermark.text;
+      if (imported.watermark !== undefined) {
+        if (
+          !imported.watermark ||
+          typeof imported.watermark !== "object" ||
+          Array.isArray(imported.watermark)
+        ) {
+          throw new TypeError("watermark");
+        }
+        const watermark = imported.watermark as Record<string, unknown>;
+        if (
+          typeof watermark.enabled !== "boolean" ||
+          typeof watermark.text !== "string" ||
+          watermark.text.length > 200
+        ) {
+          throw new TypeError("watermark");
+        }
+        watermarkEnabled.value = watermark.enabled;
+        watermarkText.value = watermark.text;
       }
 
       message.success("配置已导入");

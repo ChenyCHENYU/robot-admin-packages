@@ -40,7 +40,7 @@ export { setupLayout } from "./setup";
 export { createSettingsStore, useSettingsStore } from "./stores/settings";
 
 // ============ Utils ============
-export { adjustColor } from "./stores/settings";
+export { adjustColor, sanitizeSettingsPatch } from "./stores/settings";
 
 // ============ Composables ============
 export { useLayoutCache } from "./composables/useLayoutCache";

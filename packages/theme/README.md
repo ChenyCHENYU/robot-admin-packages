@@ -2,14 +2,20 @@
 
 > 主题切换和管理系统 — 为 Robot Admin 提供完整的主题管理能力
 
+[![npm version](https://img.shields.io/npm/v/@robot-admin/theme.svg)](https://www.npmjs.com/package/@robot-admin/theme)
+[![license](https://img.shields.io/npm/l/@robot-admin/theme.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
+
+当前版本：`0.4.0`。
+
 ## 特性
 
 - 🌓 **多模式支持** — Light / Dark / System 三种主题模式
 - 🎨 **View Transition API** — 丝滑流畅的主题切换动画
 - 🔮 **设计风格系统** — Glass Morphism / Corporate Minimal / Dark Tech 三套风格
--  **持久化存储** — 自动保存用户的主题偏好和设计风格
+- 💾 **安全持久化** — 自动保存偏好，并容忍隐私模式、配额耗尽和历史脏值
 - 🛡️ **三层解耦** — 基础主题、菜单风格、设计风格互不冲突
--  **高度可配置** — 灵活的配置选项
+- ⚙️ **高度可配置** — 支持独立 Store id、存储键、默认值与过渡开关
+- ♿ **无障碍与 SSR** — 尊重 reduced-motion，服务端和不支持 View Transition 时安全降级
 - 🚀 **TypeScript** — 完整的类型支持
 
 ## 安装
@@ -17,6 +23,9 @@
 ```bash
 bun add @robot-admin/theme
 ```
+
+**Peer Dependencies**：`vue ^3.4` · `pinia ^2 || ^3`；只有使用 Naive UI
+主题类型或集成时才需要可选 peer `naive-ui ^2.38`。
 
 ## 快速开始
 
@@ -113,9 +122,12 @@ const useMyThemeStore = createThemeStore({
   storageKey: 'theme-mode',                        // localStorage 键名（主题）
   designStyleStorageKey: 'robot-admin-design-style', // localStorage 键名（设计风格）
   enableTransition: true,                          // 启用 View Transition 过渡动画
-  transitionDuration: 500,                         // 过渡动画时长（毫秒）
+  id: 'my-theme',                                  // 多实例时必须使用不同 Pinia Store id
 })
 ```
+
+Store 的 `init()` 可重复调用且只注册一次系统主题监听；测试、HMR 或显式卸载时
+调用 `destroy()` 释放监听器。
 
 #### `useThemeStore()`
 
@@ -136,6 +148,7 @@ const useMyThemeStore = createThemeStore({
 | 方法 | 说明 |
 |------|------|
 | `init()` | 初始化主题系统（必须调用，同步 DOM 属性 + 监听系统偏好） |
+| `destroy()` | 移除系统主题监听；适用于应用卸载、测试和 HMR 清理 |
 | `setMode(mode)` | 设置主题模式（带过渡动画） |
 | `toggleMode()` | 循环切换 light → dark → system |
 | `toggleDark()` | 仅在 light / dark 之间切换 |
@@ -152,10 +165,17 @@ const useMyThemeStore = createThemeStore({
 import { useViewTransition } from '@robot-admin/theme'
 
 await useViewTransition(
-  () => document.documentElement.setAttribute('data-theme', 'dark'),
-  { duration: 500, transitioningClass: 'theme-transitioning' },
+  async () => {
+    await persistPreference()
+    document.documentElement.setAttribute('data-theme', 'dark')
+  },
+  { transitioningClass: 'theme-transitioning' },
 )
 ```
+
+回调支持同步或异步执行。SSR、浏览器不支持该 API 或用户启用“减少动态效果”时，
+函数会直接执行回调；业务回调抛出的错误不会被过渡中断逻辑吞掉。动画时长请通过
+`::view-transition-*` CSS 控制。
 
 #### `isViewTransitionSupported()`
 
@@ -263,19 +283,19 @@ const styleOptions = Object.entries(DESIGN_STYLE_CONFIGS).map(([value, config]) 
 </script>
 ```
 
-## 从 v0.1.x 升级
+## 升级到 v0.4.0
 
-v0.2.0 是**纯增量更新**，不含任何破坏性变更：
+v0.4.0 保持现有 Store 调用方式兼容，并强化运行时边界：
 
-| 变更点 | 影响 |
-|--------|------|
-| `ThemeStoreOptions` 新增 2 个可选字段 | 无影响，全部可选 |
-| Store 新增 `designStyle` 状态 | 无影响，不会改变现有属性 |
-| Store 新增 4 个方法 | 无影响，不会改变现有方法 |
-| `syncThemeAttr()` 多设一个 `data-design-style` 属性 | 无影响，新的 HTML 属性不会触发任何现有样式 |
-| `DEFAULT_THEME_OPTIONS` 新增 2 个字段 | 无影响，现有字段值不变 |
+| 变更点 | 升级说明 |
+|--------|----------|
+| `ThemeStoreOptions.id` | 多实例应用应为每个 Store 指定唯一 id；默认实例无需修改 |
+| `destroy()` | 应用卸载、测试或 HMR 清理时建议调用，普通单页应用可不调用 |
+| `useViewTransition` | 移除无效的 `duration` 选项；请改用 CSS 设置动画时长 |
+| 存储值校验 | 非法主题/风格值会回退到安全默认值，不再直接断言为合法类型 |
+| 持久化失败 | Safari 隐私模式或存储配额异常不会阻断主题切换 |
 
-**升级步骤：** 更新包版本即可，无需修改任何代码。
+从 v0.2/v0.3 升级通常只需更新依赖；若曾传入 `duration`，删除该字段即可。
 
 ```bash
 bun add @robot-admin/theme@latest

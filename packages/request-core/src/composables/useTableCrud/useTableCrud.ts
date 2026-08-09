@@ -10,7 +10,7 @@
 
 import { ref, reactive, computed, shallowRef } from "vue";
 import { useMessage, useDialog } from "naive-ui";
-import { getData, postData, putData, deleteData } from "../../axios/request";
+import { getData, postData, putData, deleteData } from "../../axios/service";
 import type {
   DataRecord,
   UseTableCrudConfig,

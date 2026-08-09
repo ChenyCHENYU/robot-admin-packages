@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.4
+
+### Patch Changes
+
+- Execute local tools correctly through `npx --no-install` or `pnpm exec`, passing executable and arguments separately to execa.
+- Back up existing generated configuration files before replacement and make initialization repeatable.
+- Deep-merge package scripts, tool configuration and lint-staged entries instead of replacing user-owned sections.
+- Register the missing `--jsdoc` option, read CLI/banner versions at runtime, and surface actionable execa error details.
+- Declare public npm publishing metadata and side-effect-free library modules explicitly.
+
 All notable changes to this project will be documented in this file.
 
 ## [1.0.0] - 2026-02-13

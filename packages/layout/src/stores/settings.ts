@@ -17,16 +17,144 @@ import {
   TRANSITION_MAP,
 } from "../constants";
 
+const ENUM_SETTINGS = {
+  themeMode: new Set(["light", "dark", "system"]),
+  borderRadius: new Set(["small", "medium", "large"]),
+  transitionType: new Set(["fade", "slide", "zoom", "none"]),
+  layoutMode: new Set([
+    "side",
+    "top",
+    "mix",
+    "mix-top",
+    "reverse-horizontal-mix",
+    "card-layout",
+  ]),
+  menuExpandMode: new Set(["inline", "panel"]),
+  tagsViewStyle: new Set(["default", "card", "smart"]),
+} as const;
+
+const BOOLEAN_SETTINGS: ReadonlySet<keyof SettingsState> = new Set([
+  "enableTransition",
+  "collapsed",
+  "fixedHeader",
+  "showBreadcrumb",
+  "showBreadcrumbIcon",
+  "showTagsView",
+  "showFooter",
+  "enableHotkeys",
+]);
+
+const NUMBER_RANGES: Partial<
+  Record<keyof SettingsState, readonly [number, number]>
+> = {
+  tagsViewHeight: [24, 100],
+  sidebarWidth: [120, 480],
+  sidebarCollapsedWidth: [32, 160],
+  headerHeight: [32, 160],
+};
+
+/**
+ * 校验来自配置文件等不可信来源的设置。
+ * 未知键为向前兼容而忽略；已知键的非法值会让整次导入失败。
+ */
+export function sanitizeSettingsPatch(input: unknown): Partial<SettingsState> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new TypeError("settings 必须是对象");
+  }
+
+  const source = input as Record<string, unknown>;
+  const result: Partial<SettingsState> = {};
+  const assign = (key: keyof SettingsState, value: unknown) => {
+    (result as Record<string, unknown>)[key] = value;
+  };
+
+  for (const [key, allowed] of Object.entries(ENUM_SETTINGS)) {
+    const value = source[key];
+    if (value === undefined) continue;
+    if (typeof value !== "string" || !allowed.has(value as never)) {
+      throw new RangeError(`无效的设置项 ${key}: ${String(value)}`);
+    }
+    assign(key as keyof SettingsState, value);
+  }
+
+  for (const key of BOOLEAN_SETTINGS) {
+    const value = source[key];
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") {
+      throw new TypeError(`设置项 ${key} 必须是布尔值`);
+    }
+    assign(key, value);
+  }
+
+  for (const [key, range] of Object.entries(NUMBER_RANGES)) {
+    const value = source[key];
+    if (value === undefined) continue;
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < range[0] ||
+      value > range[1]
+    ) {
+      throw new RangeError(`设置项 ${key} 超出允许范围`);
+    }
+    assign(key as keyof SettingsState, value);
+  }
+
+  if (source.primaryColor !== undefined) {
+    if (
+      typeof source.primaryColor !== "string" ||
+      !/^#[0-9a-fA-F]{6}$/.test(source.primaryColor)
+    ) {
+      throw new RangeError("primaryColor 必须是 #rrggbb 格式");
+    }
+    result.primaryColor = source.primaryColor;
+  }
+
+  if (source.version !== undefined) {
+    if (typeof source.version !== "string" || source.version.length > 50) {
+      throw new TypeError("version 必须是长度不超过 50 的字符串");
+    }
+    result.version = source.version;
+  }
+
+  return result;
+}
+
 /**
  * 调整颜色亮度
- * @param color - 十六进制颜色值
+ * @param color - 十六进制颜色值（支持 #rgb / #rrggbb）
  * @param amount - 调整量，正数变亮，负数变暗
+ * @returns 调整后的 #rrggbb；输入非法时原样返回（避免静默变黑）
  */
 export function adjustColor(color: string, amount: number): string {
-  const num = parseInt(color.replace("#", ""), 16);
-  const r = Math.min(255, Math.max(0, (num >> 16) + amount));
-  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amount));
-  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + amount));
+  if (typeof color !== "string") return "#000000";
+  if (!Number.isFinite(amount)) return color;
+  const normalizedAmount = Math.round(amount);
+  const trimmedColor = color.trim();
+  let hex = trimmedColor.startsWith("#")
+    ? trimmedColor.slice(1)
+    : trimmedColor;
+  // 支持 3 位简写（#rgb → #rrggbb）
+  if (hex.length === 3) {
+    hex = hex
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  // 仅当为合法的 6 位十六进制时才计算，否则原样返回
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return color;
+  }
+  const num = parseInt(hex, 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + normalizedAmount));
+  const g = Math.min(
+    255,
+    Math.max(0, ((num >> 8) & 0x00ff) + normalizedAmount),
+  );
+  const b = Math.min(
+    255,
+    Math.max(0, (num & 0x0000ff) + normalizedAmount),
+  );
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }
 
@@ -35,15 +163,18 @@ export function adjustColor(color: string, amount: number): string {
  * @param options - 配置选项
  */
 export function createSettingsStore(options: SettingsStoreOptions = {}) {
-  const { defaults = {}, onThemeModeChange } = options;
+  const { id = "settings", defaults = {}, onThemeModeChange } = options;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new RangeError("Settings store id 不能为空");
+  }
 
   // 合并默认配置
   const finalDefaults = {
     ...DEFAULT_SETTINGS,
-    ...defaults,
+    ...sanitizeSettingsPatch(defaults),
   };
 
-  return defineStore("settings", () => {
+  return defineStore(id, () => {
     // ============ 状态定义 ============
 
     // 外观设置
@@ -201,9 +332,18 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
      * 更新主题模式
      */
     const updateThemeMode = async (mode: ThemeMode) => {
+      if (!ENUM_SETTINGS.themeMode.has(mode)) {
+        throw new RangeError(`未知的主题模式: ${String(mode)}`);
+      }
+      const previousMode = themeMode.value;
       themeMode.value = mode;
-      if (onThemeModeChange) {
-        await onThemeModeChange(mode);
+      try {
+        if (onThemeModeChange) {
+          await onThemeModeChange(mode);
+        }
+      } catch (error) {
+        themeMode.value = previousMode;
+        throw error;
       }
     };
 

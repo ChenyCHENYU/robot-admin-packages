@@ -46,6 +46,20 @@ export interface UseMenuSplitReturn {
   isMenuItemActive: (menuPath: string | undefined) => boolean;
 }
 
+/** 判断当前路径是否等于菜单路径或位于其子路径下。 */
+export function isPathSegmentPrefix(
+  menuPath: string | undefined,
+  currentPath: string,
+): boolean {
+  if (!menuPath) return false;
+  const menuSegments = menuPath.split("/").filter(Boolean);
+  const currentSegments = currentPath.split("/").filter(Boolean);
+  if (menuSegments.length === 0) return currentSegments.length === 0;
+  return menuSegments.every(
+    (segment, index) => currentSegments[index] === segment,
+  );
+}
+
 /**
  * 菜单拆分 Composable
  *
@@ -76,17 +90,8 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
 
   // ============ 路径匹配 ============
 
-  const normalizePath = (path: string) =>
-    path.startsWith("/") ? path : `/${path}`;
-
   const isMenuItemActive = (menuPath: string | undefined): boolean => {
-    if (!menuPath) return false;
-    const currentPath = route.path;
-    if (currentPath === menuPath) return true;
-    const normalizedMenuPath = normalizePath(menuPath);
-    const normalizedCurrentPath = normalizePath(currentPath);
-    if (normalizedCurrentPath === normalizedMenuPath) return true;
-    return normalizedCurrentPath.includes(`/${menuPath}`);
+    return isPathSegmentPrefix(menuPath, route.path);
   };
 
   // ============ 查找一级菜单 ============

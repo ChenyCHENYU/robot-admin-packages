@@ -2,6 +2,11 @@
 
 > 文件处理工具集 - Excel / 下载 / 压缩 / CSV / JSON / XML / 图片处理 / 大文件分片
 
+[![npm version](https://img.shields.io/npm/v/@robot-admin/file-utils.svg)](https://www.npmjs.com/package/@robot-admin/file-utils)
+[![license](https://img.shields.io/npm/l/@robot-admin/file-utils.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
+
+当前版本：`2.0.0`。
+
 ## 📦 安装
 
 ```bash
@@ -138,9 +143,23 @@ jszip.addFile(zip, "hello.txt", "Hello World");
 await jszip.downloadZip(zip, "output.zip");
 ```
 
+ZIP 内路径会统一分隔符，并清理盘符、绝对路径、父级穿越、控制字符及 Windows
+保留名。清理后发生路径冲突时会抛错，不会静默覆盖已有文件。所有高层导出方法
+在失败时会更新 `state.lastResult`、触发错误通知，并继续向调用方抛出原始错误：
+
+```typescript
+try {
+  await jszip.exportCodeProject(config);
+} catch (error) {
+  // 可在此记录错误、恢复 UI 或提示重试
+}
+```
+
 ### 4. useCSV - CSV 处理 <sup>v1.1</sup>
 
-CSV 解析和生成，支持引号字段、自定义分隔符、Excel BOM 兼容。
+按 RFC 4180 解析和生成 CSV，支持引号字段内换行、双引号转义、自定义分隔符、
+CRLF 输出和 Excel UTF-8 BOM。解析器会拒绝未闭合引号、未转义引号、非法的
+引号后内容与重复表头，避免损坏数据被静默接受。
 
 ```typescript
 import { useCSV } from "@robot-admin/file-utils";
@@ -149,6 +168,9 @@ const csv = useCSV();
 
 // 解析 CSV 字符串
 const data = csv.parse(csvString, { delimiter: "," });
+
+// 引号内换行和双引号会被正确还原
+csv.parse('name,note\r\nAlice,"line 1\r\nline 2"\r\nBob,"say ""hi"""');
 
 // 生成 CSV 并下载
 csv.download(data, "导出.csv");
@@ -212,7 +234,9 @@ const info = await image.getInfo(file);
 
 ### 7. useChunkUpload / useChunkDownload - 大文件分片 <sup>v2.0</sup>
 
-支持并发控制、失败重试、SHA-256 秒传校验、进度追踪、中止操作。
+支持并发控制、失败重试、SHA-256 秒传指纹、进度追踪、中止操作。指纹由文件
+首尾采样块与文件大小共同计算，保持标准 64 位十六进制格式；它用于断点续传
+身份识别，不等同于完整文件内容校验。
 
 ```typescript
 import { useChunkUpload, useChunkDownload } from "@robot-admin/file-utils";
@@ -226,13 +250,14 @@ const {
 } = useChunkUpload({
   chunkSize: 5 * 1024 * 1024, // 5MB 分片
   concurrent: 3, // 3 路并发
-  retries: 3, // 失败重试 3 次
+  retries: 3, // 每个分片最多尝试 3 次（包含首次请求）
 });
 
 await upload(
   file,
-  async (chunk, index, total, hash) => {
-    await api.uploadChunk({ chunk, index, total, hash });
+  async (chunk, index, total, hash, signal) => {
+    // 第 5 个参数可直接交给 fetch/axios，使 abort() 能取消在途请求
+    await api.uploadChunk({ chunk, index, total, hash, signal });
   },
   async (fileName, totalChunks, hash) => {
     await api.mergeChunks({ fileName, totalChunks, hash });
@@ -281,7 +306,24 @@ await download("https://example.com/large.zip", "large.zip", {
 | `file-saver` | dependency     | 文件保存（仅 useJSZip）                        |
 | `vue`        | peerDependency | 响应式状态（useExcel / useJSZip / useChunk\*） |
 
-> useDownload、useCSV、useFile、useImage 为纯函数，不依赖 Vue，可在任意 JS/TS 项目中使用。
+> `xlsx`、`jszip`、`file-saver` 会作为依赖安装，但不会被重复打入本包产物；应用
+> 打包器可以统一去重。useDownload、useCSV、useFile、useImage 为纯函数，不依赖
+> Vue，可在任意 JS/TS 项目中使用。
+
+## 从 v1.x 升级到 v2.0.0
+
+v2.0.0 的主要不兼容点是错误传播与 CSV 的严格语义，请在升级前检查：
+
+| 变更 | 迁移方式 |
+|------|----------|
+| ZIP 高层导出失败后会抛出错误 | 在需要恢复 UI 或自定义提示的位置使用 `try/catch` |
+| CSV 生成统一使用 RFC 4180 的 `\r\n` | 若快照或后端严格比较换行符，请同步预期值 |
+| CSV 解析拒绝畸形引号和重复表头 | 在导入界面捕获 `SyntaxError` 并提示用户修正源文件 |
+| 分片上传回调新增第 5 个 `AbortSignal` | 旧的四参数回调仍可运行；建议把 signal 传给实际网络请求 |
+| ZIP 路径清理后不允许重复 | 生成文件列表前确保规范化后的路径唯一 |
+
+此外，分片大小、并发数和重试次数现在必须是大于 0 的整数；不支持
+`crypto.subtle` 的非安全上下文会给出明确错误，不再隐式失败。
 
 ## 🔤 TypeScript 支持
 

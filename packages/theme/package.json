@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/theme",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Theme switching and management system for Robot Admin",
   "type": "module",
   "keywords": [
@@ -37,6 +37,10 @@
     "src/themes",
     "README.md"
   ],
+  "sideEffects": [
+    "**/*.css",
+    "**/*.scss"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -46,7 +50,8 @@
     "build": "tsup && bun run build:styles",
     "build:ts": "tsup",
     "build:styles": "sass src/themes:dist/styles --style=compressed --no-source-map",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "vitest run tests",
     "type-check": "tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
@@ -54,6 +59,11 @@
     "vue": "^3.4.0",
     "pinia": "^2.0.0 || ^3.0.0",
     "naive-ui": "^2.38.0"
+  },
+  "peerDependenciesMeta": {
+    "naive-ui": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.13.9",

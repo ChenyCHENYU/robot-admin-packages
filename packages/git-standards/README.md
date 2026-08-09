@@ -1,6 +1,6 @@
 # @robot-admin/git-standards
 
-> **v1.0.1** · 零配置 · 模块化 · Git 工程化标准工具包
+> **v1.0.4** · 零配置 · 模块化 · Git 工程化标准工具包
 
 集成 Commitizen + Commitlint + Husky + ESLint + Prettier + Oxlint + lint-staged，支持按需选配。
 
@@ -17,6 +17,12 @@ node node_modules/@robot-admin/git-standards/bin/robot-standards.js init
 运行后进入交互式引导，选择预设方案即可完成全部配置。
 
 > **注意**：所有配置文件生成后即为完整独立文件，不依赖本包的运行时导入，直接修改即可自定义。
+> 初始化可重复执行：覆盖已有配置前会创建 `.bak` 备份；更新 `package.json` 时会
+> 深合并 `scripts`、工具配置与 `lint-staged`，不会整段抹掉已有字段。
+
+CLI 会按项目实际包管理器使用 `npx --no-install` 或 `pnpm exec` 等本地二进制执行
+方式，避免把含参数的整条命令误当作可执行文件。`--version` 始终从当前安装包的
+`package.json` 读取，和 npm 发布版本保持一致。
 
 ## 提交代码
 

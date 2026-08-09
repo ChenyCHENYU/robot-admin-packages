@@ -9,15 +9,24 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { init } from "../dist/cli/init.js";
 import { doctor } from "../dist/cli/doctor.js";
+
+// 运行时读取版本，避免与 package.json 漂移
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(
+  readFileSync(resolve(__dirname, "..", "package.json"), "utf-8"),
+);
 
 const program = new Command();
 
 program
   .name("robot-standards")
   .description("零配置 Git 工程化标准工具包")
-  .version("1.0.0");
+  .version(pkg.version);
 
 program
   .command("init")
@@ -32,13 +41,16 @@ program
   .option("--no-oxlint", "不启用 Oxlint")
   .option("--prettier", "启用 Prettier")
   .option("--no-prettier", "不启用 Prettier")
+  .option("--jsdoc", "启用 JSDoc（生成相关配置）", false)
   .action(async (options) => {
     try {
       await init(options);
     } catch (error) {
+      // execa 错误带 stderr/shortMessage，优先展示便于排障
+      const detail = error?.stderr || error?.shortMessage || error?.message || error;
       console.error(
         `\n  ${chalk.red("x")} ${chalk.red.bold("初始化失败:")}`,
-        error.message || error,
+        detail,
       );
       process.exit(1);
     }
@@ -53,9 +65,10 @@ program
       const passed = await doctor(options);
       process.exit(passed ? 0 : 1);
     } catch (error) {
+      const detail = error?.stderr || error?.shortMessage || error?.message || error;
       console.error(
         `\n  ${chalk.red("x")} ${chalk.red.bold("诊断失败:")}`,
-        error.message || error,
+        detail,
       );
       process.exit(1);
     }

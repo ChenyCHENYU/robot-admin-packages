@@ -136,7 +136,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
 
   // 高级
   enableHotkeys: true,
-  version: "2.0.2",
+  version: "2.3.2",
 };
 
 // ============ 其他常量 ============

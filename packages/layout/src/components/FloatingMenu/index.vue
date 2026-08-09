@@ -10,6 +10,8 @@
       v-if="show && menuItem"
       class="floating-menu"
       :class="[ctx.isDark.value ? 'dark-theme' : 'light-theme']"
+      role="navigation"
+      aria-label="二级功能导航"
     >
       <!-- 标题 -->
       <div class="floating-menu__header">
@@ -43,7 +45,11 @@
               :key="subChild.path"
               class="floating-menu__item floating-menu__item--sub"
               :class="{ active: isActive?.(subChild.path) }"
+              role="link"
+              tabindex="0"
               @click="emit('click', subChild)"
+              @keydown.enter="emit('click', subChild)"
+              @keydown.space.prevent="emit('click', subChild)"
             >
               <component
                 :is="ctx.iconComponent"
@@ -61,7 +67,11 @@
             v-else
             class="floating-menu__item"
             :class="{ active: isActive?.(child.path) }"
+            role="link"
+            tabindex="0"
             @click="emit('click', child)"
+            @keydown.enter="emit('click', child)"
+            @keydown.space.prevent="emit('click', child)"
           >
             <component
               :is="ctx.iconComponent"
@@ -184,6 +194,11 @@ const brand = { ...DEFAULT_BRAND_CONFIG, ...ctx.brand };
 
 .floating-menu__item:hover {
   background: rgba(99, 102, 241, 0.08);
+}
+
+.floating-menu__item:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
 }
 
 .floating-menu__item.active {

@@ -19,30 +19,29 @@ import { setupCancelPlugin } from "./cancel";
 /**
  * 设置所有插件
  *
- * 插件加载顺序说明：
- * 1. 请求拦截器按注册顺序执行
- * 2. 响应拦截器按注册逆序执行
+ * 拦截器执行规则（axios）：
+ * - 请求拦截器按注册的【逆序】执行（LIFO）
+ * - 响应拦截器按注册【顺序】执行（FIFO）
  *
- * 优化后的顺序（解决冲突问题）：
- * - 请求阶段：request -> cache -> cancel -> dedupe -> retry -> response
- * - 响应阶段：response -> retry -> dedupe -> cancel -> cache -> request
+ * 注册顺序：request -> cache -> cancel -> dedupe -> retry -> response
  *
- * 优化说明：
- * - cache 在最前：确保缓存检查优先级最高
- * - cancel 在 dedupe 之前：确保 cancel 的 signal 不被覆盖
- * - dedupe 在 cancel 之后：复用 cancel 的 signal（如果存在）
+ * 关键说明：
+ * - dedupe 与 cancel 通过共享的 `config.__abortController` 复用同一个
+ *   AbortController，避免各自创建导致 signal 互相覆盖、取消失效。
+ * - cache 在请求拦截器中若命中缓存，以 rejected Promise 携带 `__fromCache`
+ *   短路，并在自身响应错误拦截器中 resolve，避免发出真实网络请求。
  */
 export function setupPlugins(instance: AxiosInstance): void {
   // 1. 请求通用处理（token、headers）
   setupRequestPlugin(instance);
 
-  // 2. 请求缓存（GET 请求缓存，优先级最高）
+  // 2. 请求缓存（GET 请求缓存）
   setupCachePlugin(instance);
 
-  // 3. 路由取消（在去重之前，确保 signal 不被覆盖）
+  // 3. 路由取消
   setupCancelPlugin(instance);
 
-  // 4. 请求去重（防止重复请求，复用 cancel 的 signal）
+  // 4. 请求去重（与 cancel 共享 AbortController）
   setupDedupePlugin(instance);
 
   // 5. 请求重试（网络错误自动重试）
@@ -53,7 +52,12 @@ export function setupPlugins(instance: AxiosInstance): void {
 }
 
 // 导出所有插件的工具函数
-export { resolveReLogin, rejectReLogin, getReLoginPromise } from "./request";
+export {
+  waitForReLogin,
+  resolveReLogin,
+  rejectReLogin,
+  getReLoginPromise,
+} from "./request";
 export { cancelAllPendingRequests, getPendingRequestCount } from "./dedupe";
 export {
   clearAllCache,

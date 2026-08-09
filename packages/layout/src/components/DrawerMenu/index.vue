@@ -11,6 +11,9 @@
       ctx.isDark.value ? 'dark-theme' : 'light-theme',
       { visible: show },
     ]"
+    role="navigation"
+    aria-label="功能导航"
+    :aria-hidden="!show"
     @mouseenter="handlers.show()"
     @mouseleave="handlers.startHide()"
   >
@@ -34,7 +37,14 @@
           :key="category.path"
           class="drawer-menu__category"
         >
-          <div class="drawer-menu__category-header" @click="navigate(category)">
+          <div
+            class="drawer-menu__category-header"
+            role="link"
+            tabindex="0"
+            @click="navigate(category)"
+            @keydown.enter="navigate(category)"
+            @keydown.space.prevent="navigate(category)"
+          >
             <component
               :is="ctx.iconComponent"
               v-if="ctx.iconComponent && category.meta?.icon"
@@ -52,7 +62,11 @@
               v-for="item in category.children"
               :key="item.path"
               class="drawer-menu__item"
+              role="link"
+              tabindex="0"
               @click="navigate(item)"
+              @keydown.enter="navigate(item)"
+              @keydown.space.prevent="navigate(item)"
             >
               <component
                 :is="ctx.iconComponent"
@@ -75,7 +89,11 @@
                   v-for="subItem in item.children"
                   :key="subItem.path"
                   class="drawer-menu__item drawer-menu__item--sub"
+                  role="link"
+                  tabindex="0"
                   @click="navigate(subItem)"
+                  @keydown.enter="navigate(subItem)"
+                  @keydown.space.prevent="navigate(subItem)"
                 >
                   <component
                     :is="ctx.iconComponent"
@@ -143,6 +161,7 @@ const navigate = (item: MenuOptions) => {
   max-height: 60vh;
   overflow-y: auto;
   opacity: 0;
+  visibility: hidden;
   transform: translateY(-8px);
   pointer-events: none;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -154,6 +173,7 @@ const navigate = (item: MenuOptions) => {
 
 .drawer-menu.visible {
   opacity: 1;
+  visibility: visible;
   transform: translateY(0);
   pointer-events: all;
 }
@@ -212,6 +232,12 @@ const navigate = (item: MenuOptions) => {
 
 .drawer-menu__category-header:hover {
   background: rgba(99, 102, 241, 0.06);
+}
+
+.drawer-menu__category-header:focus-visible,
+.drawer-menu__item:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
 }
 
 .drawer-menu__items {

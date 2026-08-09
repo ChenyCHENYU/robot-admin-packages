@@ -17,6 +17,9 @@
 - 🔌 **零依赖** - 仅依赖 Vue 3.3+
 - 📦 **体积小巧** - 打包后 ~45KB (gzip < 14KB)
 - 🎨 **灵活配置** - 简单/高级两种用法
+- 🛡️ **安全与可回收** - loading 文本不注入 HTML，异步监听与 Observer 在卸载时完整清理
+
+当前版本：`1.1.1`。
 
 ---
 
@@ -765,19 +768,15 @@ bun run build
 ### 在主项目中调试
 
 ```bash
-# 1. 在 directives 包目录建立链接
-cd packages/directives
-bun link
-
-# 2. 在主项目中使用链接
-cd /path/to/your-project
-bun link @robot-admin/directives
-
-# 3. 启动开发服务器（自动使用本地源码）
+# 保持 Robot_Admin 与 robot-admin-packages 为同级目录
+cd ../../../Robot_Admin
 bun run dev:local
 ```
 
-**提示**：主项目需配置 Vite alias 解析本地包源码，参考 [viteLocalPackagesConfig.ts](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/src/config/vite/localPackagesAlias.ts)
+Robot_Admin 的 `dev:local` 会启用 `USE_LOCAL_PACKAGES=true`，由 Vite alias 直接
+解析 Monorepo 源码，无需 `bun link`。其他项目可参考
+[localPackagesAlias.ts](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/src/config/vite/localPackagesAlias.ts)
+配置同等能力。
 
 ---
 
@@ -865,6 +864,10 @@ bun run build
 - ✅ 11 个核心指令（copy / debounce / throttle / drag / longpress / permission / watermark / lazy / loading / tooltip / click-outside）
 - ✅ 完整 TypeScript 支持
 - ✅ 零依赖设计
+- ✅ 关键指令自动化测试覆盖
+- ✅ `v-loading` 使用安全 DOM 构造，用户文本按纯文本渲染
+- ✅ `v-click-outside` 同 tick 卸载时也会取消延迟监听，避免 document 监听泄漏
+- ✅ `v-watermark` ResizeObserver 始终读取最新绑定配置
 
 ### v2.0（规划中）
 
@@ -875,7 +878,7 @@ bun run build
 ### 未来计划
 
 - [ ] 指令组合器（Compose API）
-- [ ] 单元测试覆盖
+- [ ] 扩充浏览器交互与无障碍测试矩阵
 - [ ] 在线 Playground 演示
 - [ ] 性能监控和优化
 

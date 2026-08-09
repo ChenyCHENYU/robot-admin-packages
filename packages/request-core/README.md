@@ -1,16 +1,18 @@
 # @robot-admin/request-core
 
-> 为 Vue 3 打造的企业级请求解决方案：Axios 增强 + 7 大插件 + CRUD Composable
+> 为 Vue 3 打造的企业级请求解决方案：Axios 增强 + 6 个请求插件 + CRUD Composable
 
 [![npm version](https://img.shields.io/npm/v/@robot-admin/request-core.svg)](https://www.npmjs.com/package/@robot-admin/request-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+当前版本：`0.2.0`。
 
 ---
 
 ## ✨ 核心特性
 
 - 🚀 **开箱即用**：3 步接入，5 分钟实现完整 CRUD
-- 🔌 **7 大插件**：缓存、重试、去重、取消、reLogin 等开箱即用
+- 🔌 **请求插件**：缓存、重试、去重、取消与可共享的 reLogin 协调
 - 📊 **useTableCrud**：配置式表格 CRUD，自动处理分页/搜索/增删改查
 - 🎯 **智能适配**：自动兼容不同后端响应格式（字段名、成功码）
 - 💪 **类型安全**：完整 TypeScript 支持
@@ -26,7 +28,12 @@ npm install @robot-admin/request-core
 bun add @robot-admin/request-core
 ```
 
-**Peer Dependencies**: `vue@^3.4.0`, `naive-ui@^2.38.0`
+**Peer Dependencies**: `axios@^1.7.0`；使用根入口或 `./crud` 时还需
+`vue@^3.4.0` 与 `naive-ui@^2.38.0`。
+
+纯请求场景可从 `@robot-admin/request-core/axios` 导入 `createAxiosInstance`
+等 API；CRUD 可使用 `@robot-admin/request-core/crud`。根入口继续保留
+`createRequestCore` 和全部 API，兼容已有项目。
 
 ---
 
@@ -139,15 +146,19 @@ getData('/users', {
 ### 重试插件
 
 ```ts
-postData('/submit', data, {
+getData('/report', {
   retry: {
-    enabled: true,          // 启用重试
-    count: 3,               // 最多重试 3 次
-    delay: 1000,            // 重试延迟 1 秒
-    exponentialBackoff: true // 指数退避（1s, 2s, 4s）
+    enabled: true,           // 启用重试
+    count: 3,                // 最多重试 3 次
+    delay: 1000,             // 基础延迟 1 秒
+    exponentialBackoff: true,// 指数退避
+    jitter: true,            // ±25% 随机抖动，降低并发惊群
   }
 })
 ```
+
+默认只重试 `GET/HEAD/OPTIONS/PUT/DELETE`。只有服务端实现幂等键等保护、确认重复
+执行安全时，才应通过 `retryableMethods: ['POST']` 显式允许 POST。
 
 ### 去重插件
 
@@ -159,6 +170,9 @@ getData('/users', {
   }
 })
 ```
+
+默认 key 会包含 `Authorization`、`X-Tenant-Id` 和 `X-User-Id`，防止多租户或
+多用户场景下缓存/去重串用；如自定义 `keyGenerator`，也应保留等价的身份维度。
 
 ### 取消插件
 
@@ -173,13 +187,22 @@ getData('/users', {
 
 ### reLogin 插件
 
-自动管理重新登录场景，多个请求等待登录完成后自动重试：
+为多个 401 请求提供同一个等待 Promise。业务拦截器仍负责展示登录界面、
+刷新 token 和重发请求，库不会擅自决定业务流程：
 
 ```ts
-import { onReLoginSuccess } from '@robot-admin/request-core'
+import {
+  waitForReLogin,
+  onReLoginSuccess,
+  onReLoginCancel,
+} from '@robot-admin/request-core/axios'
 
-// 在登录成功后调用
-onReLoginSuccess()  // 通知所有等待的请求继续
+// 每个收到 401 的请求都等待同一个 Promise
+await waitForReLogin()
+
+// 登录弹窗在成功或取消时调用其一
+onReLoginSuccess()
+onReLoginCancel()
 ```
 
 ---
@@ -258,11 +281,20 @@ const users = await getData('/api/users', {
   cache: { enabled: true, ttl: 300000 }  // 缓存 5 分钟
 })
 
-// 带重试的 POST 请求
-const result = await postData('/api/submit', { data: 'test' }, {
-  retry: { enabled: true, count: 3 }
+// 默认仅重试幂等方法；POST 必须由业务明确确认可安全重复后才能加入白名单
+const result = await postData('/api/idempotent-submit', { data: 'test' }, {
+  retry: {
+    enabled: true,
+    count: 3,
+    retryableMethods: ['POST'],
+    jitter: true,
+  }
 })
 ```
+
+调用方传入的 `AbortSignal` 会与 dedupe、路由批量取消共享同一取消链；自动重试
+的退避等待也可立即取消。默认重试方法为 `GET/HEAD/OPTIONS/PUT/DELETE`，不会
+自动重试普通 POST 请求。
 
 ---
 
@@ -347,9 +379,9 @@ useTableCrud({
    getData('/api/config', { cache: { enabled: true, ttl: 600000 } })
    ```
 
-4. **重要接口启用重试**
+4. **仅为幂等接口启用重试**
    ```ts
-   postData('/api/payment', data, { retry: { enabled: true, count: 3 } })
+   getData('/api/report', { retry: { enabled: true, count: 3, jitter: true } })
    ```
 
 ### ❌ 避免的做法
@@ -357,6 +389,7 @@ useTableCrud({
 1. ❌ 不要在每个组件中重复配置 axios
 2. ❌ 不要禁用去重插件（除非有特殊需求）
 3. ❌ 不要在 useTableCrud 外部调用其内部方法
+4. ❌ 不要为付款、创建订单等非幂等 POST 盲目开启重试
 
 ---
 
@@ -393,6 +426,17 @@ export type EnhancedAxiosRequestConfig = AxiosRequestConfig & {
 
 查看完整类型定义：[src/index.ts](./src/index.ts)
 
+## 从 v0.1.x 升级到 v0.2.0
+
+- `axios` 现在是必须的 peerDependency，应用应显式安装 `axios ^1.7`；这可以避免
+  多 Axios 实例导致取消错误识别失效。
+- 纯请求场景建议改从 `@robot-admin/request-core/axios` 导入，避免引入 Vue 与
+  Naive UI；CRUD 可从 `@robot-admin/request-core/crud` 导入，根入口保持兼容。
+- POST 不再默认重试。确有幂等保障时，通过 `retryableMethods` 显式开启。
+- 去重和路由取消现在共享取消控制器，调用方 `AbortSignal` 也会参与同一取消链。
+- 401 协调使用共享 Promise；登录成功或取消后必须分别调用 `onReLoginSuccess()`
+  或 `onReLoginCancel()` 释放所有等待请求。
+
 ---
 
 ## 🛠️ 开发
@@ -409,4 +453,3 @@ bun run type-check # 类型检查
 ## 📄 License
 
 MIT © [ChenYu](https://github.com/ChenyCHENYU)
-

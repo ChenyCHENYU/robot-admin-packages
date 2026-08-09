@@ -14,13 +14,13 @@
   ],
   "scripts": {
     "dev": "bun run --filter './packages/*' dev",
-    "build": "bun run --filter './packages/*' build",
-    "test": "bun run --filter './packages/*' test",
+    "build": "bun run --cwd packages/theme build && bun run --cwd packages/directives build && bun run --cwd packages/file-utils build && bun run --cwd packages/form-validate build && bun run --cwd packages/request-core build && bun run --cwd packages/git-standards build && bun run --cwd packages/layout build",
+    "test": "vitest run packages",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "bun run build && changeset publish",
     "clean": "bun run --filter './packages/*' clean",
-    "type-check": "bun run --filter './packages/*' type-check"
+    "type-check": "tsc --noEmit -p packages/theme/tsconfig.json && tsc --noEmit -p packages/directives/tsconfig.json && tsc --noEmit -p packages/file-utils/tsconfig.json && tsc --noEmit -p packages/form-validate/tsconfig.json && tsc --noEmit -p packages/request-core/tsconfig.json && tsc --noEmit -p packages/git-standards/tsconfig.json && bun run --cwd packages/layout type-check"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

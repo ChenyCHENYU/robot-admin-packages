@@ -6,7 +6,7 @@
  */
 
 import { resolve } from "node:path";
-import { unlinkSync, existsSync } from "node:fs";
+import { unlinkSync, existsSync, readFileSync } from "node:fs";
 import chalk from "chalk";
 import ora from "ora";
 import { execa } from "execa";
@@ -15,10 +15,13 @@ import {
   getInstallCommand,
   getExecCommand,
   getPackageManagerName,
+  splitExecCommand,
+  type PackageManager,
 } from "../utils/package-manager";
 import { isGitRepository, initGitRepository } from "../utils/git";
 import {
   writeFileContent,
+  writeFileWithBackup,
   writeExecutableFile,
   updatePackageJson,
   readJsonFile,
@@ -27,6 +30,27 @@ import { generateLintStagedConfig } from "../configs/lint-staged";
 
 // ─── 品牌 & 符号系统 ──────────────────────────────────────────────
 const BRAND = "#7C3AED";
+
+// 运行时读取版本，避免与 package.json 漂移（兼容 ESM/CJS，路径深度自适应）
+function readPkgVersion(): string {
+  try {
+    // dist/cli/init.js → package.json 在 dist 的上两级
+    const candidates: string[] = [
+      resolve(__dirname, "..", "..", "package.json"),
+      resolve(process.cwd(), "package.json"),
+    ];
+    for (const p of candidates) {
+      if (existsSync(p)) {
+        return JSON.parse(readFileSync(p, "utf-8")).version ?? "0.0.0";
+      }
+    }
+  } catch {
+    // 忽略，返回占位
+  }
+  return "0.0.0";
+}
+const VERSION = readPkgVersion();
+
 const S = {
   LOGO: chalk.hex(BRAND).bold("[RS]"),
   OK: chalk.green("✔"),
@@ -223,7 +247,7 @@ function printBanner() {
   console.log();
   console.log(S.LINE);
   console.log(
-    `  ${S.LOGO}  ${chalk.bold("Robot Standards")}  ${chalk.gray("v1.0.0")}`,
+    `  ${S.LOGO}  ${chalk.bold("Robot Standards")}  ${chalk.gray(`v${VERSION}`)}`,
   );
   console.log(`  ${chalk.gray("零配置 · 模块化 · Git 工程化标准工具包")}`);
   console.log(S.LINE);
@@ -461,7 +485,7 @@ function printSummary(
 // ─── 安装依赖 ────────────────────────────────────────────────────
 async function installDependencies(
   cwd: string,
-  pm: string,
+  pm: PackageManager,
   features: FeatureSet,
   eslintOpts: ESLintOptions,
 ) {
@@ -518,7 +542,7 @@ async function installDependencies(
   spinner.text = chalk.gray(`安装 ${deps.length} 个依赖...`);
 
   try {
-    const installCmd = getInstallCommand(pm as any);
+    const installCmd = getInstallCommand(pm);
     await execa(
       installCmd.split(" ")[0],
       [...installCmd.split(" ").slice(1), ...deps],
@@ -603,7 +627,7 @@ module.exports = {
   subjectLimit: 88,
 }
 `;
-    await writeFileContent(resolve(cwd, `.cz-config${jsExt}`), czConfig);
+    await writeFileWithBackup(resolve(cwd, `.cz-config${jsExt}`), czConfig);
     generated.push(`.cz-config${jsExt}`);
 
     // ── commitlint.config.js（始终生成）──
@@ -629,7 +653,7 @@ module.exports = {
   },
 }
 `;
-    await writeFileContent(
+    await writeFileWithBackup(
       resolve(cwd, `commitlint.config${jsExt}`),
       commitlintConfig,
     );
@@ -660,7 +684,7 @@ module.exports = {
   singleAttributePerLine: true,
 }
 `;
-      await writeFileContent(resolve(cwd, `.prettierrc${jsExt}`), prettierConfig);
+      await writeFileWithBackup(resolve(cwd, `.prettierrc${jsExt}`), prettierConfig);
       generated.push(`.prettierrc${jsExt}`);
     }
 
@@ -938,7 +962,7 @@ ${vueComponentRules}
 ${ignoreAssets}${jsdocWhitelist}${skipLine}
 ${wrapperEnd}
 `;
-      await writeFileContent(resolve(cwd, "eslint.config.ts"), eslintConfig);
+      await writeFileWithBackup(resolve(cwd, "eslint.config.ts"), eslintConfig);
       generated.push("eslint.config.ts");
     }
 
@@ -967,7 +991,7 @@ indent_size = 2
 [Makefile]
 indent_style = tab
 `;
-      await writeFileContent(resolve(cwd, ".editorconfig"), editorConfig);
+      await writeFileWithBackup(resolve(cwd, ".editorconfig"), editorConfig);
       generated.push(".editorconfig");
     }
 
@@ -982,7 +1006,7 @@ indent_style = tab
 }
 
 // ─── Husky 设置 ──────────────────────────────────────────────────
-async function setupHusky(cwd: string, pm: string, features: FeatureSet) {
+async function setupHusky(cwd: string, pm: PackageManager, features: FeatureSet) {
   const spinner = ora({
     text: chalk.gray("初始化 Husky..."),
     prefixText: "  ",
@@ -990,7 +1014,10 @@ async function setupHusky(cwd: string, pm: string, features: FeatureSet) {
   }).start();
 
   try {
-    const execCmd = getExecCommand(pm as any);
+    // execCmd 为“执行本地包”前缀（如 "npx --no-install" / "pnpm exec"），
+    // 既是 hook 脚本里的命令前缀，也需拆分后传给 execa（首个参数须为单个可执行名）。
+    const execCmd = getExecCommand(pm);
+    const [execBin, ...execArgs] = splitExecCommand(pm);
     // husky init 会执行两件事：
     // 1. 调用 index.js default export → 创建 .husky/_/ 运行时基础设施 + 设置 core.hooksPath = .husky/_
     // 2. 创建 .husky/ 目录和默认 pre-commit 脚本
@@ -1002,10 +1029,14 @@ async function setupHusky(cwd: string, pm: string, features: FeatureSet) {
     //
     // ⚠️ 切勿删除 .husky/_/ 目录！它不是旧版遗留物，而是 hook 执行的必要基础设施。
     //    该目录由 prepare 脚本（husky）在每次 install 后自动重建。
-    await execa(execCmd, ["husky", "init"], { cwd, stdio: "pipe" });
+    await execa(execBin, [...execArgs, "husky", "init"], {
+      cwd,
+      stdio: "pipe",
+    });
 
     // ── commit-msg hook（始终创建）──
-    const commitMsg = `${execCmd} --no-install commitlint --edit "$1"\n`;
+    // --no-install 已包含在 npm 的 execCmd 中；pnpm exec / yarn / bunx 无需该参数
+    const commitMsg = `${execCmd} commitlint --edit "$1"\n`;
     await writeExecutableFile(resolve(cwd, ".husky/commit-msg"), commitMsg);
 
     const hooks: string[] = ["commit-msg"];
@@ -1049,7 +1080,7 @@ async function setupHusky(cwd: string, pm: string, features: FeatureSet) {
 // ─── 更新 package.json ──────────────────────────────────────────
 async function addPackageScripts(
   cwd: string,
-  pm: string,
+  pm: PackageManager,
   features: FeatureSet,
 ) {
   const spinner = ora({
@@ -1118,7 +1149,7 @@ async function addPackageScripts(
 }
 
 // ─── 完成输出 ────────────────────────────────────────────────────
-function printCompletion(pm: string, features: FeatureSet) {
+function printCompletion(pm: PackageManager, features: FeatureSet) {
   console.log();
   console.log(S.LINE);
   console.log(`  ${S.OK} ${chalk.green.bold("初始化完成!")}`);

@@ -55,15 +55,39 @@ function parseOptions(value: LoadingBinding | undefined): LoadingOptions {
 }
 
 /**
- * * @description 创建 Spinner SVG 元素
+ * * @description 创建 Spinner SVG 元素（不使用 HTML 字符串，避免属性注入）
  * ? @param color - spinner 颜色
  * ? @param size - spinner 大小（px）
- * ! @return SVG HTML 字符串
+ * ! @return SVG DOM 元素
  */
-function createSpinnerSvg(color: string, size: number): string {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" style="animation:v-loading-rotate 0.8s linear infinite">
-    <circle cx="22" cy="22" r="18" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-dasharray="90,150" stroke-dashoffset="0" style="animation:v-loading-dash 1.5s ease-in-out infinite"/>
-  </svg>`;
+export function createSpinnerElement(
+  color: string,
+  size: number,
+): SVGSVGElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const safeSize = Number.isFinite(Number(size))
+    ? Math.min(256, Math.max(8, Number(size)))
+    : 32;
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("width", String(safeSize));
+  svg.setAttribute("height", String(safeSize));
+  svg.setAttribute("viewBox", "0 0 44 44");
+  svg.setAttribute("aria-hidden", "true");
+  svg.style.animation = "v-loading-rotate 0.8s linear infinite";
+
+  const circle = document.createElementNS(namespace, "circle");
+  circle.setAttribute("cx", "22");
+  circle.setAttribute("cy", "22");
+  circle.setAttribute("r", "18");
+  circle.setAttribute("fill", "none");
+  circle.setAttribute("stroke", String(color));
+  circle.setAttribute("stroke-width", "4");
+  circle.setAttribute("stroke-linecap", "round");
+  circle.setAttribute("stroke-dasharray", "90,150");
+  circle.setAttribute("stroke-dashoffset", "0");
+  circle.style.animation = "v-loading-dash 1.5s ease-in-out infinite";
+  svg.appendChild(circle);
+  return svg;
 }
 
 /**
@@ -123,11 +147,14 @@ function createOverlay(options: LoadingOptions): HTMLElement {
   overlay.style.color = spinnerColor;
   overlay.style.opacity = "0";
 
-  let html = createSpinnerSvg(spinnerColor, spinnerSize);
+  overlay.appendChild(createSpinnerElement(spinnerColor, spinnerSize));
   if (options.text) {
-    html += `<span class="v-loading-text">${options.text}</span>`;
+    // 文本可能来自用户数据，使用 textContent 避免 XSS
+    const textEl = document.createElement("span");
+    textEl.className = "v-loading-text";
+    textEl.textContent = options.text;
+    overlay.appendChild(textEl);
   }
-  overlay.innerHTML = html;
 
   return overlay;
 }

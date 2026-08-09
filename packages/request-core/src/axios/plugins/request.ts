@@ -15,12 +15,12 @@ import type { AxiosInstance } from "axios";
  */
 let reLoginPromise: Promise<void> | null = null;
 let reLoginResolve: (() => void) | null = null;
-let reLoginReject: ((reason?: any) => void) | null = null;
+let reLoginReject: ((reason?: unknown) => void) | null = null;
 
 /**
  * 创建重新登录 Promise
  */
-export function createReLoginPromise(): Promise<void> {
+export function waitForReLogin(): Promise<void> {
   if (!reLoginPromise) {
     reLoginPromise = new Promise<void>((resolve, reject) => {
       reLoginResolve = resolve;
@@ -53,7 +53,7 @@ export function resolveReLogin(): void {
 /**
  * 重新登录失败或取消
  */
-export function rejectReLogin(reason?: any): void {
+export function rejectReLogin(reason?: unknown): void {
   if (reLoginReject) {
     reLoginReject(reason);
   }

@@ -10,5 +10,6 @@ export default defineConfig({
   sourcemap: true,
   minify: false,
   outDir: "dist",
-  external: ["vue"],
+  external: ["vue", "xlsx", "jszip", "file-saver"],
+  target: "es2020",
 });
