@@ -17,7 +17,7 @@
 | [@robot-admin/directives](./packages/directives)       | `2.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/directives)](https://www.npmjs.com/package/@robot-admin/directives) | 11 个 Vue 3 指令、应用级适配器、无障碍与严格生命周期清理    |
 | [@robot-admin/file-utils](./packages/file-utils)       | `3.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/file-utils)](https://www.npmjs.com/package/@robot-admin/file-utils) | 安全 Excel/ZIP/CSV、隔离配置及可取消的真流式大文件传输      |
 | [@robot-admin/request-core](./packages/request-core)   | `0.2.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/request-core)](https://www.npmjs.com/package/@robot-admin/request-core) | Axios 请求编排、6 类插件能力与 CRUD Composables             |
-| [@robot-admin/form-validate](./packages/form-validate) | `3.4.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/form-validate)](https://www.npmjs.com/package/@robot-admin/form-validate) | 面向 Naive UI 的类型安全表单验证规则库                      |
+| [@robot-admin/form-validate](./packages/form-validate) | `3.4.2`    | [![npm](https://img.shields.io/npm/v/@robot-admin/form-validate)](https://www.npmjs.com/package/@robot-admin/form-validate) | Naive UI / Element Plus 双框架类型安全表单验证规则库        |
 | [@robot-admin/git-standards](./packages/git-standards) | `1.0.4`    | [![npm](https://img.shields.io/npm/v/@robot-admin/git-standards)](https://www.npmjs.com/package/@robot-admin/git-standards) | 幂等初始化、配置备份与 4 种 Git 工程化预设                  |
 
 > “本仓库版本”随版本提交更新；“npm 最新版”徽章反映注册表状态，发布传播期间可能短暂滞后。

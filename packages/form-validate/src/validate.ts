@@ -12,13 +12,27 @@ import type { RuleSpec } from "./types";
 
 /**
  * 按点路径取值（支持 'a.b.c' / 'a[0].b' / 'a[0][1]'）。
- * 普通键（不含 . [ ]）行为与 obj[key] 完全一致，无副作用。
+ * 只读取对象自身属性，避免被继承属性或原型链污染影响校验结果。
  */
-const getPath = (obj: any, path: string): any =>
-  path.split(/[.[\]]/).filter(Boolean).reduce(
-    (acc, key) => (acc == null ? undefined : acc[key]),
-    obj,
-  );
+const getOwnValue = (value: any, key: string): any => {
+  if (
+    value === null ||
+    value === undefined ||
+    !Object.prototype.hasOwnProperty.call(value, key)
+  ) {
+    return undefined;
+  }
+  return value[key];
+};
+
+const getPath = (obj: any, path: string): any => {
+  if (!/[.[\]]/.test(path)) return getOwnValue(obj, path);
+
+  return path
+    .split(/[.[\]]/)
+    .filter(Boolean)
+    .reduce((value, key) => getOwnValue(value, key), obj);
+};
 
 /**
  * 校验单个值：依次执行规则，返回第一条失败消息；全部通过返回 null。
@@ -36,7 +50,7 @@ const getPath = (obj: any, path: string): any =>
  */
 export async function validateValue(
   value: any,
-  rules: RuleSpec[],
+  rules: readonly RuleSpec[],
 ): Promise<string | null> {
   for (const rule of rules) {
     // eslint-disable-next-line no-await-in-loop
@@ -70,13 +84,13 @@ export async function validateValue(
  * if (err) ElMessage.error(`${err.message}`);
  */
 export async function validateRecord(
-  record: Record<string, any>,
-  ruleMap: Record<string, RuleSpec[]>,
+  record: Readonly<Record<string, any>>,
+  ruleMap: Readonly<Record<string, readonly RuleSpec[]>>,
 ): Promise<{ field: string; message: string } | null> {
   for (const field of Object.keys(ruleMap)) {
     // eslint-disable-next-line no-await-in-loop
     const message = await validateValue(getPath(record, field), ruleMap[field]);
-    if (message) return { field, message };
+    if (message !== null) return { field, message };
   }
   return null;
 }
@@ -94,8 +108,8 @@ export async function validateRecord(
  * if (err) return `${title}第${err.rowIndex}行：${err.message}`;
  */
 export async function validateRows(
-  rows: Record<string, any>[],
-  ruleMap: Record<string, RuleSpec[]>,
+  rows: readonly Readonly<Record<string, any>>[],
+  ruleMap: Readonly<Record<string, readonly RuleSpec[]>>,
   options?: { startIndex?: number },
 ): Promise<{
   rowIndex: number;
@@ -107,7 +121,11 @@ export async function validateRows(
     // eslint-disable-next-line no-await-in-loop
     const err = await validateRecord(rows[i], ruleMap);
     if (err) {
-      return { rowIndex: startIndex + i, field: err.field, message: err.message };
+      return {
+        rowIndex: startIndex + i,
+        field: err.field,
+        message: err.message,
+      };
     }
   }
   return null;

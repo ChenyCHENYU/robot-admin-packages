@@ -1,15 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   createSpec,
   createAsyncSpec,
+  debounce,
   optional,
   mergeSpecs,
+  mergeRules,
   mergeTriggers,
   transform,
   isBlank,
   createRule,
 } from "../src/utils";
-import { runSpec, toNaiveRule, toElementRule } from "../src/adapter";
+import { toNaiveRule, toElementRule } from "../src/adapter";
 import type { RuleSpec } from "../src/types";
 
 const run = async (spec: RuleSpec, value: unknown) => {
@@ -18,12 +20,48 @@ const run = async (spec: RuleSpec, value: unknown) => {
   return { ok: false, message: typeof r === "string" ? r : spec.message };
 };
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("isBlank", () => {
   it.each([null, undefined, "", "   ", "\t\n"])("空白值 %j 判空", (v) => {
     expect(isBlank(v)).toBe(true);
   });
   it.each([0, false, "0", [], {}])("非空白值 %j 不判空", (v) => {
     expect(isBlank(v)).toBe(false);
+  });
+});
+
+describe("debounce", () => {
+  it("合并等待窗口内的调用，并让所有 Promise 收到最后一次结果", async () => {
+    vi.useFakeTimers();
+    const fn = vi.fn((value: string) => `checked:${value}`);
+    const debounced = debounce(fn, 50);
+
+    const first = debounced("first");
+    const second = debounced("second");
+    await vi.advanceTimersByTimeAsync(50);
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      "checked:second",
+      "checked:second",
+    ]);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenCalledWith("second");
+  });
+
+  it("同步异常会拒绝同一批次的全部 Promise", async () => {
+    vi.useFakeTimers();
+    const debounced = debounce(() => {
+      throw new Error("服务异常");
+    }, 10);
+
+    const first = expect(debounced()).rejects.toThrow("服务异常");
+    const second = expect(debounced()).rejects.toThrow("服务异常");
+    await vi.advanceTimersByTimeAsync(10);
+
+    await Promise.all([first, second]);
   });
 });
 
@@ -42,6 +80,10 @@ describe("createSpec", () => {
     const rule = createSpec(["blur", "input"], () => true, "");
     expect(rule.trigger).toEqual(["blur", "input"]);
   });
+  it("支持返回动态失败消息", async () => {
+    const rule = createSpec("blur", () => "动态消息", "默认消息");
+    expect((await run(rule, "x")).message).toBe("动态消息");
+  });
 });
 
 describe("createAsyncSpec", () => {
@@ -49,6 +91,14 @@ describe("createAsyncSpec", () => {
     const rule = createAsyncSpec("blur", async (v) => v === 1, "失败");
     expect((await run(rule, 1)).ok).toBe(true);
     expect((await run(rule, 2)).ok).toBe(false);
+  });
+  it("支持异步返回动态失败消息", async () => {
+    const rule = createAsyncSpec(
+      "blur",
+      async () => "异步动态消息",
+      "默认消息",
+    );
+    expect((await run(rule, "x")).message).toBe("异步动态消息");
   });
 });
 
@@ -65,7 +115,10 @@ describe("optional", () => {
 
 describe("transform", () => {
   it("校验前转换值", async () => {
-    const rule = transform((v: string) => v.trim(), createSpec("blur", (v) => v === "abc", "失败"));
+    const rule = transform(
+      (v: string) => v.trim(),
+      createSpec("blur", (v) => v === "abc", "失败"),
+    );
     expect((await run(rule, "  abc  ")).ok).toBe(true);
   });
 });
@@ -75,7 +128,9 @@ describe("mergeTriggers", () => {
     expect(mergeTriggers([])).toEqual(["blur", "input"]);
   });
   it("单元素返回单个", () => {
-    expect(mergeTriggers([{ trigger: "blur", validate: () => true, message: "" }])).toBe("blur");
+    expect(
+      mergeTriggers([{ trigger: "blur", validate: () => true, message: "" }]),
+    ).toBe("blur");
   });
   it("多元素去重取并集", () => {
     const specs = [
@@ -106,6 +161,16 @@ describe("mergeSpecs", () => {
       createSpec("blur", () => true, ""),
     ])[0];
     expect((await run(merged, "x")).ok).toBe(true);
+  });
+});
+
+describe("mergeRules", () => {
+  it("保留被合并规则的实际 trigger", () => {
+    const merged = mergeRules([
+      createRule("change", () => true, ""),
+      createRule("blur", () => true, ""),
+    ]);
+    expect(merged[0].trigger).toEqual(["change", "blur"]);
   });
 });
 
@@ -140,6 +205,42 @@ describe("适配器 toNaiveRule / toElementRule", () => {
     return new Promise<void>((resolve) => {
       fn(el, "no", (err) => {
         expect(err).toBeInstanceOf(Error);
+        resolve();
+      });
+    });
+  });
+
+  it("toElementRule 对映射后的重复 trigger 去重", () => {
+    const inputAndChange = createSpec(["input", "change"], () => true, "");
+    expect(toElementRule(inputAndChange).trigger).toBe("change");
+  });
+
+  it.each([
+    [
+      "同步异常",
+      createSpec(
+        "blur",
+        () => {
+          throw new Error("同步异常");
+        },
+        "默认消息",
+      ),
+    ],
+    [
+      "异步异常",
+      createAsyncSpec(
+        "blur",
+        async () => Promise.reject("异步异常"),
+        "默认消息",
+      ),
+    ],
+  ])("toElementRule 将%s交给 callback", (message, errorSpec) => {
+    const elementRule = toElementRule(errorSpec);
+
+    return new Promise<void>((resolve) => {
+      elementRule.validator?.(elementRule, "value", (error) => {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe(message);
         resolve();
       });
     });

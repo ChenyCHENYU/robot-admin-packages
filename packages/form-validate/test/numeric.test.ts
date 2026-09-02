@@ -56,6 +56,14 @@ describe("numeric", () => {
     it("前导零不计入总位数", async () => {
       expect((await run(rule, "00123")).ok).toBe(true);
     });
+    it("小于 1 的小数不把占位整数 0 计入总位数", async () => {
+      const fractionRule = numeric(
+        { kind: "decimal", totalDigits: 3, fractionDigits: 3 },
+        "比例",
+      );
+      expect((await run(fractionRule, ".125")).ok).toBe(true);
+      expect((await run(fractionRule, "0.125")).ok).toBe(true);
+    });
     it("超位数失败", async () => {
       expect((await run(rule, "123456")).ok).toBe(false);
     });
@@ -86,7 +94,13 @@ describe("numeric", () => {
     });
     it("开区间 minExclusive/maxExclusive", async () => {
       const openRule = numeric(
-        { kind: "decimal", min: 0, max: 100, minExclusive: true, maxExclusive: true },
+        {
+          kind: "decimal",
+          min: 0,
+          max: 100,
+          minExclusive: true,
+          maxExclusive: true,
+        },
         "值",
       );
       expect((await run(openRule, 0)).ok).toBe(false);
@@ -107,7 +121,10 @@ describe("numeric", () => {
 
   describe("组合契约（对标 SQL DECIMAL(11,3)）", () => {
     const decimalContract: NumericContract = {
-      kind: "decimal", totalDigits: 11, fractionDigits: 3, min: 0,
+      kind: "decimal",
+      totalDigits: 11,
+      fractionDigits: 3,
+      min: 0,
     };
     const rule = numeric(decimalContract, "温度");
     it("合法值通过", async () => {
@@ -118,6 +135,19 @@ describe("numeric", () => {
     });
     it("负数失败", async () => {
       expect((await run(rule, "-1")).ok).toBe(false);
+    });
+  });
+
+  describe("契约配置校验", () => {
+    it.each([
+      [{ totalDigits: 0 }, "totalDigits"],
+      [{ fractionDigits: -1 }, "fractionDigits"],
+      [{ totalDigits: 2, fractionDigits: 3 }, "fractionDigits"],
+      [{ min: Number.NEGATIVE_INFINITY }, "min"],
+      [{ max: Number.POSITIVE_INFINITY }, "max"],
+      [{ min: 2, max: 1 }, "min"],
+    ] as const)("拒绝非法契约 %j", (contract, message) => {
+      expect(() => numeric(contract, "值")).toThrow(message);
     });
   });
 });

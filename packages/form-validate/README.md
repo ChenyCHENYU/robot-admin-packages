@@ -34,7 +34,7 @@ RuleSpec(源真相) ──┼── toElementRule → ELEMENT_RULES / ELEMENT_CO
 - 🚀 **高级组合** — 条件验证、跨字段比较、OR/AND 组合、防抖异步
 - 🇨🇳 **中国本地化** — 身份证、银行卡、车牌、统一社会信用代码
 - 💪 **TypeScript** — 完整类型推导，Tree-shaking 友好
-- ✅ **84 测试覆盖** — 行为有保障，不靠肉眼
+- ✅ **核心边界测试覆盖** — 行为、类型、异步异常与产物均可验证
 
 ---
 
@@ -52,7 +52,7 @@ npm i @robot-admin/form-validate
 
 ## 🚀 30 秒上手
 
-### Naive UI 用户（默认导出即 naive 格式）
+### Naive UI 用户（推荐入口为 naive 格式）
 
 ```ts
 import { PRESET_RULES, RULE_COMBOS } from "@robot-admin/form-validate";
@@ -128,35 +128,42 @@ userNo: [
 ### 场景 3：非必填，填了才校验格式
 
 ```ts
-import { optional, toNaiveRule, toElementRule, SPEC_RULES } from "@robot-admin/form-validate";
+import {
+  PRESET_RULES,
+  ELEMENT_RULES,
+  optional,
+  SPEC_RULES,
+} from "@robot-admin/form-validate";
 
-// optional() 返回 RuleSpec，需经适配器转为框架规则
+// Naive UI：同一命名空间内完成，无需手工适配
+PRESET_RULES.optional(PRESET_RULES.boolean("启用状态"))
 
-// naive
-toNaiveRule(optional(SPEC_RULES.email("邮箱")))   // 空值放行，有值才校验
+// Element Plus：写法完全对称
+ELEMENT_RULES.optional(ELEMENT_RULES.boolean("启用状态"))
 
-// element
-toElementRule(optional(SPEC_RULES.email("邮箱")))
+// 框架无关场景仍使用核心包装器
+optional(SPEC_RULES.boolean("启用状态"))
 ```
 
-> `optional` 同样可包装 `numeric`、自定义规则等任意 RuleSpec。
+> `optional` 不修改传入规则；空值直接放行，有值时继续执行原规则。
 
 ### 场景 4：数据库数值契约（DECIMAL）
 
 ```ts
-import { numeric, toElementRule } from "@robot-admin/form-validate";
+import { SPEC_RULES, PRESET_RULES, ELEMENT_RULES } from "@robot-admin/form-validate";
 
-// 对标 DECIMAL(11,3)，温度 ≥ 0
-numeric({ kind: "decimal", totalDigits: 11, fractionDigits: 3, min: 0 }, "温度")
+const contract = { kind: "decimal", totalDigits: 11, fractionDigits: 3, min: 0 } as const;
+
+// 按使用环境选择同名入口，无需手工适配
+PRESET_RULES.numeric(contract, "温度") // Naive UI
+ELEMENT_RULES.numeric(contract, "温度") // Element Plus
+SPEC_RULES.numeric(contract, "温度") // 框架无关 / 批量校验
 
 // 整数 + 范围
-numeric({ kind: "integer", totalDigits: 11, min: 1 }, "处理次数")
+ELEMENT_RULES.numeric({ kind: "integer", totalDigits: 11, min: 1 }, "处理次数")
 
 // 开区间（必须严格大于 min）
-numeric({ kind: "decimal", min: 0, max: 100, minExclusive: true }, "百分比")
-
-// element 版需包一层
-toElementRule(numeric({ kind: "integer", min: 1 }, "处理次数"))
+SPEC_RULES.numeric({ kind: "decimal", min: 0, max: 100, minExclusive: true }, "百分比")
 ```
 
 ### 场景 5：跨字段比较（结束日期不早于开始）
@@ -186,7 +193,7 @@ when(
 ### 场景 7：表格提交前批量校验（含嵌套路径）
 
 ```ts
-import { validateRows, validateValue, numeric, SPEC_RULES } from "@robot-admin/form-validate";
+import { validateRows, validateRecord, numeric, SPEC_RULES } from "@robot-admin/form-validate";
 
 const ruleMap = {
   steel_code: [SPEC_RULES.required("钢种")],
@@ -201,7 +208,7 @@ if (err) {
 }
 
 // 主从结构：字段名支持点路径嵌套
-const nestedErr = await validateValue(
+const nestedErr = await validateRecord(
   record,
   {
     "address.city":    [SPEC_RULES.required("城市")],
@@ -212,7 +219,7 @@ const nestedErr = await validateValue(
 ```
 
 > 点路径支持 `'a.b.c'`（对象嵌套）、`'items[0].qty'`（数组索引）、深层组合。
-> 平铺字段（不含 `.` `[` `]`）行为与 `record[key]` 完全一致，零副作用。
+> 路径只读取对象自身属性，不会沿原型链取值，避免污染数据影响校验结果。
 
 ### 场景 8：OR 组合（手机号或邮箱任一）
 
@@ -260,6 +267,8 @@ some(
 | OR 组合 | `some` | `someElement` | `someSpec` |
 | AND 组合 | `every` | `everyElement` | `everySpec` |
 
+组合器可直接接收同框架预设：Naive 版本使用 `PRESET_RULES`，Element 版本使用 `ELEMENT_RULES`，框架无关版本使用 `SPEC_RULES`。
+
 ### 适配器
 
 | 函数 | 作用 |
@@ -292,6 +301,23 @@ some(
 | `mergeSpecs(specs)` | 串行校验，返回第一条失败 |
 | `isBlank(v)` | 空值判断（null/undefined/纯空格） |
 | `REGEX_PATTERNS` | 正则常量库（40+） |
+
+### 运行时语义
+
+- 空值统一指 `null`、`undefined`、空字符串或纯空白字符串；`0` 与 `false` 都是已填写值。
+- `required` 元数据会同步传给 Naive UI 与 Element Plus，用于框架展示必填状态。
+- 防抖校验在同一等待窗口内只执行最后一次调用，但每个调用方返回的 Promise 都会结算。
+- 规则函数抛出的异常会继续向上传递；Element Plus 适配器会将异常规范化为 `Error` 交给 callback。
+- `numeric` 会在创建规则时拒绝非法精度、非有限边界和反向区间，尽早暴露配置错误。
+- 规则工厂会快照 trigger、枚举值、静态日期边界等配置；调用方后续修改原始配置不会改变既有规则。
+- 预设、组合和正则命名空间均为只读对象，防止某个业务模块误改后影响其他表单。
+
+### 接入隔离保证
+
+- 零运行时依赖，不要求安装 Naive UI 或 Element Plus，也不会自动注册组件。
+- 不修改全局对象、原型链、传入数据或传入规则；每次工厂调用均返回独立规则。
+- 不使用全局可变配置，多应用、多租户及微前端场景之间不会共享校验状态。
+- 规则对象本身保持可扩展，业务侧仍可安全追加框架支持的局部字段。
 
 ---
 
@@ -335,14 +361,14 @@ when(
 
 ```ts
 import { computed } from "vue";
-import { ELEMENT_RULES, numeric, toElementRule } from "@robot-admin/form-validate";
+import { ELEMENT_RULES } from "@robot-admin/form-validate";
 
 // 根据表单类型动态返回不同规则
 const workTimeRules = computed(() => {
   if (form.value.type === "overtime") {
-    return [toElementRule(numeric({ kind: "integer", min: 1, max: 10080 }, "加班时长"))];
+    return [ELEMENT_RULES.numeric({ kind: "integer", min: 1, max: 10080 }, "加班时长")];
   }
-  return [toElementRule(numeric({ kind: "integer", min: 0, max: 480 }, "工时"))];
+  return [ELEMENT_RULES.numeric({ kind: "integer", min: 0, max: 480 }, "工时")];
 });
 // :rules="workTimeRules"
 ```
@@ -410,7 +436,7 @@ REGEX_PATTERNS.IP / IPV6    // IP 地址
 │   ├── presets.ts     # PRESET_RULES / ELEMENT_RULES / SPEC_RULES
 │   ├── regex.ts       # 正则常量库
 │   └── rules/         # basic / value / format / china（产 RuleSpec）
-└── test/              # 84 个 vitest 用例
+└── test/              # 单元、边界与公共类型契约
 ```
 
 ---

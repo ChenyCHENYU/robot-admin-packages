@@ -37,11 +37,59 @@ const normalizedText = (value: unknown) =>
 const digitCounts = (text: string) => {
   const unsigned = text.replace(/^[+-]/, "");
   const [rawInteger = "", fraction = ""] = unsigned.split(".");
-  const integer = rawInteger.replace(/^0+(?=\d)/, "") || "0";
+  const integerDigits = rawInteger.replace(/^0+/, "").length;
   return {
-    total: integer.length + fraction.length,
+    total: Math.max(integerDigits + fraction.length, 1),
     fraction: fraction.length,
   };
+};
+
+const assertNumericContract = (contract: NumericContract): void => {
+  if (
+    contract.kind !== undefined &&
+    contract.kind !== "integer" &&
+    contract.kind !== "decimal"
+  ) {
+    throw new TypeError("numeric.kind 必须是 integer 或 decimal");
+  }
+
+  if (
+    contract.totalDigits !== undefined &&
+    (!Number.isInteger(contract.totalDigits) || contract.totalDigits < 1)
+  ) {
+    throw new RangeError("numeric.totalDigits 必须是大于 0 的整数");
+  }
+
+  if (
+    contract.fractionDigits !== undefined &&
+    (!Number.isInteger(contract.fractionDigits) || contract.fractionDigits < 0)
+  ) {
+    throw new RangeError("numeric.fractionDigits 必须是非负整数");
+  }
+
+  if (
+    contract.totalDigits !== undefined &&
+    contract.fractionDigits !== undefined &&
+    contract.fractionDigits > contract.totalDigits
+  ) {
+    throw new RangeError("numeric.fractionDigits 不能大于 totalDigits");
+  }
+
+  if (contract.min !== undefined && !Number.isFinite(contract.min)) {
+    throw new RangeError("numeric.min 必须是有限数值");
+  }
+
+  if (contract.max !== undefined && !Number.isFinite(contract.max)) {
+    throw new RangeError("numeric.max 必须是有限数值");
+  }
+
+  if (
+    contract.min !== undefined &&
+    contract.max !== undefined &&
+    contract.min > contract.max
+  ) {
+    throw new RangeError("numeric.min 不能大于 max");
+  }
 };
 
 /**
@@ -54,7 +102,16 @@ export function numeric(
   contract: NumericContract,
   field: string = "数值",
 ): RuleSpec {
-  const kind = contract.kind ?? "decimal";
+  assertNumericContract(contract);
+  const {
+    kind = "decimal",
+    totalDigits,
+    fractionDigits,
+    min,
+    max,
+    minExclusive,
+    maxExclusive,
+  } = contract;
 
   return {
     trigger: "blur",
@@ -80,31 +137,19 @@ export function numeric(
       }
 
       const counts = digitCounts(text);
-      if (
-        contract.totalDigits !== undefined &&
-        counts.total > contract.totalDigits
-      ) {
-        return `${field}数字总位数不能超过 ${contract.totalDigits} 位`;
+      if (totalDigits !== undefined && counts.total > totalDigits) {
+        return `${field}数字总位数不能超过 ${totalDigits} 位`;
       }
-      if (
-        contract.fractionDigits !== undefined &&
-        counts.fraction > contract.fractionDigits
-      ) {
-        return `${field}小数位数不能超过 ${contract.fractionDigits} 位`;
+      if (fractionDigits !== undefined && counts.fraction > fractionDigits) {
+        return `${field}小数位数不能超过 ${fractionDigits} 位`;
       }
 
-      if (
-        contract.min !== undefined &&
-        (contract.minExclusive ? num <= contract.min : num < contract.min)
-      ) {
-        return `${field}${contract.minExclusive ? "必须大于" : "不能小于"} ${contract.min}`;
+      if (min !== undefined && (minExclusive ? num <= min : num < min)) {
+        return `${field}${minExclusive ? "必须大于" : "不能小于"} ${min}`;
       }
 
-      if (
-        contract.max !== undefined &&
-        (contract.maxExclusive ? num >= contract.max : num > contract.max)
-      ) {
-        return `${field}${contract.maxExclusive ? "必须小于" : "不能大于"} ${contract.max}`;
+      if (max !== undefined && (maxExclusive ? num >= max : num > max)) {
+        return `${field}${maxExclusive ? "必须小于" : "不能大于"} ${max}`;
       }
 
       return true;

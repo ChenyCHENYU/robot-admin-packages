@@ -6,12 +6,7 @@
  * - toElementRule：element-plus 风格（validator 为 callback / asyncValidator）
  */
 
-import type {
-  ElementRule,
-  NaiveRule,
-  RuleSpec,
-  Trigger,
-} from "./types";
+import type { ElementRule, NaiveRule, RuleSpec, Trigger } from "./types";
 
 /**
  * 运行单条 RuleSpec，返回结构化结果。
@@ -32,18 +27,21 @@ export const runSpec = async (
  * RuleSpec → naive-ui 规则（throw 风格 validator）
  */
 export function toNaiveRule(spec: RuleSpec): NaiveRule {
+  const validate = spec.validate;
+  const message = spec.message;
   return {
-    trigger: spec.trigger,
+    trigger: Array.isArray(spec.trigger) ? [...spec.trigger] : spec.trigger,
+    ...(spec.required === undefined ? {} : { required: spec.required }),
     validator: async (_rule, value) => {
-      const result = await spec.validate(value);
+      const result = await validate(value);
       if (result === true) return;
-      throw new Error(typeof result === "string" ? result : spec.message);
+      throw new Error(typeof result === "string" ? result : message);
     },
-    message: spec.message,
+    message,
   };
 }
 
-export function toNaiveRules(specs: RuleSpec[]): NaiveRule[] {
+export function toNaiveRules(specs: readonly RuleSpec[]): NaiveRule[] {
   return specs.map(toNaiveRule);
 }
 
@@ -54,28 +52,44 @@ const mapElementTrigger = (
   trigger: Trigger | Trigger[],
 ): ElementRule["trigger"] => {
   const arr = Array.isArray(trigger) ? trigger : [trigger];
-  const mapped = arr.map((t) => (t === "input" ? ("change" as const) : t));
+  const mapped = [
+    ...new Set(arr.map((t) => (t === "input" ? ("change" as const) : t))),
+  ];
   return (mapped.length === 1 ? mapped[0] : mapped) as ElementRule["trigger"];
+};
+
+const normalizeError = (error: unknown, fallback: string): Error => {
+  if (error instanceof Error) return error;
+  if (typeof error === "string" && error) return new Error(error);
+  return new Error(fallback);
 };
 
 /**
  * RuleSpec → element-plus 规则（callback 风格 validator）
  */
 export function toElementRule(spec: RuleSpec): ElementRule {
+  const source: RuleSpec = {
+    trigger: Array.isArray(spec.trigger) ? [...spec.trigger] : spec.trigger,
+    validate: spec.validate,
+    message: spec.message,
+    ...(spec.required === undefined ? {} : { required: spec.required }),
+  };
   return {
-    trigger: mapElementTrigger(spec.trigger),
+    trigger: mapElementTrigger(source.trigger),
+    ...(source.required === undefined ? {} : { required: source.required }),
+    message: source.message,
     validator: (_rule, value, callback) => {
-      Promise.resolve(spec.validate(value)).then((result) => {
-        if (result === true) {
-          callback();
-          return;
-        }
-        callback(new Error(typeof result === "string" ? result : spec.message));
-      });
+      void Promise.resolve()
+        .then(() => runSpec(source, value))
+        .then(
+          (result) =>
+            callback(result.ok ? undefined : new Error(result.message)),
+          (error) => callback(normalizeError(error, source.message)),
+        );
     },
   };
 }
 
-export function toElementRules(specs: RuleSpec[]): ElementRule[] {
+export function toElementRules(specs: readonly RuleSpec[]): ElementRule[] {
   return specs.map(toElementRule);
 }

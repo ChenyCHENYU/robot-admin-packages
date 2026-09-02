@@ -3,7 +3,7 @@
  * 提供常用的验证正则表达式（纯常量）
  */
 
-export const REGEX_PATTERNS = {
+const PATTERNS = {
   // ===== 基础通用 =====
   /** 手机号（支持 +86 和 0086 前缀） */
   MOBILE: /^(?:(?:\+|00)86)?1[3-9]\d{9}$/,
@@ -64,9 +64,14 @@ export const REGEX_PATTERNS = {
   /** 整数（含负数） */
   INTEGER: /^-?\d+$/,
   /** 正整数 */
-  POSITIVE_INTEGER: /^\d+$/,
+  POSITIVE_INTEGER: /^[1-9]\d*$/,
   /** 负整数 */
   NEGATIVE_INTEGER: /^-\d+$/,
   /** 小数（含负数） */
   DECIMAL: /^-?\d+(\.\d+)?$/,
 } as const;
+
+for (const pattern of Object.values(PATTERNS)) Object.freeze(pattern);
+
+/** 只读正则命名空间，避免消费侧误改造成跨表单串扰。 */
+export const REGEX_PATTERNS = Object.freeze(PATTERNS);

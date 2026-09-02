@@ -27,6 +27,8 @@ export type ValidateResult = boolean | string;
 export interface RuleSpec {
   /** 触发方式 */
   trigger: Trigger | Trigger[];
+  /** 是否为必填规则；适配 UI 框架时用于展示必填状态 */
+  required?: boolean;
   /**
    * 验证函数。返回 true 通过；返回 false 走 message；返回 string 直接作为失败消息。
    */

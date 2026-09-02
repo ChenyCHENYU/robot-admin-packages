@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateValue, validateRecord, validateRows } from "../src/validate";
-import {
-  createSpec,
-  createAsyncSpec,
-  optional,
-} from "../src/utils";
+import { createSpec, createAsyncSpec, optional } from "../src/utils";
 import { numeric, SPEC_RULES } from "../src/index";
 
 describe("validateValue", () => {
@@ -13,7 +9,10 @@ describe("validateValue", () => {
   });
 
   it("全部通过返回 null", async () => {
-    const rules = [createSpec("blur", (v) => !!v, "必填"), createSpec("blur", (v) => v === "ok", "必须ok")];
+    const rules = [
+      createSpec("blur", (v) => !!v, "必填"),
+      createSpec("blur", (v) => v === "ok", "必须ok"),
+    ];
     expect(await validateValue("ok", rules)).toBeNull();
   });
 
@@ -31,7 +30,9 @@ describe("validateValue", () => {
   });
 
   it("支持异步规则", async () => {
-    const rules = [createAsyncSpec("blur", async (v) => v === "valid", "异步失败")];
+    const rules = [
+      createAsyncSpec("blur", async (v) => v === "valid", "异步失败"),
+    ];
     expect(await validateValue("valid", rules)).toBeNull();
     expect(await validateValue("invalid", rules)).toBe("异步失败");
   });
@@ -77,13 +78,24 @@ describe("validateRecord", () => {
   });
 
   it("ruleMap 中缺失的字段，若规则含 required 则报错", async () => {
-    const err = await validateRecord({}, { name: [SPEC_RULES.required("姓名")] });
+    const err = await validateRecord(
+      {},
+      { name: [SPEC_RULES.required("姓名")] },
+    );
     expect(err?.field).toBe("name");
     expect(err?.message).toBe("姓名不能为空");
   });
 
   it("空 ruleMap 返回 null", async () => {
     expect(await validateRecord({ a: 1 }, {})).toBeNull();
+  });
+
+  it("失败消息为空字符串时仍返回失败字段", async () => {
+    const err = await validateRecord(
+      { code: "invalid" },
+      { code: [createSpec("blur", () => "", "")] },
+    );
+    expect(err).toEqual({ field: "code", message: "" });
   });
 
   it("支持点路径嵌套 'a.b.c'", async () => {
@@ -114,9 +126,41 @@ describe("validateRecord", () => {
 
   it("普通键（不含路径）行为与 record[key] 一致", async () => {
     // 回归：确保 getPath 不破坏平铺字段
-    expect(await validateRecord({ name: "x" }, { name: [SPEC_RULES.required("姓名")] })).toBeNull();
-    const err = await validateRecord({ name: "" }, { name: [SPEC_RULES.required("姓名")] });
+    expect(
+      await validateRecord(
+        { name: "x" },
+        { name: [SPEC_RULES.required("姓名")] },
+      ),
+    ).toBeNull();
+    const err = await validateRecord(
+      { name: "" },
+      { name: [SPEC_RULES.required("姓名")] },
+    );
     expect(err).toEqual({ field: "name", message: "姓名不能为空" });
+  });
+
+  it("忽略原型链上的平铺与嵌套属性", async () => {
+    const record = Object.create({ inherited: "污染值" }) as Record<
+      string,
+      any
+    >;
+    record.profile = Object.create({ name: "污染值" });
+
+    const flatError = await validateRecord(record, {
+      inherited: [SPEC_RULES.required("继承字段")],
+    });
+    const nestedError = await validateRecord(record, {
+      "profile.name": [SPEC_RULES.required("姓名")],
+    });
+
+    expect(flatError).toEqual({
+      field: "inherited",
+      message: "继承字段不能为空",
+    });
+    expect(nestedError).toEqual({
+      field: "profile.name",
+      message: "姓名不能为空",
+    });
   });
 });
 

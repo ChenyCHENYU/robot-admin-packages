@@ -7,8 +7,12 @@ import {
   everySpec,
   when,
   whenElement,
+  some,
+  someElement,
+  every,
 } from "../src/advanced";
 import { createSpec } from "../src/utils";
+import { ELEMENT_RULES, PRESET_RULES } from "../src/presets";
 import type { RuleSpec } from "../src/types";
 
 const run = async (spec: RuleSpec, value: unknown) => {
@@ -20,7 +24,12 @@ const run = async (spec: RuleSpec, value: unknown) => {
 describe("whenSpec", () => {
   const thenRules = [createSpec("blur", (v) => v === "A", "必须是A")];
   it("条件为真时执行 thenRules", async () => {
-    const rule = whenSpec(() => true, () => true, thenRules, []);
+    const rule = whenSpec(
+      () => true,
+      () => true,
+      thenRules,
+      [],
+    );
     expect((await run(rule, "A")).ok).toBe(true);
     const r = await run(rule, "B");
     expect(r.ok).toBe(false);
@@ -28,14 +37,24 @@ describe("whenSpec", () => {
   });
   it("条件为假时执行 elseRules", async () => {
     const elseRules = [createSpec("blur", () => false, "else失败")];
-    const rule = whenSpec(() => true, () => false, thenRules, elseRules);
+    const rule = whenSpec(
+      () => true,
+      () => false,
+      thenRules,
+      elseRules,
+    );
     const r = await run(rule, "x");
     expect(r.ok).toBe(false);
     expect(r.message).toBe("else失败");
   });
   it("依赖值动态读取", async () => {
     let flag = "on";
-    const rule = whenSpec(() => flag, (v) => v === "on", thenRules, []);
+    const rule = whenSpec(
+      () => flag,
+      (v) => v === "on",
+      thenRules,
+      [],
+    );
     expect((await run(rule, "A")).ok).toBe(true);
     flag = "off";
     expect((await run(rule, "A")).ok).toBe(true);
@@ -52,6 +71,12 @@ describe("compareWithSpec", () => {
   it("空值放行", async () => {
     const rule = compareWithSpec("结束", () => 10, "gte");
     expect((await run(rule, null)).ok).toBe(true);
+  });
+  it("0 和 false 不是空值，仍执行比较", async () => {
+    const numberRule = compareWithSpec("数量", () => 1, "gte");
+    const booleanRule = compareWithSpec("状态", () => true, "eq");
+    expect((await run(numberRule, 0)).ok).toBe(false);
+    expect((await run(booleanRule, false)).ok).toBe(false);
   });
   it("自定义消息", async () => {
     const rule = compareWithSpec("结束", () => 10, "gte", "不能早于开始");
@@ -71,6 +96,12 @@ describe("debouncedAsyncCheckSpec", () => {
     const r = await run(rule, "test");
     expect(r.ok).toBe(false);
     expect(r.message).toBe("已被占用");
+  });
+  it("0 不是空值，会执行异步校验", async () => {
+    const fn = vi.fn(async () => false);
+    const rule = debouncedAsyncCheckSpec("编号", fn, 0);
+    expect((await run(rule, 0)).ok).toBe(false);
+    expect(fn).toHaveBeenCalledWith(0);
   });
 });
 
@@ -103,15 +134,70 @@ describe("everySpec (AND)", () => {
 describe("naive / element 包装一致性", () => {
   const thenRules = [createSpec("blur", (v) => v === "A", "必须是A")];
   it("when（naive）与 whenSpec 行为一致", async () => {
-    const naive = when(() => true, () => true, thenRules, []);
+    const naive = when(
+      () => true,
+      () => true,
+      thenRules,
+      [],
+    );
     await expect(naive.validator?.(naive, "A")).resolves.toBeUndefined();
     await expect(naive.validator?.(naive, "B")).rejects.toThrow("必须是A");
   });
   it("whenElement（ele）通过 callback 报错", async () => {
-    const el = whenElement(() => true, () => true, thenRules, []);
+    const el = whenElement(
+      () => true,
+      () => true,
+      thenRules,
+      [],
+    );
     return new Promise<void>((resolve) => {
       el.validator?.(el, "B", (err) => {
         expect(err).toBeInstanceOf(Error);
+        resolve();
+      });
+    });
+  });
+
+  it("when 保持兼容，可直接组合 PRESET_RULES", async () => {
+    const naive = when(() => true, Boolean, [
+      PRESET_RULES.required("公司名称"),
+    ]);
+    await expect(naive.validator?.(naive, "")).rejects.toThrow(
+      "公司名称不能为空",
+    );
+  });
+
+  it("some/every 保持兼容，可直接组合 PRESET_RULES", async () => {
+    const anyContact = some([
+      PRESET_RULES.mobile("联系方式"),
+      PRESET_RULES.email("联系方式"),
+    ]);
+    const strongValue = every([
+      PRESET_RULES.required("编码"),
+      PRESET_RULES.minLength("编码", 3),
+    ]);
+
+    await expect(
+      anyContact.validator?.(anyContact, "robot@example.com"),
+    ).resolves.toBeUndefined();
+    await expect(anyContact.validator?.(anyContact, "invalid")).rejects.toThrow(
+      "至少满足一个条件",
+    );
+    await expect(strongValue.validator?.(strongValue, "ab")).rejects.toThrow(
+      "编码长度至少3位",
+    );
+  });
+
+  it("Element 组合器可直接组合 ELEMENT_RULES", () => {
+    const element = someElement([
+      ELEMENT_RULES.mobile("联系方式"),
+      ELEMENT_RULES.email("联系方式"),
+    ]);
+
+    return new Promise<void>((resolve) => {
+      element.validator?.(element, "invalid", (error) => {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe("至少满足一个条件");
         resolve();
       });
     });
