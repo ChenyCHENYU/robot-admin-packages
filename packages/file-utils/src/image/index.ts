@@ -4,11 +4,7 @@
  */
 
 import { getFileUtilsContext, type FileUtilsContext } from "../config";
-import {
-  assertWithinLimit,
-  FileUtilsError,
-  throwIfAborted,
-} from "../types";
+import { assertWithinLimit, FileUtilsError, throwIfAborted } from "../types";
 import { useFile } from "../file";
 
 // ==================== 类型定义 ====================
@@ -58,6 +54,8 @@ export type ImageFormat = "png" | "jpeg" | "webp";
 
 export interface UseImageOptions {
   context?: FileUtilsContext;
+  /** Verify common raster file signatures against the declared MIME type. */
+  verifyMimeType?: boolean;
 }
 
 // ==================== 内部工具函数 ====================
@@ -79,22 +77,88 @@ function get2DContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 /**
  * @description 从 File/Blob 加载 HTMLImageElement
  */
-function loadImage(
+function startsWith(bytes: Uint8Array, signature: readonly number[]): boolean {
+  return signature.every((byte, index) => bytes[index] === byte);
+}
+
+function ascii(bytes: Uint8Array, start: number, length: number): string {
+  return String.fromCharCode(...bytes.subarray(start, start + length));
+}
+
+/** Detects common raster image formats from file signatures. */
+export async function detectImageMimeType(
+  source: Blob,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  throwIfAborted(signal);
+  const bytes = new Uint8Array(await source.slice(0, 64).arrayBuffer());
+  throwIfAborted(signal);
+  if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+    return "image/png";
+  }
+  if (startsWith(bytes, [0xff, 0xd8, 0xff])) return "image/jpeg";
+  const header6 = ascii(bytes, 0, 6);
+  if (header6 === "GIF87a" || header6 === "GIF89a") return "image/gif";
+  if (ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 4) === "WEBP") {
+    return "image/webp";
+  }
+  if (ascii(bytes, 0, 2) === "BM") return "image/bmp";
+  if (
+    startsWith(bytes, [0x49, 0x49, 0x2a, 0x00]) ||
+    startsWith(bytes, [0x4d, 0x4d, 0x00, 0x2a])
+  ) {
+    return "image/tiff";
+  }
+  if (startsWith(bytes, [0x00, 0x00, 0x01, 0x00])) return "image/x-icon";
+  if (ascii(bytes, 4, 4) === "ftyp") {
+    const brands = ascii(bytes, 8, Math.max(0, bytes.length - 8));
+    if (/avif|avis/.test(brands)) return "image/avif";
+    if (/heic|heix|hevc|hevx/.test(brands)) return "image/heic";
+  }
+  return undefined;
+}
+
+function normalizeImageMimeType(type: string): string {
+  const normalized = type.toLowerCase().split(";", 1)[0].trim();
+  if (normalized === "image/jpg") return "image/jpeg";
+  if (normalized === "image/vnd.microsoft.icon") return "image/x-icon";
+  return normalized;
+}
+
+async function loadImage(
   source: File | Blob,
   signal?: AbortSignal,
+  verifyMimeType = false,
 ): Promise<HTMLImageElement> {
+  if (source.type && !source.type.startsWith("image/")) {
+    return Promise.reject(
+      new FileUtilsError(
+        "INVALID_CONTENT",
+        `不支持的图片 MIME 类型: ${source.type}`,
+      ),
+    );
+  }
+  if (verifyMimeType) {
+    const detected = await detectImageMimeType(source, signal);
+    if (!detected) {
+      throw new FileUtilsError("INVALID_CONTENT", "无法识别图片文件签名");
+    }
+    if (
+      source.type &&
+      normalizeImageMimeType(source.type) !== normalizeImageMimeType(detected)
+    ) {
+      throw new FileUtilsError(
+        "INVALID_CONTENT",
+        `图片 MIME 与文件签名不一致: ${source.type} / ${detected}`,
+        { details: { declared: source.type, detected } },
+      );
+    }
+  }
   if (
     typeof Image === "undefined" ||
     typeof globalThis.URL?.createObjectURL !== "function"
   ) {
-    return Promise.reject(
-      new FileUtilsError("NOT_SUPPORTED", "当前环境不支持浏览器图片解码"),
-    );
-  }
-  if (source.type && !source.type.startsWith("image/")) {
-    return Promise.reject(
-      new FileUtilsError("INVALID_CONTENT", `不支持的图片 MIME 类型: ${source.type}`),
-    );
+    throw new FileUtilsError("NOT_SUPPORTED", "当前环境不支持浏览器图片解码");
   }
   throwIfAborted(signal);
   return new Promise((resolve, reject) => {
@@ -106,15 +170,25 @@ function loadImage(
       signal?.removeEventListener("abort", onAbort);
     };
     const onAbort = () => {
+      img.onload = null;
+      img.onerror = null;
       cleanup();
-      img.src = "";
-      reject(new FileUtilsError("ABORTED", "图片处理已取消", { cause: signal?.reason }));
+      img.removeAttribute("src");
+      reject(
+        new FileUtilsError("ABORTED", "图片处理已取消", {
+          cause: signal?.reason,
+        }),
+      );
     };
     img.onload = () => {
+      img.onload = null;
+      img.onerror = null;
       cleanup();
       resolve(img);
     };
     img.onerror = () => {
+      img.onload = null;
+      img.onerror = null;
       cleanup();
       reject(new FileUtilsError("READ_FAILED", "图片加载失败"));
     };
@@ -197,6 +271,7 @@ function assertPixelLimit(
  */
 export function useImage(options: UseImageOptions = {}) {
   const context = () => getFileUtilsContext(options.context);
+  const verifyMimeType = options.verifyMimeType ?? false;
   const createCanvas = (): HTMLCanvasElement => {
     if (!globalThis.document?.createElement) {
       throw new FileUtilsError("NOT_SUPPORTED", "当前环境不支持 Canvas");
@@ -234,8 +309,12 @@ export function useImage(options: UseImageOptions = {}) {
     if (maxWidth !== undefined) assertDimension(maxWidth, "maxWidth");
     if (maxHeight !== undefined) assertDimension(maxHeight, "maxHeight");
 
-    const img = await loadImage(file, signal);
-    assertPixelLimit(img.width, img.height, maxPixels ?? context().limits.maxImagePixels);
+    const img = await loadImage(file, signal, verifyMimeType);
+    assertPixelLimit(
+      img.width,
+      img.height,
+      maxPixels ?? context().limits.maxImagePixels,
+    );
     let { width, height } = img;
 
     // 按比例缩放
@@ -248,7 +327,11 @@ export function useImage(options: UseImageOptions = {}) {
       height = maxHeight;
     }
 
-    assertPixelLimit(width, height, maxPixels ?? context().limits.maxImagePixels);
+    assertPixelLimit(
+      width,
+      height,
+      maxPixels ?? context().limits.maxImagePixels,
+    );
     const canvas = createCanvas();
     canvas.width = width;
     canvas.height = height;
@@ -263,7 +346,10 @@ export function useImage(options: UseImageOptions = {}) {
     const blob = await canvasToBlob(canvas, type, quality);
     throwIfAborted(signal);
     if (blob.type && blob.type !== type) {
-      throw new FileUtilsError("NOT_SUPPORTED", `浏览器不支持输出格式: ${type}`);
+      throw new FileUtilsError(
+        "NOT_SUPPORTED",
+        `浏览器不支持输出格式: ${type}`,
+      );
     }
     return blob;
   };
@@ -277,12 +363,15 @@ export function useImage(options: UseImageOptions = {}) {
   ): Promise<Blob> => {
     const { signal, maxPixels } = options;
     validateInput(file, options.maxFileSize);
-    const img = await loadImage(file, signal);
+    const img = await loadImage(file, signal, verifyMimeType);
     assertDimension(options.width, "width");
     assertDimension(options.height, "height");
     assertCoordinate(options.x, "x");
     assertCoordinate(options.y, "y");
-    if (options.x + options.width > img.width || options.y + options.height > img.height) {
+    if (
+      options.x + options.width > img.width ||
+      options.y + options.height > img.height
+    ) {
       throw new RangeError("裁剪区域超出图片边界");
     }
     assertPixelLimit(
@@ -328,7 +417,7 @@ export function useImage(options: UseImageOptions = {}) {
     } = {},
   ): Promise<Blob> => {
     validateInput(file, options.maxFileSize);
-    const img = await loadImage(file, options.signal);
+    const img = await loadImage(file, options.signal, verifyMimeType);
     assertPixelLimit(
       img.width,
       img.height,
@@ -343,8 +432,11 @@ export function useImage(options: UseImageOptions = {}) {
     ctx.drawImage(img, 0, 0);
 
     const mimeType = `image/${format}`;
-    const quality = format === "jpeg" ? (options.quality ?? 0.92) : undefined;
-    if (quality !== undefined && (!Number.isFinite(quality) || quality < 0 || quality > 1)) {
+    const quality = format === "jpeg" ? options.quality ?? 0.92 : undefined;
+    if (
+      quality !== undefined &&
+      (!Number.isFinite(quality) || quality < 0 || quality > 1)
+    ) {
       throw new RangeError("quality 必须位于 0 到 1 之间");
     }
 
@@ -352,7 +444,10 @@ export function useImage(options: UseImageOptions = {}) {
     const blob = await canvasToBlob(canvas, mimeType, quality);
     throwIfAborted(options.signal);
     if (blob.type && blob.type !== mimeType) {
-      throw new FileUtilsError("NOT_SUPPORTED", `浏览器不支持输出格式: ${mimeType}`);
+      throw new FileUtilsError(
+        "NOT_SUPPORTED",
+        `浏览器不支持输出格式: ${mimeType}`,
+      );
     }
     return blob;
   };
@@ -373,7 +468,7 @@ export function useImage(options: UseImageOptions = {}) {
     validateInput(file, options.maxFileSize);
     assertDimension(width, "width");
     if (height !== undefined) assertDimension(height, "height");
-    const img = await loadImage(file, options.signal);
+    const img = await loadImage(file, options.signal, verifyMimeType);
     const targetHeight = height ?? Math.round((img.height * width) / img.width);
     assertPixelLimit(
       width,
@@ -406,7 +501,7 @@ export function useImage(options: UseImageOptions = {}) {
     } = {},
   ): Promise<ImageInfo> => {
     validateInput(file, readOptions.maxFileSize);
-    const img = await loadImage(file, readOptions.signal);
+    const img = await loadImage(file, readOptions.signal, verifyMimeType);
     assertPixelLimit(
       img.width,
       img.height,

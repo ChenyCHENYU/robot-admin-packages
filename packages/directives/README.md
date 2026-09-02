@@ -75,11 +75,11 @@ app.directive("permission", vPermission);
 | `v-copy` | 复制文本 | 动态文本、Clipboard 降级、键盘操作、消息适配 |
 | `v-debounce` | 防抖 | handler-owned 模式、leading/trailing、动态事件 |
 | `v-throttle` | 节流 | handler-owned 模式、leading/trailing、动态事件 |
-| `v-drag` | 拖拽 | Pointer Events、边界、轴向、网格、回调 |
+| `v-drag` | 拖拽 | Pointer Events、边界、轴向、网格、无侵入清理 |
 | `v-longpress` | 长按 | 指针与键盘、移动容差、进度、取消 |
 | `v-permission` | 权限控制 | 应用级 Provider、AND/OR、通配符、三种降级 |
-| `v-watermark` | 水印 | 多行、缓存、响应更新、可选防删除 |
-| `v-lazy` | 懒加载 | 图片/背景、占位与错误图、竞态取消 |
+| `v-watermark` | 水印 | 多行、高 DPI、缓存、响应更新、可选防删除 |
+| `v-lazy` | 懒加载 | 图片/背景、占位与错误图、竞态与请求清理 |
 | `v-loading` | 加载遮罩 | 最小展示时长、全屏、ARIA、CSP |
 | `v-tooltip` | 提示 | hover/focus/Escape、视口翻转、ellipsis |
 | `v-click-outside` | 外部点击 | Shadow DOM、排除项、Document 级共享监听 |
@@ -176,7 +176,7 @@ const permissionMap = {
 - `disable`：禁用表单控件；普通元素禁用指针交互。
 - `show`：保留可见性，同时使用禁用状态和半透明提示。
 
-未提供权限数据时采用拒绝默认值。权限恢复或指令卸载后，元素原有的 `display`、`opacity`、`pointer-events`、`disabled` 和 `aria-disabled` 会被准确还原。
+未提供权限数据时采用拒绝默认值。权限恢复或指令卸载时只回收指令仍然持有的 `display`、`opacity`、`pointer-events`、`disabled` 和 `aria-disabled`；若业务在指令生效期间更新了这些状态，会保留业务的新值，避免卸载覆盖宿主状态。权限集合发生变化时会重新触发一次拒绝通知，重复渲染同一集合不会重复通知。
 
 ### 拖拽与长按
 
@@ -205,7 +205,7 @@ const permissionMap = {
 </button>
 ```
 
-`v-drag` 的 `boundary` 支持 `true`（父元素）、CSS 选择器或 `HTMLElement`；`axis` 支持 `x`、`y`、`both`。
+`v-drag` 的 `boundary` 支持 `true`（父元素）、CSS 选择器或 `HTMLElement`；`axis` 支持 `x`、`y`、`both`。更新或卸载时只恢复仍由指令写入的内联样式，并主动释放 Pointer Capture、动画帧、Document 监听与文本选择锁，不覆盖业务运行期写入的新样式。
 
 ### 水印与懒加载
 
@@ -238,7 +238,7 @@ const permissionMap = {
 <div v-lazy:background="bannerUrl" />
 ```
 
-`preventDelete` 会启用 `MutationObserver`，只建议用于确有防篡改需求的区域。懒加载在不支持 `IntersectionObserver` 时会立即加载，并使用 generation 标记阻止旧异步请求覆盖新绑定值。
+水印会按当前 `devicePixelRatio` 生成清晰位图（内部上限为 4），同时保持 CSS 平铺尺寸不变。`preventDelete` 会启用 `MutationObserver`，只建议用于确有防篡改需求的区域。懒加载在不支持 `IntersectionObserver` 时会立即加载，并使用 generation 标记阻止旧异步请求覆盖新绑定值；更新或卸载会断开观察器并移除预加载器属性，不会通过空 `src` 触发额外请求。
 
 ### Loading、Tooltip 与外部点击
 

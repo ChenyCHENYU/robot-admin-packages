@@ -13,7 +13,9 @@ Configured limits reduce accidental exhaustion and common denial-of-service inpu
 - Validate business schemas after JSON, CSV or Excel parsing; syntactic validity is not semantic validity.
 - Treat ZIP paths as logical archive names. If another system extracts the result, it must independently prevent zip-slip and symlink traversal.
 - Use a `ChunkDownloadSink` for genuinely large files. The no-sink fallback buffers in memory and is intentionally bounded.
-- Verify complete file hashes and signatures on the server when integrity or authenticity matters. The sampled upload hash is only an identity hint.
+- Enable `useImage({ verifyMimeType: true })` for common untrusted raster formats, while retaining server-side MIME inspection and malware scanning.
+- Verify complete file hashes and signatures on the server when integrity or authenticity matters. The sampled upload hash is only an identity hint; client `hashMode: "full"` is defense in depth, not a trust boundary.
+- Use `shouldRetry` to exclude permanent HTTP or business failures from automatic chunk retries. Keep upload endpoints idempotent because transport outcomes can still be ambiguous.
 - Abort client operations when the user leaves the workflow, and propagate the supplied signal to every network request.
 
 ## Dependency policy

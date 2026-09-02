@@ -29,6 +29,7 @@ interface DragState {
     top: string;
     touchAction: string;
   };
+  applied: Partial<DragState["original"]>;
   pointerId?: number;
   startX: number;
   startY: number;
@@ -45,7 +46,10 @@ interface DragState {
 }
 
 const states = new WeakMap<HTMLElement, DragState>();
-const selectionLocks = new WeakMap<Document, { count: number; original: string }>();
+const selectionLocks = new WeakMap<
+  Document,
+  { count: number; original: string }
+>();
 
 function lockSelection(doc: Document): void {
   const current = selectionLocks.get(doc);
@@ -73,16 +77,20 @@ function parseOptions(value: DragBinding | undefined): DragState["options"] {
   if (typeof value === "boolean") {
     return { disabled: !value, boundary: true, grid: [1, 1], axis: "both" };
   }
+  const raw = value ?? {};
   const options = {
-    disabled: false,
-    boundary: true,
-    grid: [1, 1] as const,
-    axis: "both" as const,
-    ...(value ?? {}),
+    ...raw,
+    disabled: raw.disabled ?? false,
+    boundary: raw.boundary ?? true,
+    grid: raw.grid ?? ([1, 1] as const),
+    axis: raw.axis ?? ("both" as const),
   };
   const [gridX, gridY] = options.grid;
   if (gridX <= 0 || gridY <= 0 || !Number.isFinite(gridX + gridY)) {
     throw new RangeError("grid 必须包含两个大于 0 的有限数值");
+  }
+  if (options.axis !== "x" && options.axis !== "y" && options.axis !== "both") {
+    throw new TypeError("axis 必须是 x、y 或 both");
   }
   return options;
 }
@@ -94,13 +102,19 @@ function resolveTrigger(el: HTMLElement, handle?: string): HTMLElement {
     trigger = el.querySelector(handle);
   } catch (error) {
     throw new SyntaxError(
-      `无效的拖拽 handle 选择器: ${error instanceof Error ? error.message : handle}`,
+      `无效的拖拽 handle 选择器: ${
+        error instanceof Error ? error.message : handle
+      }`,
     );
   }
-  if (!(trigger instanceof HTMLElement)) {
+  const HTMLElementConstructor = el.ownerDocument.defaultView?.HTMLElement;
+  if (
+    !trigger ||
+    (HTMLElementConstructor && !(trigger instanceof HTMLElementConstructor))
+  ) {
     throw new Error(`未找到拖拽 handle: ${handle}`);
   }
-  return trigger;
+  return trigger as HTMLElement;
 }
 
 function resolveBoundary(
@@ -108,18 +122,30 @@ function resolveBoundary(
   boundary: DragOptions["boundary"],
 ): HTMLElement | undefined {
   if (!boundary) return undefined;
-  if (boundary instanceof HTMLElement) return boundary;
+  if (typeof boundary === "object" && "getBoundingClientRect" in boundary) {
+    return boundary;
+  }
   if (typeof boundary === "string") {
-    const match = el.ownerDocument.querySelector(boundary);
-    return match instanceof HTMLElement ? match : undefined;
+    let match: Element | null;
+    try {
+      match = el.ownerDocument.querySelector(boundary);
+    } catch (error) {
+      throw new SyntaxError(
+        `无效的拖拽 boundary 选择器: ${
+          error instanceof Error ? error.message : boundary
+        }`,
+      );
+    }
+    const HTMLElementConstructor = el.ownerDocument.defaultView?.HTMLElement;
+    return match &&
+      (!HTMLElementConstructor || match instanceof HTMLElementConstructor)
+      ? (match as HTMLElement)
+      : undefined;
   }
   return el.parentElement ?? undefined;
 }
 
-function constrain(
-  state: DragState,
-  event: PointerEvent,
-): Position {
+function constrain(state: DragState, event: PointerEvent): Position {
   let dx = event.clientX - state.startX;
   let dy = event.clientY - state.startY;
   if (state.options.axis === "x") dy = 0;
@@ -146,18 +172,23 @@ function flushMove(el: HTMLElement, state: DragState): void {
   const event = state.pendingEvent;
   if (!event || state.pointerId !== event.pointerId) return;
   const position = constrain(state, event);
-  el.style.left = `${position.x}px`;
-  el.style.top = `${position.y}px`;
+  state.applied.left = el.style.left = `${position.x}px`;
+  state.applied.top = el.style.top = `${position.y}px`;
   state.lastPosition = position;
   state.options.onDrag?.(el, position, event);
 }
 
-function endDrag(el: HTMLElement, state: DragState, event: PointerEvent): void {
-  if (state.pointerId !== event.pointerId) return;
-  if (state.frame !== undefined) {
-    cancelAnimationFrame(state.frame);
-    flushMove(el, state);
-  }
+function cancelFrame(el: HTMLElement, state: DragState): void {
+  if (state.frame === undefined) return;
+  const view = el.ownerDocument.defaultView;
+  if (view?.cancelAnimationFrame) view.cancelAnimationFrame(state.frame);
+  else globalThis.cancelAnimationFrame?.(state.frame);
+  state.frame = undefined;
+}
+
+function releaseActiveDrag(el: HTMLElement, state: DragState): void {
+  const pointerId = state.pointerId;
+  if (pointerId === undefined) return;
   state.pointerId = undefined;
   state.pendingEvent = undefined;
   const doc = el.ownerDocument;
@@ -166,11 +197,32 @@ function endDrag(el: HTMLElement, state: DragState, event: PointerEvent): void {
   doc.removeEventListener("pointercancel", state.pointerup);
   unlockSelection(doc);
   try {
-    state.trigger.releasePointerCapture(event.pointerId);
+    state.trigger.releasePointerCapture(pointerId);
   } catch {
     // Pointer capture is optional and may already be released by the browser.
   }
+}
+
+function endDrag(el: HTMLElement, state: DragState, event: PointerEvent): void {
+  if (state.pointerId !== event.pointerId) return;
+  if (state.frame !== undefined) {
+    cancelFrame(el, state);
+    state.pendingEvent = event;
+    flushMove(el, state);
+  }
+  releaseActiveDrag(el, state);
   state.options.onEnd?.(el, state.lastPosition, event);
+}
+
+function restoreOwnedStyle(
+  target: HTMLElement,
+  property: keyof DragState["original"],
+  state: DragState,
+): void {
+  const applied = state.applied[property];
+  if (applied !== undefined && target.style[property] === applied) {
+    target.style[property] = state.original[property];
+  }
 }
 
 function bind(el: HTMLElement, value: DragBinding | undefined): void {
@@ -189,6 +241,7 @@ function bind(el: HTMLElement, value: DragBinding | undefined): void {
   state.options = options;
   state.trigger = trigger;
   state.original = original;
+  state.applied = {};
   state.startX = 0;
   state.startY = 0;
   state.startLeft = 0;
@@ -199,13 +252,21 @@ function bind(el: HTMLElement, value: DragBinding | undefined): void {
     event.preventDefault();
     state.pendingEvent = event;
     if (state.frame === undefined) {
-      state.frame = requestAnimationFrame(() => flushMove(el, state));
+      const view = el.ownerDocument.defaultView;
+      state.frame = view?.requestAnimationFrame
+        ? view.requestAnimationFrame(() => flushMove(el, state))
+        : globalThis.requestAnimationFrame(() => flushMove(el, state));
     }
   };
   state.pointerup = (event) => endDrag(el, state, event);
   state.pointerdown = (event) => {
     if (state.options.disabled || state.pointerId !== undefined) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    const startRect = el.getBoundingClientRect();
+    const boundaryRect = resolveBoundary(
+      el,
+      state.options.boundary,
+    )?.getBoundingClientRect();
     event.preventDefault();
     state.pointerId = event.pointerId;
     state.startX = event.clientX;
@@ -213,8 +274,8 @@ function bind(el: HTMLElement, value: DragBinding | undefined): void {
     state.startLeft = el.offsetLeft;
     state.startTop = el.offsetTop;
     state.lastPosition = { x: state.startLeft, y: state.startTop };
-    state.startRect = el.getBoundingClientRect();
-    state.boundaryRect = resolveBoundary(el, state.options.boundary)?.getBoundingClientRect();
+    state.startRect = startRect;
+    state.boundaryRect = boundaryRect;
     const doc = el.ownerDocument;
     doc.addEventListener("pointermove", state.pointermove, { passive: false });
     doc.addEventListener("pointerup", state.pointerup);
@@ -225,15 +286,26 @@ function bind(el: HTMLElement, value: DragBinding | undefined): void {
     } catch {
       // Older DOM implementations may not support pointer capture.
     }
-    state.options.onStart?.(el, event);
+    try {
+      state.options.onStart?.(el, event);
+    } catch (cause) {
+      releaseActiveDrag(el, state);
+      throw cause;
+    }
   };
 
   states.set(el, state);
   if (!options.disabled) {
-    if (getComputedStyle(el).position === "static") el.style.position = "relative";
-    trigger.style.cursor = "move";
-    trigger.style.touchAction = "none";
-    trigger.addEventListener("pointerdown", state.pointerdown, { passive: false });
+    const computedPosition =
+      el.ownerDocument.defaultView?.getComputedStyle(el).position;
+    if (computedPosition === "static") {
+      state.applied.position = el.style.position = "relative";
+    }
+    state.applied.cursor = trigger.style.cursor = "move";
+    state.applied.touchAction = trigger.style.touchAction = "none";
+    trigger.addEventListener("pointerdown", state.pointerdown, {
+      passive: false,
+    });
   }
 }
 
@@ -245,13 +317,13 @@ function unbind(el: HTMLElement): void {
   doc.removeEventListener("pointermove", state.pointermove);
   doc.removeEventListener("pointerup", state.pointerup);
   doc.removeEventListener("pointercancel", state.pointerup);
-  if (state.pointerId !== undefined) unlockSelection(doc);
-  if (state.frame !== undefined) cancelAnimationFrame(state.frame);
-  state.trigger.style.cursor = state.original.cursor;
-  state.trigger.style.touchAction = state.original.touchAction;
-  el.style.position = state.original.position;
-  el.style.left = state.original.left;
-  el.style.top = state.original.top;
+  cancelFrame(el, state);
+  releaseActiveDrag(el, state);
+  restoreOwnedStyle(state.trigger, "cursor", state);
+  restoreOwnedStyle(state.trigger, "touchAction", state);
+  restoreOwnedStyle(el, "position", state);
+  restoreOwnedStyle(el, "left", state);
+  restoreOwnedStyle(el, "top", state);
   states.delete(el);
 }
 

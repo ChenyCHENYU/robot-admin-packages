@@ -82,6 +82,20 @@ export function assertWithinLimit(
   maximum: number,
   label: string,
 ): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new FileUtilsError("INVALID_ARGUMENT", `${label}不是有效的非负数值`, {
+      details: { value, maximum, label },
+    });
+  }
+  if (!Number.isFinite(maximum) || maximum < 0) {
+    throw new FileUtilsError(
+      "INVALID_ARGUMENT",
+      `${label}上限不是有效的非负数值`,
+      {
+        details: { value, maximum, label },
+      },
+    );
+  }
   if (value > maximum) {
     throw new FileUtilsError(
       "LIMIT_EXCEEDED",
@@ -97,19 +111,35 @@ export function downloadBlob(
   options: DownloadBlobOptions = {},
 ): void {
   const doc = options.document ?? globalThis.document;
-  if (!doc?.body || typeof URL?.createObjectURL !== "function") {
+  const URLConstructor = doc?.defaultView?.URL ?? globalThis.URL;
+  if (!doc?.body || typeof URLConstructor?.createObjectURL !== "function") {
     throw new FileUtilsError("NOT_SUPPORTED", "当前环境不支持浏览器文件下载");
   }
-  const url = URL.createObjectURL(blob);
+  const revokeDelay = options.revokeDelay ?? 1000;
+  if (!Number.isFinite(revokeDelay) || revokeDelay < 0) {
+    throw new FileUtilsError(
+      "INVALID_ARGUMENT",
+      "revokeDelay 必须是大于等于 0 的有限数值",
+    );
+  }
+  const url = URLConstructor.createObjectURL(blob);
   const link = doc.createElement("a");
   link.href = url;
   link.download = sanitizeFileName(fileName);
   link.style.display = "none";
-  doc.body.appendChild(link);
-  link.click();
-  const revokeDelay = options.revokeDelay ?? 1000;
-  setTimeout(() => {
+  const cleanup = () => {
     link.remove();
-    URL.revokeObjectURL(url);
-  }, revokeDelay);
+    URLConstructor.revokeObjectURL(url);
+  };
+  try {
+    doc.body.appendChild(link);
+    link.click();
+    if (doc.defaultView) doc.defaultView.setTimeout(cleanup, revokeDelay);
+    else globalThis.setTimeout(cleanup, revokeDelay);
+  } catch (cause) {
+    cleanup();
+    throw new FileUtilsError("WRITE_FAILED", "无法触发浏览器文件下载", {
+      cause,
+    });
+  }
 }

@@ -5,16 +5,28 @@ import { createDirectives } from "../src/install";
 import { createCopyDirective } from "../src/directives/copy";
 import debounce from "../src/directives/debounce";
 import clickOutside from "../src/directives/click-outside";
+import drag from "../src/directives/drag";
 import {
   createPermissionDirective,
   hasPermission,
 } from "../src/directives/permission";
+import watermark, { clearWatermarkCache } from "../src/directives/watermark";
 
-function mount(directive: any, element: HTMLElement, value?: unknown, arg?: string) {
+function mount(
+  directive: any,
+  element: HTMLElement,
+  value?: unknown,
+  arg?: string,
+) {
   directive.mounted?.(element, { value, arg }, undefined, undefined);
 }
 
-function update(directive: any, element: HTMLElement, value?: unknown, arg?: string) {
+function update(
+  directive: any,
+  element: HTMLElement,
+  value?: unknown,
+  arg?: string,
+) {
   directive.updated?.(element, { value, arg }, undefined, undefined);
 }
 
@@ -26,11 +38,14 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   document.body.replaceChildren();
+  clearWatermarkCache();
 });
 
 describe("permission directive", () => {
   it("supports wildcard/AND authorization and restores the exact host state", () => {
-    expect(hasPermission(["users:read", "users:write"], { "users:*": true }, "AND")).toBe(true);
+    expect(
+      hasPermission(["users:read", "users:write"], { "users:*": true }, "AND"),
+    ).toBe(true);
 
     let authorized = false;
     const denied = vi.fn();
@@ -68,6 +83,82 @@ describe("permission directive", () => {
     unmount(directive, button);
     expect(button.disabled).toBe(false);
   });
+
+  it("does not overwrite host changes and reports a changed permission set", () => {
+    const denied = vi.fn();
+    const directive = createPermissionDirective({
+      getAuthData: () => ({}),
+      onDenied: denied,
+    });
+    const element = document.createElement("div");
+    element.style.display = "flex";
+
+    mount(directive, element, "orders:read");
+    expect(element.style.display).toBe("none");
+    element.style.display = "grid";
+    update(directive, element, "orders:write");
+    expect(element.style.display).toBe("none");
+    expect(denied).toHaveBeenCalledTimes(2);
+
+    element.style.display = "inline-grid";
+    unmount(directive, element);
+    expect(element.style.display).toBe("inline-grid");
+  });
+});
+
+describe("DOM ownership", () => {
+  it("only restores drag styles that are still owned by the directive", () => {
+    const element = document.createElement("div");
+    element.style.cursor = "help";
+    mount(drag, element, true);
+    expect(element.style.cursor).toBe("move");
+
+    element.style.cursor = "crosshair";
+    element.style.left = "40px";
+    unmount(drag, element);
+
+    expect(element.style.cursor).toBe("crosshair");
+    expect(element.style.left).toBe("40px");
+  });
+
+  it("renders a device-pixel-ratio-aware watermark tile", () => {
+    Object.defineProperty(window, "devicePixelRatio", {
+      configurable: true,
+      value: 2,
+    });
+    let canvas: HTMLCanvasElement | undefined;
+    const context = {
+      scale: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      fillText: vi.fn(),
+      globalAlpha: 1,
+      font: "",
+      fillStyle: "",
+      textAlign: "start",
+      textBaseline: "alphabetic",
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      function (this: HTMLCanvasElement) {
+        canvas = this;
+        return context as unknown as CanvasRenderingContext2D;
+      },
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
+      "data:image/png;base64,watermark",
+    );
+    const element = document.createElement("div");
+
+    mount(watermark, element, { text: "audit", gap: [160, 80] });
+
+    expect(canvas?.width).toBe(320);
+    expect(canvas?.height).toBe(160);
+    expect(context.scale).toHaveBeenCalledWith(2, 2);
+    expect(
+      element.querySelector<HTMLElement>(".ra-watermark")?.style.backgroundSize,
+    ).toBe("160px 80px");
+    unmount(watermark, element);
+  });
 });
 
 describe("owned event directives", () => {
@@ -102,11 +193,15 @@ describe("owned event directives", () => {
 
     excluded.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     expect(handler).not.toHaveBeenCalled();
-    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    document.body.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true }),
+    );
     expect(handler).toHaveBeenCalledTimes(1);
 
     unmount(clickOutside, host);
-    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    document.body.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true }),
+    );
     expect(handler).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,3 +1,5 @@
+import { FileUtilsError } from "./types";
+
 export type MessageType = "success" | "error" | "info" | "warning";
 export type NotificationType = "success" | "error" | "info";
 
@@ -43,6 +45,18 @@ export const DEFAULT_FILE_UTILS_LIMITS: Readonly<FileUtilsLimits> = {
   maxBufferedDownloadSize: 512 * 1024 * 1024,
 };
 
+function validateLimits(limits: FileUtilsLimits): void {
+  for (const [name, value] of Object.entries(limits)) {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new FileUtilsError(
+        "INVALID_ARGUMENT",
+        `${name} 必须是大于等于 0 的安全整数`,
+        { details: { name, value } },
+      );
+    }
+  }
+}
+
 export function createFileUtilsContext(
   config: FileUtilsConfig = {},
 ): FileUtilsContext {
@@ -50,6 +64,7 @@ export function createFileUtilsContext(
     ...DEFAULT_FILE_UTILS_LIMITS,
     ...config.limits,
   });
+  validateLimits(limits);
   const snapshot: Readonly<FileUtilsConfig> = Object.freeze({
     ...config,
     limits,
@@ -95,9 +110,6 @@ export function getMessageHandler(context?: FileUtilsContext) {
 }
 
 export function getNotificationHandler(context?: FileUtilsContext) {
-  return (
-    type: NotificationType,
-    content: string,
-    duration?: number,
-  ): void => getFileUtilsContext(context).notify(type, content, duration);
+  return (type: NotificationType, content: string, duration?: number): void =>
+    getFileUtilsContext(context).notify(type, content, duration);
 }

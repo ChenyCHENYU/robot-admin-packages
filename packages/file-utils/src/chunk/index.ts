@@ -15,8 +15,21 @@ export interface ChunkUploadOptions {
   /** Number of retries after the first attempt. Default: 3. */
   retries?: number;
   retryDelay?: number | ((attempt: number, error: unknown) => number);
+  hashMode?: ChunkHashMode;
+  shouldRetry?: (context: ChunkRetryContext) => boolean;
+  onRetry?: (context: ChunkRetryContext & { delay: number }) => void;
   maxFileSize?: number;
   context?: FileUtilsContext;
+}
+
+export type ChunkHashMode = "sampled" | "full";
+
+export interface ChunkRetryContext {
+  chunkIndex: number;
+  /** Retry number after the initial attempt. Starts at 1. */
+  attempt: number;
+  retries: number;
+  error: unknown;
 }
 
 export interface ChunkUploadRunOptions {
@@ -145,42 +158,78 @@ function waitForRetry(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-function chunkByteLength(fileSize: number, chunkSize: number, index: number): number {
+function chunkByteLength(
+  fileSize: number,
+  chunkSize: number,
+  index: number,
+): number {
   const start = index * chunkSize;
   return Math.max(0, Math.min(chunkSize, fileSize - start));
 }
 
-/** A stable sampled SHA-256 identifier. It is an upload identity, not a full-file integrity checksum. */
+function reportObserverError(
+  context: FileUtilsContext,
+  callbackName: string,
+  cause: unknown,
+): void {
+  context.config.logger?.warn?.(
+    `[file-utils] ${callbackName} callback failed and was ignored`,
+    cause,
+  );
+}
+
+/**
+ * Calculates a sampled upload identifier by default. Use `full` only when a
+ * standard whole-file SHA-256 checksum is required; Web Crypto buffers the
+ * complete Blob for that mode.
+ */
 export async function calculateFileHash(
   file: Blob,
   signal?: AbortSignal,
+  mode: ChunkHashMode = "sampled",
 ): Promise<string> {
   throwIfAborted(signal);
-  const sampleSize = 1024 * 1024;
-  const samples = [
-    await file.slice(0, Math.min(sampleSize, file.size)).arrayBuffer(),
-  ];
-  if (file.size > sampleSize) {
-    samples.push(
-      await file.slice(Math.max(0, file.size - sampleSize)).arrayBuffer(),
+  if (mode !== "sampled" && mode !== "full") {
+    throw new FileUtilsError("INVALID_ARGUMENT", `不支持的哈希模式: ${mode}`);
+  }
+  let content: ArrayBuffer;
+  if (mode === "full") {
+    content = await file.arrayBuffer();
+  } else {
+    const sampleSize = 1024 * 1024;
+    const samples = [
+      await file.slice(0, Math.min(sampleSize, file.size)).arrayBuffer(),
+    ];
+    if (file.size > sampleSize) {
+      samples.push(
+        await file.slice(Math.max(0, file.size - sampleSize)).arrayBuffer(),
+      );
+    }
+    const contentLength = samples.reduce(
+      (total, sample) => total + sample.byteLength,
+      0,
     );
+    const combined = new Uint8Array(contentLength + 8);
+    let offset = 0;
+    for (const sample of samples) {
+      combined.set(new Uint8Array(sample), offset);
+      offset += sample.byteLength;
+    }
+    new DataView(combined.buffer).setBigUint64(
+      contentLength,
+      BigInt(file.size),
+      false,
+    );
+    content = combined.buffer;
   }
   throwIfAborted(signal);
-  const contentLength = samples.reduce((total, sample) => total + sample.byteLength, 0);
-  const combined = new Uint8Array(contentLength + 8);
-  let offset = 0;
-  for (const sample of samples) {
-    combined.set(new Uint8Array(sample), offset);
-    offset += sample.byteLength;
-  }
-  new DataView(combined.buffer).setBigUint64(contentLength, BigInt(file.size), false);
   if (!globalThis.crypto?.subtle?.digest) {
     throw new FileUtilsError(
       "NOT_SUPPORTED",
       "当前环境不支持 Web Crypto SHA-256（浏览器中需要 HTTPS 或 localhost）",
     );
   }
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", combined);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", content);
   throwIfAborted(signal);
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
@@ -191,9 +240,25 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
   const chunkSize = options.chunkSize ?? 2 * 1024 * 1024;
   const concurrent = options.concurrent ?? 3;
   const retries = options.retries ?? 3;
+  const hashMode = options.hashMode ?? "sampled";
   assertPositiveInteger(chunkSize, "chunkSize");
   assertPositiveInteger(concurrent, "concurrent");
   assertNonNegativeInteger(retries, "retries");
+  if (
+    typeof options.retryDelay === "number" &&
+    (!Number.isFinite(options.retryDelay) || options.retryDelay < 0)
+  ) {
+    throw new FileUtilsError(
+      "INVALID_ARGUMENT",
+      "retryDelay 必须是大于等于 0 的有限数值",
+    );
+  }
+  if (hashMode !== "sampled" && hashMode !== "full") {
+    throw new FileUtilsError(
+      "INVALID_ARGUMENT",
+      `不支持的哈希模式: ${hashMode}`,
+    );
+  }
 
   let activeController: AbortController | null = null;
   const state = ref<ChunkUploadState>({
@@ -227,16 +292,10 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
       throw new FileUtilsError("INVALID_ARGUMENT", "不能分片上传空文件");
     }
 
-    const controller = new AbortController();
-    activeController = controller;
-    const unlink = linkAbortSignal(runOptions.signal, controller);
-    const { signal } = controller;
     const totalChunks = Math.ceil(file.size / chunkSize);
     const resumed = new Set<number>();
     for (const index of runOptions.completedChunks ?? []) {
       if (!Number.isSafeInteger(index) || index < 0 || index >= totalChunks) {
-        activeController = null;
-        unlink();
         throw new FileUtilsError(
           "INVALID_ARGUMENT",
           `已完成分片索引无效：${index}`,
@@ -244,6 +303,10 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
       }
       resumed.add(index);
     }
+    const controller = new AbortController();
+    activeController = controller;
+    const unlink = linkAbortSignal(runOptions.signal, controller);
+    const { signal } = controller;
     let uploadedBytes = Array.from(resumed).reduce(
       (total, index) => total + chunkByteLength(file.size, chunkSize, index),
       0,
@@ -260,14 +323,18 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
       state.value.completedChunks = Array.from(completed).sort((a, b) => a - b);
       state.value.uploadedBytes = uploadedBytes;
       state.value.speed = speed;
-      runOptions.onProgress?.({
-        phase: "upload",
-        loaded: uploadedBytes,
-        total: file.size,
-        percent,
-        speed,
-        eta: speed > 0 ? (file.size - uploadedBytes) / speed : undefined,
-      });
+      try {
+        runOptions.onProgress?.({
+          phase: "upload",
+          loaded: uploadedBytes,
+          total: file.size,
+          percent,
+          speed,
+          eta: speed > 0 ? (file.size - uploadedBytes) / speed : undefined,
+        });
+      } catch (cause) {
+        reportObserverError(context, "onProgress", cause);
+      }
     };
 
     state.value = {
@@ -281,13 +348,15 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
       aborted: false,
       error: null,
     };
+    let stoppedForChunkFailure = false;
 
     try {
       throwIfAborted(signal);
-      const hash = await calculateFileHash(file, signal);
-      const pending = Array.from({ length: totalChunks }, (_, index) => index).filter(
-        (index) => !completed.has(index),
-      );
+      const hash = await calculateFileHash(file, signal, hashMode);
+      const pending = Array.from(
+        { length: totalChunks },
+        (_, index) => index,
+      ).filter((index) => !completed.has(index));
       let cursor = 0;
       let firstError: unknown;
 
@@ -306,12 +375,29 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
           } catch (cause) {
             if (signal.aborted) throw abortedError(signal);
             if (attempt >= retries) throw cause;
+            const retryContext: ChunkRetryContext = {
+              chunkIndex: index,
+              attempt: attempt + 1,
+              retries,
+              error: cause,
+            };
+            if (options.shouldRetry && !options.shouldRetry(retryContext)) {
+              throw cause;
+            }
             const retryDelay =
               typeof options.retryDelay === "function"
                 ? options.retryDelay(attempt + 1, cause)
                 : (options.retryDelay ?? 1000) * (attempt + 1);
             if (!Number.isFinite(retryDelay) || retryDelay < 0) {
-              throw new FileUtilsError("INVALID_ARGUMENT", "retryDelay 返回值无效");
+              throw new FileUtilsError(
+                "INVALID_ARGUMENT",
+                "retryDelay 返回值无效",
+              );
+            }
+            try {
+              options.onRetry?.({ ...retryContext, delay: retryDelay });
+            } catch (cause) {
+              reportObserverError(context, "onRetry", cause);
             }
             await waitForRetry(retryDelay, signal);
           }
@@ -327,6 +413,7 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
           } catch (cause) {
             if (firstError === undefined) {
               firstError = cause;
+              stoppedForChunkFailure = true;
               controller.abort(cause);
             }
             return;
@@ -335,7 +422,9 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
       };
 
       await Promise.all(
-        Array.from({ length: Math.min(concurrent, pending.length) }, () => worker()),
+        Array.from({ length: Math.min(concurrent, pending.length) }, () =>
+          worker(),
+        ),
       );
       if (firstError !== undefined) throw firstError;
       throwIfAborted(signal);
@@ -353,8 +442,12 @@ export function useChunkUpload(options: ChunkUploadOptions = {}) {
         cause instanceof FileUtilsError
           ? cause
           : new FileUtilsError(
-              signal.aborted ? "ABORTED" : "NETWORK_ERROR",
-              signal.aborted ? "分片上传已取消" : "分片上传失败",
+              signal.aborted && !stoppedForChunkFailure
+                ? "ABORTED"
+                : "NETWORK_ERROR",
+              signal.aborted && !stoppedForChunkFailure
+                ? "分片上传已取消"
+                : "分片上传失败",
               { cause },
             );
       state.value.aborted = failure.code === "ABORTED";
@@ -409,6 +502,12 @@ export function useChunkDownload(defaults: UseChunkDownloadOptions = {}) {
       throw new FileUtilsError("NOT_SUPPORTED", "当前环境不支持 fetch");
     }
     const context = getFileUtilsContext(defaults.context);
+    if (options.expectedSize !== undefined) {
+      assertNonNegativeInteger(options.expectedSize, "expectedSize");
+    }
+    const maxBufferedSize =
+      options.maxBufferedSize ?? context.limits.maxBufferedDownloadSize;
+    assertPositiveInteger(maxBufferedSize, "maxBufferedSize");
     const controller = new AbortController();
     activeController = controller;
     const unlink = linkAbortSignal(options.signal, controller);
@@ -440,34 +539,39 @@ export function useChunkDownload(defaults: UseChunkDownloadOptions = {}) {
         );
       }
       const headerValue = response.headers.get("content-length");
-      const headerLength = headerValue === null ? Number.NaN : Number(headerValue);
+      const headerLength =
+        headerValue === null ? Number.NaN : Number(headerValue);
       const total =
         options.expectedSize ??
         (Number.isSafeInteger(headerLength) && headerLength >= 0
           ? headerLength
           : undefined);
-      if (options.expectedSize !== undefined) {
-        assertNonNegativeInteger(options.expectedSize, "expectedSize");
-      }
-      const maxBufferedSize =
-        options.maxBufferedSize ?? context.limits.maxBufferedDownloadSize;
-      assertPositiveInteger(maxBufferedSize, "maxBufferedSize");
       if (!options.sink && total !== undefined) {
         assertWithinLimit(total, maxBufferedSize, "缓冲下载大小");
       }
       reader = response.body?.getReader();
-      if (!reader) {
-        throw new FileUtilsError("NOT_SUPPORTED", "响应不支持 ReadableStream");
+      if (!reader && total !== undefined && total > 0) {
+        throw new FileUtilsError("INVALID_CONTENT", "下载响应缺少文件内容");
       }
 
       const chunks: Uint8Array[] = [];
       let received = 0;
-      while (true) {
+      while (reader) {
         throwIfAborted(signal);
         const part = await reader.read();
         if (part.done) break;
         if (!part.value) continue;
         received += part.value.byteLength;
+        if (
+          options.expectedSize !== undefined &&
+          received > options.expectedSize
+        ) {
+          throw new FileUtilsError(
+            "INVALID_CONTENT",
+            `下载大小超过预期：${received} > ${options.expectedSize}`,
+            { details: { received, expected: options.expectedSize } },
+          );
+        }
         if (!options.sink) {
           assertWithinLimit(received, maxBufferedSize, "缓冲下载大小");
           chunks.push(part.value);
@@ -476,22 +580,36 @@ export function useChunkDownload(defaults: UseChunkDownloadOptions = {}) {
         }
         const elapsed = Math.max((performance.now() - startedAt) / 1000, 0.001);
         const speed = received / elapsed;
-        const percent = total && total > 0 ? Math.min(100, (received / total) * 100) : undefined;
+        const percent =
+          total && total > 0
+            ? Math.min(100, (received / total) * 100)
+            : undefined;
         state.value.loaded = received;
         state.value.total = total;
         state.value.speed = speed;
         state.value.progress = percent === undefined ? 0 : Math.round(percent);
-        options.onProgress?.(state.value.progress);
-        options.onProgressDetail?.({
-          phase: "download",
-          loaded: received,
-          total,
-          percent,
-          speed,
-          eta: total && speed > 0 ? (total - received) / speed : undefined,
-        });
+        try {
+          options.onProgress?.(state.value.progress);
+        } catch (cause) {
+          reportObserverError(context, "onProgress", cause);
+        }
+        try {
+          options.onProgressDetail?.({
+            phase: "download",
+            loaded: received,
+            total,
+            percent,
+            speed,
+            eta: total && speed > 0 ? (total - received) / speed : undefined,
+          });
+        } catch (cause) {
+          reportObserverError(context, "onProgressDetail", cause);
+        }
       }
-      if (options.expectedSize !== undefined && received !== options.expectedSize) {
+      if (
+        options.expectedSize !== undefined &&
+        received !== options.expectedSize
+      ) {
         throw new FileUtilsError(
           "INVALID_CONTENT",
           `下载大小不匹配：${received} !== ${options.expectedSize}`,

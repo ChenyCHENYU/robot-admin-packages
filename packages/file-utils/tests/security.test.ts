@@ -52,6 +52,7 @@ describe("chunk fingerprint", () => {
     expect(() => useChunkUpload({ chunkSize: 0 })).toThrow("chunkSize");
     expect(() => useChunkUpload({ concurrent: 0 })).toThrow("concurrent");
     expect(() => useChunkUpload({ retries: -1 })).toThrow("retries");
+    expect(() => useChunkUpload({ retryDelay: -1 })).toThrow("retryDelay");
     expect(() => useChunkUpload({ retries: 0 })).not.toThrow();
   });
 
@@ -74,7 +75,8 @@ describe("chunk fingerprint", () => {
       },
     );
 
-    while (!callbackSignal) await new Promise((resolve) => setTimeout(resolve, 0));
+    while (!callbackSignal)
+      await new Promise((resolve) => setTimeout(resolve, 0));
     abort();
     await expect(pending).rejects.toMatchObject({ code: "ABORTED" });
 

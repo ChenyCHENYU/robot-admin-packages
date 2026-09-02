@@ -36,7 +36,7 @@ const PLACEHOLDER =
   'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
 
 function parseOptions(value: LazyBinding | undefined): NormalizedOptions {
-  const raw = typeof value === "string" ? { src: value } : (value ?? { src: "" });
+  const raw = typeof value === "string" ? { src: value } : value ?? { src: "" };
   const threshold = raw.threshold ?? 0;
   const values = Array.isArray(threshold) ? threshold : [threshold];
   if (values.some((item) => !Number.isFinite(item) || item < 0 || item > 1)) {
@@ -66,7 +66,8 @@ function stop(state: LazyState): void {
   if (state.loader) {
     state.loader.onload = null;
     state.loader.onerror = null;
-    state.loader.src = "";
+    state.loader.removeAttribute("src");
+    state.loader.removeAttribute("srcset");
     state.loader = undefined;
   }
 }
@@ -92,6 +93,8 @@ function load(el: HTMLElement, state: LazyState): void {
   }
   image.onload = () => {
     if (generation !== state.generation || states.get(el) !== state) return;
+    image.onload = null;
+    image.onerror = null;
     setSource(el, state, src);
     el.classList.remove("ra-lazy-loading", "ra-lazy-error");
     el.classList.add("ra-lazy-loaded");
@@ -100,6 +103,8 @@ function load(el: HTMLElement, state: LazyState): void {
   };
   image.onerror = () => {
     if (generation !== state.generation || states.get(el) !== state) return;
+    image.onload = null;
+    image.onerror = null;
     if (state.options.error) setSource(el, state, state.options.error);
     el.classList.remove("ra-lazy-loading", "ra-lazy-loaded");
     el.classList.add("ra-lazy-error");
@@ -116,11 +121,14 @@ function observe(el: HTMLElement, state: LazyState): void {
   el.classList.add("ra-lazy-loading");
   if (state.options.loading) setSource(el, state, state.options.loading);
 
-  if (typeof IntersectionObserver === "undefined") {
+  const Observer =
+    el.ownerDocument.defaultView?.IntersectionObserver ??
+    globalThis.IntersectionObserver;
+  if (!Observer) {
     load(el, state);
     return;
   }
-  state.observer = new IntersectionObserver(
+  state.observer = new Observer(
     (entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         state.observer?.disconnect();
@@ -158,7 +166,8 @@ const lazyDirective: Directive<HTMLElement, LazyBinding | undefined> = {
       state.options.error !== next.error ||
       state.options.root !== next.root ||
       state.options.rootMargin !== next.rootMargin ||
-      JSON.stringify(state.options.threshold) !== JSON.stringify(next.threshold) ||
+      JSON.stringify(state.options.threshold) !==
+        JSON.stringify(next.threshold) ||
       state.options.crossOrigin !== next.crossOrigin ||
       state.options.referrerPolicy !== next.referrerPolicy ||
       state.mode !== nextMode;

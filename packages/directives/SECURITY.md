@@ -11,6 +11,7 @@ Watermarks deter casual redistribution but cannot prevent screenshots or deliber
 - Treat copy text, tooltip text and loading text as untrusted. The package renders UI text through DOM properties rather than HTML injection.
 - Use `styleNonce` for Loading and Tooltip when a strict Content Security Policy requires nonces. Review Canvas data URLs before enabling watermarks under a restrictive CSP.
 - Provide permission data synchronously and fail closed while identity is loading. Avoid placing tokens or personal data in directive bindings or DOM attributes.
+- Permission and drag cleanup only restores DOM state still owned by the directive. Continue treating application-side style and authorization state as the source of truth.
 - Prefer handler-owned debounce/throttle bindings. Compatibility mode redispatches a synthetic DOM event and should not be used as an authorization boundary.
 - Keep Vue and this package updated, and test Pointer Events, observers and clipboard behavior against the browsers supported by the application.
 

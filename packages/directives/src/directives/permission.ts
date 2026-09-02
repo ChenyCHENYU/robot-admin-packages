@@ -12,10 +12,7 @@ export interface PermissionOptions {
   onDenied?: (reason: string) => void;
 }
 
-export type PermissionBinding =
-  | string
-  | readonly string[]
-  | PermissionOptions;
+export type PermissionBinding = string | readonly string[] | PermissionOptions;
 
 export interface PermissionProvider {
   getAuthData?: () => PermissionRecord | undefined;
@@ -33,7 +30,12 @@ interface PermissionState {
   pointerEvents: string;
   ariaDisabled: string | null;
   disabled?: boolean;
-  lastDeniedReason?: string;
+  appliedDisplay?: string;
+  appliedOpacity?: string;
+  appliedPointerEvents?: string;
+  appliedAriaDisabled?: string;
+  appliedDisabled?: boolean;
+  lastDeniedSignature?: string;
 }
 
 const states = new WeakMap<HTMLElement, PermissionState>();
@@ -83,7 +85,9 @@ export function hasPermission(
     ? required.every((permission) =>
         checkSinglePermission(permission, authData),
       )
-    : required.some((permission) => checkSinglePermission(permission, authData));
+    : required.some((permission) =>
+        checkSinglePermission(permission, authData),
+      );
 }
 
 function captureState(el: HTMLElement): PermissionState {
@@ -95,35 +99,88 @@ function captureState(el: HTMLElement): PermissionState {
     pointerEvents: el.style.pointerEvents,
     ariaDisabled: el.getAttribute("aria-disabled"),
     disabled:
-      "disabled" in el ? Boolean((el as HTMLButtonElement).disabled) : undefined,
+      "disabled" in el
+        ? Boolean((el as HTMLButtonElement).disabled)
+        : undefined,
   };
   states.set(el, state);
   return state;
 }
 
-function restoreElement(el: HTMLElement, state: PermissionState): void {
-  el.style.display = state.display;
-  el.style.opacity = state.opacity;
-  el.style.pointerEvents = state.pointerEvents;
-  if (state.ariaDisabled === null) el.removeAttribute("aria-disabled");
-  else el.setAttribute("aria-disabled", state.ariaDisabled);
+function releaseRestriction(el: HTMLElement, state: PermissionState): void {
+  if (state.appliedDisplay !== undefined) {
+    if (el.style.display === state.appliedDisplay)
+      el.style.display = state.display;
+    else state.display = el.style.display;
+    state.appliedDisplay = undefined;
+  } else {
+    state.display = el.style.display;
+  }
+  if (state.appliedOpacity !== undefined) {
+    if (el.style.opacity === state.appliedOpacity)
+      el.style.opacity = state.opacity;
+    else state.opacity = el.style.opacity;
+    state.appliedOpacity = undefined;
+  } else {
+    state.opacity = el.style.opacity;
+  }
+  if (state.appliedPointerEvents !== undefined) {
+    if (el.style.pointerEvents === state.appliedPointerEvents) {
+      el.style.pointerEvents = state.pointerEvents;
+    } else {
+      state.pointerEvents = el.style.pointerEvents;
+    }
+    state.appliedPointerEvents = undefined;
+  } else {
+    state.pointerEvents = el.style.pointerEvents;
+  }
+  if (state.appliedAriaDisabled !== undefined) {
+    if (el.getAttribute("aria-disabled") === state.appliedAriaDisabled) {
+      if (state.ariaDisabled === null) el.removeAttribute("aria-disabled");
+      else el.setAttribute("aria-disabled", state.ariaDisabled);
+    } else {
+      state.ariaDisabled = el.getAttribute("aria-disabled");
+    }
+    state.appliedAriaDisabled = undefined;
+  } else {
+    state.ariaDisabled = el.getAttribute("aria-disabled");
+  }
   if (state.disabled !== undefined && "disabled" in el) {
-    (el as HTMLButtonElement).disabled = state.disabled;
+    const control = el as HTMLButtonElement;
+    if (state.appliedDisabled !== undefined) {
+      if (control.disabled === state.appliedDisabled)
+        control.disabled = state.disabled;
+      else state.disabled = control.disabled;
+      state.appliedDisabled = undefined;
+    } else {
+      state.disabled = control.disabled;
+    }
   }
 }
 
 function applyRestriction(
   el: HTMLElement,
+  state: PermissionState,
   fallback: PermissionFallback,
 ): void {
   if (fallback === "hide") {
     el.style.display = "none";
+    state.appliedDisplay = "none";
     return;
   }
   el.setAttribute("aria-disabled", "true");
-  if ("disabled" in el) (el as HTMLButtonElement).disabled = true;
-  else el.style.pointerEvents = "none";
-  if (fallback === "show") el.style.opacity = "0.5";
+  state.appliedAriaDisabled = "true";
+  if ("disabled" in el) {
+    (el as HTMLButtonElement).disabled = true;
+    state.appliedDisabled = true;
+  } else {
+    el.style.pointerEvents = "none";
+    state.appliedPointerEvents = "none";
+  }
+  if (fallback === "show") {
+    el.style.opacity = "0.5";
+    state.appliedOpacity = "0.5";
+  }
 }
 
 function applyPermission(
@@ -132,10 +189,10 @@ function applyPermission(
   provider: PermissionProvider,
 ): void {
   const state = captureState(el);
-  restoreElement(el, state);
+  releaseRestriction(el, state);
   const required = normalizePermissions(options.permissions);
   if (required.length === 0) {
-    state.lastDeniedReason = undefined;
+    state.lastDeniedSignature = undefined;
     return;
   }
 
@@ -148,16 +205,19 @@ function applyPermission(
   else reason = "权限数据未提供";
 
   if (allowed) {
-    state.lastDeniedReason = undefined;
+    state.lastDeniedSignature = undefined;
     return;
   }
 
-  applyRestriction(el, options.fallback ?? "hide");
-  if (state.lastDeniedReason !== reason) {
+  applyRestriction(el, state, options.fallback ?? "hide");
+  const deniedSignature = `${reason}\u0000${mode}\u0000${required.join(
+    "\u0000",
+  )}`;
+  if (state.lastDeniedSignature !== deniedSignature) {
     options.onDenied?.(reason);
     provider.onDenied?.(reason, el);
   }
-  state.lastDeniedReason = reason;
+  state.lastDeniedSignature = deniedSignature;
 }
 
 export function createPermissionDirective(
@@ -173,7 +233,7 @@ export function createPermissionDirective(
     },
     unmounted(el) {
       const state = states.get(el);
-      if (state) restoreElement(el, state);
+      if (state) releaseRestriction(el, state);
       states.delete(el);
     },
   };

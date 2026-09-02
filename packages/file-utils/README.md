@@ -79,7 +79,7 @@ configureFileUtils({ onMessage, onNotification, limits });
 | `maxArchiveSize` | 1 GiB | ZIP 原始内容和生成结果 |
 | `maxBufferedDownloadSize` | 512 MiB | 无 sink 的分片下载 |
 
-可在实例级覆盖，也可在具体操作中进一步收紧。库只接受有限、安全的数值；上限不是服务端校验、病毒扫描或内容安全网关的替代品。
+可在实例级覆盖，也可在具体操作中进一步收紧。所有实例级上限必须是大于等于 0 的安全整数，非法配置会在创建上下文时立即抛出 `INVALID_ARGUMENT`，不会延迟到文件处理中才暴露。上限不是服务端校验、病毒扫描或内容安全网关的替代品。
 
 ## 结构化错误
 
@@ -256,9 +256,13 @@ XML 会转义文本、拒绝 XML 1.0 非法控制字符、检测循环引用、�
 ## 图片
 
 ```ts
-import { useImage } from "@robot-admin/file-utils/image";
+import {
+  detectImageMimeType,
+  useImage,
+} from "@robot-admin/file-utils/image";
 
-const image = useImage();
+// 默认保持兼容；处理不可信位图时可启用文件签名校验
+const image = useImage({ verifyMimeType: true });
 
 const compressed = await image.compress(file, {
   quality: 0.8,
@@ -276,9 +280,11 @@ const cropped = await image.crop(file, {
   height: 400,
   signal,
 });
+
+const detectedType = await detectImageMimeType(file, signal);
 ```
 
-支持 `compress`、`crop`、`convert`、`resize`、`getInfo`、`toBase64`。库校验 MIME、文件大小、质量、整数尺寸、裁剪边界、像素上限和浏览器实际输出 MIME。JPEG 默认用白色填充透明区域，可通过 `backgroundColor` 修改。
+支持 `compress`、`crop`、`convert`、`resize`、`getInfo`、`toBase64`。库校验 MIME、文件大小、质量、整数尺寸、裁剪边界、像素上限和浏览器实际输出 MIME。`verifyMimeType` 是兼容性安全开关，启用后会校验 PNG、JPEG、GIF、WebP、BMP、TIFF、ICO、AVIF 和 HEIC 等常见位图签名，并拒绝声明 MIME 与签名不一致的内容；SVG 或业务私有格式应保持关闭并交给服务端内容网关检查。JPEG 默认用白色填充透明区域，可通过 `backgroundColor` 修改。
 
 Canvas 解码仍会消耗浏览器内存；处理不可信超大图片时应在上传网关同步限制字节数和图像尺寸。
 
@@ -292,6 +298,10 @@ const uploader = useChunkUpload({
   concurrent: 3,
   retries: 3, // 首次失败后的额外重试次数；0 表示不重试
   retryDelay: (attempt) => attempt * 1000,
+  shouldRetry: ({ error }) => isTransientNetworkError(error),
+  onRetry: ({ chunkIndex, attempt, delay }) =>
+    auditRetry({ chunkIndex, attempt, delay }),
+  hashMode: "sampled", // 默认；需要标准全文件 SHA-256 时显式使用 "full"
 });
 
 const result = await uploader.upload(
@@ -311,9 +321,9 @@ const result = await uploader.upload(
 );
 ```
 
-同一实例拒绝并发上传。进度按实际字节计算，断点续传会跳过 `completedChunks`，分片失败会取消其他 worker，外部取消会传递到上传和合并回调。返回值包含稳定的 sampled SHA-256 标识、分片总数和完成索引。
+同一实例拒绝并发上传。进度按实际字节计算，断点续传会跳过 `completedChunks`，分片失败会取消其他 worker，外部取消会传递到上传和合并回调。内部停止 worker 不会再被误报为用户取消：请求失败返回 `NETWORK_ERROR`，外部取消返回 `ABORTED`。`shouldRetry` 可阻止 4xx、业务校验失败等无意义重试，`onRetry` 只用于观测。进度和重试观测回调抛错不会中断传输或造成分片重复上传；如配置了 `logger` 会记录 warning。返回值包含哈希、分片总数和完成索引。
 
-sampled SHA-256 混合文件首尾各 1 MiB 与文件大小，用于上传身份和秒传协商，不是完整文件校验。需要合规完整性校验时，应在服务端合并后计算全文件哈希。
+`sampled` SHA-256 混合文件首尾各 1 MiB 与文件大小，用于上传身份和秒传协商，不是完整文件校验。`hashMode: "full"` 会生成标准全文件 SHA-256，但受 Web Crypto 限制需要在浏览器内存中读取完整 Blob，只适合已受 `maxFileSize` 约束的场景。无论客户端采用哪种模式，需要合规完整性校验时仍应在服务端合并后复算。
 
 ## 真流式分片下载
 
@@ -352,7 +362,7 @@ await useChunkDownload().download(url, "large.zip", {
 });
 ```
 
-File System Access API 的浏览器支持有限；也可以提供自定义 `ChunkDownloadSink` 接入 Electron、Tauri、Service Worker 或其他持久化通道。下载完成前会校验 `expectedSize`，失败时调用 sink 的 `abort(reason)`。
+File System Access API 的浏览器支持有限；也可以提供自定义 `ChunkDownloadSink` 接入 Electron、Tauri、Service Worker 或其他持久化通道。每块数据写入 sink 前都会检查是否超过 `expectedSize`，下载完成后再次检查精确大小；失败时调用 sink 的 `abort(reason)`，避免把已知越界块继续写入目标。
 
 ## 子路径与 Tree-shaking
 
@@ -395,7 +405,7 @@ bun run test
 bun run build
 ```
 
-测试覆盖 RFC 4180、公式与原型污染防护、下载响应归一化、真流式 sink、缓冲上限、上传续传/取消、Excel 危险表头和 ZIP 路径/资源限制。
+测试覆盖 RFC 4180、公式与原型污染防护、下载响应归一化、真流式 sink、预期大小、上传续传/取消/重试分类、sampled/full 哈希、图片签名、Excel 危险表头和 ZIP 路径/资源限制。
 
 ## License
 

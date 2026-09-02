@@ -1,10 +1,11 @@
-import {
-  createFileUtilsContext,
-  type FileUtilsConfig,
-} from "./config";
+import { createFileUtilsContext, type FileUtilsConfig } from "./config";
 import { useChunkDownload, useChunkUpload } from "./chunk";
 import { useCSV } from "./csv";
-import { useDownload, type DownloadApiFunction, type DownloadConfig } from "./download";
+import {
+  useDownload,
+  type DownloadApiFunction,
+  type DownloadConfig,
+} from "./download";
 import { useExcel } from "./excel";
 import { useFile } from "./file";
 import { useImage } from "./image";
@@ -86,7 +87,7 @@ export type { CSVOptions, UseCSVOptions } from "./csv";
 export { useFile } from "./file";
 export type { JSONFileOptions, UseFileOptions, XMLOptions } from "./file";
 
-export { useImage } from "./image";
+export { detectImageMimeType, useImage } from "./image";
 export type {
   CompressOptions,
   CropOptions,
@@ -102,11 +103,13 @@ export {
   useChunkUpload,
 } from "./chunk";
 export type {
+  ChunkHashMode,
   ChunkDownloadOptions,
   ChunkDownloadResult,
   ChunkDownloadSink,
   ChunkDownloadState,
   ChunkMergeFn,
+  ChunkRetryContext,
   ChunkUploadFn,
   ChunkUploadOptions,
   ChunkUploadResult,
@@ -134,7 +137,9 @@ export function createFileUtils(config: FileUtilsConfig = {}) {
     ) {
       return useDownload(api, { ...downloadConfig, context });
     },
-    chunkUpload(options: Omit<import("./chunk").ChunkUploadOptions, "context"> = {}) {
+    chunkUpload(
+      options: Omit<import("./chunk").ChunkUploadOptions, "context"> = {},
+    ) {
       return useChunkUpload({ ...options, context });
     },
     chunkDownload(

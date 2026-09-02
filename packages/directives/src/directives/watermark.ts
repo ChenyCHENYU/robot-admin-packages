@@ -79,7 +79,12 @@ function parseOptions(value: WatermarkBinding | undefined): NormalizedOptions {
   };
 }
 
-function visualKey(options: NormalizedOptions): string {
+function getPixelRatio(doc: Document): number {
+  const ratio = doc.defaultView?.devicePixelRatio ?? 1;
+  return Number.isFinite(ratio) ? Math.min(Math.max(ratio, 1), 4) : 1;
+}
+
+function visualKey(options: NormalizedOptions, pixelRatio = 1): string {
   return JSON.stringify({
     text: options.text,
     textColor: options.textColor,
@@ -89,6 +94,7 @@ function visualKey(options: NormalizedOptions): string {
     textYGap: options.textYGap,
     rotate: options.rotate,
     opacity: options.opacity,
+    pixelRatio,
   });
 }
 
@@ -102,7 +108,8 @@ function cacheSet(key: string, value: string): void {
 }
 
 function createImage(options: NormalizedOptions, doc: Document): string {
-  const key = visualKey(options);
+  const pixelRatio = getPixelRatio(doc);
+  const key = visualKey(options, pixelRatio);
   const cached = watermarkCache.get(key);
   if (cached) {
     watermarkCache.delete(key);
@@ -110,12 +117,13 @@ function createImage(options: NormalizedOptions, doc: Document): string {
     return cached;
   }
   const canvas = doc.createElement("canvas");
-  canvas.width = Math.ceil(options.textXGap);
-  canvas.height = Math.ceil(options.textYGap);
+  canvas.width = Math.ceil(options.textXGap * pixelRatio);
+  canvas.height = Math.ceil(options.textYGap * pixelRatio);
   const context = canvas.getContext("2d");
   if (!context) throw new Error("当前环境不支持 Canvas 2D 上下文");
+  context.scale(pixelRatio, pixelRatio);
   context.globalAlpha = options.opacity;
-  context.translate(canvas.width / 2, canvas.height / 2);
+  context.translate(options.textXGap / 2, options.textYGap / 2);
   context.rotate((options.rotate * Math.PI) / 180);
   context.font = `${options.fontSize}px ${options.fontFamily}`;
   context.fillStyle = options.textColor;
@@ -142,7 +150,9 @@ function observe(el: HTMLElement, state: WatermarkState): void {
     const tampered = mutations.some((mutation) => {
       if (mutation.type === "attributes") return mutation.target === overlay;
       return [...mutation.removedNodes].some(
-        (node) => node === overlay || (node instanceof Element && node.contains(overlay)),
+        (node) =>
+          node === overlay ||
+          (node.nodeType === 1 && (node as Element).contains(overlay)),
       );
     });
     if (tampered) render(el, state);
@@ -159,7 +169,9 @@ function render(el: HTMLElement, state: WatermarkState): void {
   try {
     state.observer?.disconnect();
     state.overlay?.remove();
-    if (getComputedStyle(el).position === "static") {
+    if (
+      el.ownerDocument.defaultView?.getComputedStyle(el).position === "static"
+    ) {
       el.style.position = "relative";
       state.changedPosition = true;
     }
@@ -169,7 +181,10 @@ function render(el: HTMLElement, state: WatermarkState): void {
       position: "absolute",
       inset: "0",
       pointerEvents: "none",
-      backgroundImage: `url(${JSON.stringify(createImage(state.options, el.ownerDocument))})`,
+      backgroundImage: `url(${JSON.stringify(
+        createImage(state.options, el.ownerDocument),
+      )})`,
+      backgroundSize: `${state.options.textXGap}px ${state.options.textYGap}px`,
       backgroundRepeat: "repeat",
       zIndex: String(state.options.zIndex),
       userSelect: "none",
@@ -186,44 +201,42 @@ function render(el: HTMLElement, state: WatermarkState): void {
   }
 }
 
-const watermarkDirective: Directive<
-  HTMLElement,
-  WatermarkBinding | undefined
-> = {
-  mounted(el, binding) {
-    const state: WatermarkState = {
-      options: parseOptions(binding.value),
-      originalPosition: el.style.position,
-      changedPosition: false,
-    };
-    states.set(el, state);
-    render(el, state);
-  },
-  updated(el, binding) {
-    const state = states.get(el);
-    if (!state) return;
-    const previous = state.options;
-    const next = parseOptions(binding.value);
-    state.options = next;
-    if (
-      visualKey(previous) !== visualKey(next) ||
-      previous.zIndex !== next.zIndex ||
-      previous.preventDelete !== next.preventDelete
-    ) {
+const watermarkDirective: Directive<HTMLElement, WatermarkBinding | undefined> =
+  {
+    mounted(el, binding) {
+      const state: WatermarkState = {
+        options: parseOptions(binding.value),
+        originalPosition: el.style.position,
+        changedPosition: false,
+      };
+      states.set(el, state);
       render(el, state);
-    }
-  },
-  unmounted(el) {
-    const state = states.get(el);
-    if (!state) return;
-    state.observer?.disconnect();
-    state.overlay?.remove();
-    if (state.changedPosition && el.style.position === "relative") {
-      el.style.position = state.originalPosition;
-    }
-    states.delete(el);
-  },
-};
+    },
+    updated(el, binding) {
+      const state = states.get(el);
+      if (!state) return;
+      const previous = state.options;
+      const next = parseOptions(binding.value);
+      state.options = next;
+      if (
+        visualKey(previous) !== visualKey(next) ||
+        previous.zIndex !== next.zIndex ||
+        previous.preventDelete !== next.preventDelete
+      ) {
+        render(el, state);
+      }
+    },
+    unmounted(el) {
+      const state = states.get(el);
+      if (!state) return;
+      state.observer?.disconnect();
+      state.overlay?.remove();
+      if (state.changedPosition && el.style.position === "relative") {
+        el.style.position = state.originalPosition;
+      }
+      states.delete(el);
+    },
+  };
 
 export function clearWatermarkCache(): void {
   watermarkCache.clear();
