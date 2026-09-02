@@ -3,37 +3,132 @@
   "version": "2.0.0",
   "description": "文件处理工具集 - Excel/下载/压缩/CSV/JSON/XML/图片处理/大文件分片",
   "type": "module",
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./csv": {
+      "import": {
+        "types": "./dist/csv.d.ts",
+        "default": "./dist/csv.js"
+      },
+      "require": {
+        "types": "./dist/csv.d.cts",
+        "default": "./dist/csv.cjs"
+      }
+    },
+    "./file": {
+      "import": {
+        "types": "./dist/file.d.ts",
+        "default": "./dist/file.js"
+      },
+      "require": {
+        "types": "./dist/file.d.cts",
+        "default": "./dist/file.cjs"
+      }
+    },
+    "./download": {
+      "import": {
+        "types": "./dist/download.d.ts",
+        "default": "./dist/download.js"
+      },
+      "require": {
+        "types": "./dist/download.d.cts",
+        "default": "./dist/download.cjs"
+      }
+    },
+    "./image": {
+      "import": {
+        "types": "./dist/image.d.ts",
+        "default": "./dist/image.js"
+      },
+      "require": {
+        "types": "./dist/image.d.cts",
+        "default": "./dist/image.cjs"
+      }
+    },
+    "./excel": {
+      "import": {
+        "types": "./dist/excel.d.ts",
+        "default": "./dist/excel.js"
+      },
+      "require": {
+        "types": "./dist/excel.d.cts",
+        "default": "./dist/excel.cjs"
+      }
+    },
+    "./zip": {
+      "import": {
+        "types": "./dist/zip.d.ts",
+        "default": "./dist/zip.js"
+      },
+      "require": {
+        "types": "./dist/zip.d.cts",
+        "default": "./dist/zip.cjs"
+      }
+    },
+    "./chunk": {
+      "import": {
+        "types": "./dist/chunk.d.ts",
+        "default": "./dist/chunk.js"
+      },
+      "require": {
+        "types": "./dist/chunk.d.cts",
+        "default": "./dist/chunk.cjs"
+      }
+    },
+    "./config": {
+      "import": {
+        "types": "./dist/config.d.ts",
+        "default": "./dist/config.js"
+      },
+      "require": {
+        "types": "./dist/config.d.cts",
+        "default": "./dist/config.cjs"
+      }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
+    "type-check": "tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "xlsx": "^0.18.5",
-    "jszip": "^3.10.1",
-    "file-saver": "^2.0.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "jszip": "^3.10.1"
   },
   "peerDependencies": {
     "vue": ">=3.3.0"
   },
   "devDependencies": {
-    "@types/file-saver": "^2.0.7"
+    "typescript": "^5.8.0",
+    "tsup": "^8.3.5",
+    "vitest": "^4.1.11",
+    "vue": "^3.5.42"
   },
   "publishConfig": {
     "access": "public",
@@ -48,14 +143,13 @@
     "csv",
     "image",
     "chunk-upload",
-    "file-saver",
     "xlsx"
   ],
   "author": "ChenYu <ycyplus@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ChenyCHENYU/robot-admin-packages.git",
+    "url": "git+https://github.com/ChenyCHENYU/robot-admin-packages.git",
     "directory": "packages/file-utils"
   }
 }

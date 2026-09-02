@@ -1,363 +1,402 @@
 # @robot-admin/file-utils
 
-> 文件处理工具集 - Excel / 下载 / 压缩 / CSV / JSON / XML / 图片处理 / 大文件分片
+面向浏览器和 Vue 3 应用的企业级文件工具集：Excel、下载、ZIP、CSV、JSON/XML、图片和大文件分片传输。统一提供隔离配置、资源上限、结构化错误、取消信号和进度模型。
 
 [![npm version](https://img.shields.io/npm/v/@robot-admin/file-utils.svg)](https://www.npmjs.com/package/@robot-admin/file-utils)
-[![license](https://img.shields.io/npm/l/@robot-admin/file-utils.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/@robot-admin/file-utils.svg)](./LICENSE)
 
-当前版本：`2.0.0`。
+当前主版本：`3.x`。
 
-## 📦 安装
+## 设计目标
+
+- 安全默认值：公式注入防护、危险表头拒绝、路径清洗、XML 转义、严格 Base64、尺寸与数量上限。
+- 可取消：下载、分片上传/下载、Excel 读取、CSV/File/Image 操作均可接入 `AbortSignal`。
+- 可观测：统一 `FileProgress`、响应式状态、消息/通知适配器和稳定错误码。
+- 可隔离：推荐 `createFileUtils()`；全局 `configureFileUtils()` 仅作兼容。
+- 可组合：ESM、CommonJS、声明文件，以及每个模块的显式子路径导出。
+- 大文件可控：普通下载有内存上限；分片下载传入 sink 时逐块落盘，不保留完整文件。
+
+## 安装
 
 ```bash
-bun add @robot-admin/file-utils
-# 或
 npm install @robot-admin/file-utils
+# 或
+bun add @robot-admin/file-utils
 ```
 
-## ⚡ 快速上手
+`vue >=3.3` 是 peer dependency。Excel 使用 SheetJS 官方发布的 `xlsx 0.20.3`，ZIP 使用 `jszip`；包内不再依赖 `file-saver`。
 
-```typescript
-// 1. 初始化（main.ts 中调用一次）
-import { configureFileUtils } from "@robot-admin/file-utils";
-configureFileUtils({
-  onMessage: (type, text) => yourMessageLib[type](text),
-  onNotification: (type, content) => yourNotifyLib[type]({ content }),
-});
+## 推荐初始化方式
 
-// 2. 在任意组件中使用
-import { useExcel, useDownload, FileType } from "@robot-admin/file-utils";
+为每个应用、租户、SSR 请求或测试创建隔离实例：
 
-// 一行导出 Excel
-const { exportToExcel } = useExcel();
-await exportToExcel(tableData, { fileName: "报表.xlsx" });
+```ts
+import { createFileUtils } from "@robot-admin/file-utils";
 
-// 一行下载文件
-await useDownload(api.download, { fileName: "报表", fileType: FileType.XLSX });
-```
-
-## 🔧 初始化配置
-
-解耦了 UI 框架依赖，需要在项目入口配置消息回调：
-
-```typescript
-import { configureFileUtils } from "@robot-admin/file-utils";
-import { createDiscreteApi } from "naive-ui/es/discrete";
-
-const { message, notification } = createDiscreteApi([
-  "message",
-  "notification",
-]);
-
-configureFileUtils({
+export const files = createFileUtils({
   onMessage: (type, text) => message[type](text),
   onNotification: (type, content, duration) =>
-    notification[type]({ content, duration: duration ?? 2000 }),
+    notification[type]({ content, duration }),
+  logger,
+  limits: {
+    maxFileSize: 200 * 1024 * 1024,
+    maxRows: 200_000,
+    maxBufferedDownloadSize: 128 * 1024 * 1024,
+  },
 });
+
+const rows = files.csv.parse(csvText);
+await files.excel.exportToExcel(rows, { fileName: "report.xlsx" });
 ```
 
-> 如果不配置，默认回退到 `console.log` 输出。  
-> 支持任意 UI 框架（Naive UI / Element Plus / Ant Design 等），只需替换回调实现。
+实例包含 `csv`、`file`、`image`、`excel`、`zip`、`download()`、`chunkUpload()` 和 `chunkDownload()`。配置对象和合并后的限额会被冻结，实例之间不会互相污染。
 
-## 📖 功能模块
+兼容旧应用的全局配置：
 
-### 1. useExcel - Excel 操作
-
-基于 `xlsx` 库，提供 Excel 读取、导出、模板生成等功能。
-
-```typescript
-import { useExcel } from "@robot-admin/file-utils";
-import type { ExcelConfig, ExcelTemplate } from "@robot-admin/file-utils";
-
-const {
-  readFile,
-  exportToExcel,
-  exportMultipleSheets,
-  generateTemplate,
-  getPresetTemplates,
-} = useExcel();
-
-// 读取 Excel 文件
-const data = await readFile(file);
-
-// 导出单表
-await exportToExcel(data, { fileName: "报表.xlsx", sheetName: "数据" });
-
-// 导出多表
-await exportMultipleSheets({ Sheet1: data1, Sheet2: data2 }, "多表.xlsx");
-
-// 下载模板
-const templates = getPresetTemplates();
-await generateTemplate(templates[0]);
-```
-
-### 2. useDownload - 通用下载
-
-支持 20+ 种文件格式，自动 MIME 类型映射。
-
-```typescript
+```ts
 import {
-  useDownload,
-  useDownloadExcel,
-  FileType,
+  configureFileUtils,
+  resetFileUtilsConfig,
 } from "@robot-admin/file-utils";
-import type { DownloadConfig } from "@robot-admin/file-utils";
 
-// 通用下载
-await useDownload(api.downloadReport, {
-  fileName: "月度报表",
-  fileType: FileType.XLSX,
-  params: { month: "2025-01" },
-});
-
-// 快捷下载（Excel / CSV / PDF / JSON）
-await useDownloadExcel(api.downloadReport, "月度报表");
+configureFileUtils({ onMessage, onNotification, limits });
+// 测试或应用销毁时可调用 resetFileUtilsConfig()
 ```
 
-### 3. useJSZip - 文件压缩
+未配置消息适配器时默认静默，不会写入控制台；需要诊断输出时显式传入 `logger`。
 
-基于 `jszip` + `file-saver`，提供 4 种场景预设。
+## 默认资源上限
 
-```typescript
-import { useJSZip } from "@robot-admin/file-utils";
+| 配置 | 默认值 | 约束范围 |
+| --- | ---: | --- |
+| `maxFileSize` | 100 MiB | Excel、下载、CSV/File/Image、上传 |
+| `maxRows` | 100,000 | CSV、Excel |
+| `maxColumns` | 1,000 | CSV、Excel |
+| `maxFieldLength` | 1,000,000 字符 | CSV 单字段 |
+| `maxOutputSize` | 256 MiB | CSV、Excel、JSON/XML、Base64 |
+| `maxImagePixels` | 40,000,000 | 图片输入和输出画布 |
+| `maxArchiveFiles` | 10,000 | ZIP 条目 |
+| `maxArchiveSize` | 1 GiB | ZIP 原始内容和生成结果 |
+| `maxBufferedDownloadSize` | 512 MiB | 无 sink 的分片下载 |
 
-const jszip = useJSZip();
+可在实例级覆盖，也可在具体操作中进一步收紧。库只接受有限、安全的数值；上限不是服务端校验、病毒扫描或内容安全网关的替代品。
 
-// 导出代码项目
-await jszip.exportCodeProject({
-  projectName: "my-app",
-  framework: "vue",
-  files: [{ path: "main.ts", content: "..." }],
-});
+## 结构化错误
 
-// 导出报表
-await jszip.exportReport({
-  title: "月度报表",
-  format: "csv",
-  data: reportData,
-});
+```ts
+import { FileUtilsError } from "@robot-admin/file-utils";
 
-// 基础用法
-const zip = jszip.createZip();
-jszip.addFile(zip, "hello.txt", "Hello World");
-await jszip.downloadZip(zip, "output.zip");
-```
-
-ZIP 内路径会统一分隔符，并清理盘符、绝对路径、父级穿越、控制字符及 Windows
-保留名。清理后发生路径冲突时会抛错，不会静默覆盖已有文件。所有高层导出方法
-在失败时会更新 `state.lastResult`、触发错误通知，并继续向调用方抛出原始错误：
-
-```typescript
 try {
-  await jszip.exportCodeProject(config);
+  await operation();
 } catch (error) {
-  // 可在此记录错误、恢复 UI 或提示重试
+  if (error instanceof FileUtilsError) {
+    console.log(error.code, error.message, error.details, error.cause);
+  }
 }
 ```
 
-### 4. useCSV - CSV 处理 <sup>v1.1</sup>
+错误码包括：`ABORTED`、`INVALID_ARGUMENT`、`INVALID_CONTENT`、`LIMIT_EXCEEDED`、`NETWORK_ERROR`、`NOT_SUPPORTED`、`READ_FAILED`、`WRITE_FAILED`。
 
-按 RFC 4180 解析和生成 CSV，支持引号字段内换行、双引号转义、自定义分隔符、
-CRLF 输出和 Excel UTF-8 BOM。解析器会拒绝未闭合引号、未转义引号、非法的
-引号后内容与重复表头，避免损坏数据被静默接受。
+## Excel
 
-```typescript
-import { useCSV } from "@robot-admin/file-utils";
+```ts
+import { useExcel } from "@robot-admin/file-utils/excel";
+
+const excel = useExcel();
+
+const sheets = await excel.readFile(file, {
+  signal: controller.signal,
+  maxSheets: 20,
+  maxRows: 50_000,
+  maxColumns: 200,
+});
+
+await excel.exportToExcel(sheets.Orders, {
+  fileName: "orders.xlsx",
+  sheetName: "Orders",
+  formulaPolicy: "escape",
+  autoFitColumns: true,
+  signal: controller.signal,
+});
+
+await excel.exportMultipleSheets(
+  { Orders: orderRows, Summary: summaryRows },
+  "report.xlsx",
+);
+```
+
+读取时会在对象转换前校验工作表数量、`!ref` 行列范围、空表头、重复表头和 `__proto__`/`prototype`/`constructor` 等危险表头；公式、HTML 和富文本派生字段默认不解析。导出时公式策略为：
+
+- `escape`：默认，在 `= + - @ tab CR` 前添加单引号。
+- `reject`：发现潜在公式即抛出 `INVALID_CONTENT`。
+- `preserve`：保留原值，仅用于完全可信数据。
+
+工作表名会清洗非法字符、截断到 31 字符并自动去重。生成结果在触发浏览器下载前会校验大小。
+
+## 通用下载
+
+```ts
+import {
+  FileType,
+  useDownload,
+} from "@robot-admin/file-utils/download";
+
+const result = await useDownload(
+  async (params, { signal, onProgress } = {}) =>
+    api.downloadReport(params, { signal, onProgress }),
+  {
+    fileName: "monthly-report",
+    fileType: FileType.XLSX,
+    params: { month: "2026-09" },
+    signal: controller.signal,
+    maxFileSize: 100 * 1024 * 1024,
+    onProgress: ({ loaded, total, percent, speed, eta }) => {
+      updateProgress({ loaded, total, percent, speed, eta });
+    },
+    save: async (blob, fileName) => customStorage.save(blob, fileName),
+  },
+);
+```
+
+支持 `Blob`、`ArrayBuffer`、TypedArray、`Response` 和 axios 风格 `{ data, headers }`。功能包括：
+
+- 检查 HTTP 状态与大小，并在无 `Content-Length` 时边读边限制内存。
+- 解析 RFC 兼容的 `Content-Disposition` 文件名并进行文件名清洗。
+- 下载非 JSON 文件时检测小型 JSON 错误响应，避免把登录过期信息保存成 `.xlsx`。
+- `save` 适配器可接入桌面端、对象存储或测试；默认使用浏览器 Blob URL。
+
+快捷方法：`useDownloadExcel`、`useDownloadCSV`、`useDownloadPDF`、`useDownloadJSON`。
+
+## ZIP
+
+```ts
+import { useJSZip } from "@robot-admin/file-utils/zip";
+
+const zipTools = useJSZip();
+const zip = zipTools.createZip();
+
+zipTools.addFile(zip, "docs/readme.txt", "Hello");
+await zipTools.downloadZip(zip, "bundle.zip", {
+  compressionLevel: 6,
+  signal: controller.signal,
+  maxArchiveFiles: 1000,
+  maxArchiveSize: 256 * 1024 * 1024,
+});
+```
+
+ZIP 内路径会去除盘符、绝对路径、父级穿越、控制字符、非法字符和 Windows 保留名；规范化后重名会明确报错，不会覆盖。添加文件时同步限制条目数量与原始字节数，生成时再次检查输出大小。
+
+场景方法：
+
+```ts
+await zipTools.exportCodeProject({
+  projectName: "portal",
+  framework: "vue",
+  includeConfig: true,
+  includeReadme: true,
+  files,
+  operation: { signal: controller.signal },
+});
+
+await zipTools.exportReport({
+  title: "orders",
+  format: "excel", // 生成真实 .xlsx，不再用 CSV 伪装
+  data: rows,
+  includeSummary: true,
+});
+```
+
+另有 `exportMedia()` 与 `exportTemplates()`。所有高层方法阻止同一实例并发重入，成功或失败都会更新 `state.lastResult`，失败继续向调用方抛出 `FileUtilsError`。
+
+## CSV
+
+```ts
+import { useCSV } from "@robot-admin/file-utils/csv";
 
 const csv = useCSV();
+const rows = csv.parse(text, {
+  delimiter: ",",
+  strictColumnCount: true,
+  dangerousHeaders: "reject",
+  maxRows: 20_000,
+});
 
-// 解析 CSV 字符串
-const data = csv.parse(csvString, { delimiter: "," });
-
-// 引号内换行和双引号会被正确还原
-csv.parse('name,note\r\nAlice,"line 1\r\nline 2"\r\nBob,"say ""hi"""');
-
-// 生成 CSV 并下载
-csv.download(data, "导出.csv");
-
-// 读取 CSV 文件
-const fileData = await csv.readFile(file);
+const output = csv.generate(rows, {
+  withBOM: true,
+  formulaPolicy: "escape",
+});
 ```
 
-### 5. useFile - 文件工具 <sup>v1.1</sup>
+解析器覆盖 RFC 4180 引号、转义双引号、字段内 CRLF 和多字符分隔符，并拒绝未闭合引号、非法引号后内容、空/重复/危险表头以及列数不一致。结果对象使用 null prototype，降低原型污染风险。行、列、字段长度和输出字节数均在操作过程中受限。
 
-Base64 转换、JSON/XML 下载、文件读取等通用文件操作。
+## JSON、XML 与 Base64
 
-```typescript
-import { useFile } from "@robot-admin/file-utils";
+```ts
+import { useFile } from "@robot-admin/file-utils/file";
 
-const file = useFile();
+const files = useFile();
 
-// Base64 互转
-const base64 = await file.toBase64(imageFile);
-const restored = file.fromBase64(base64, "image.png");
+const text = await files.readAsText(file, 2 * 1024 * 1024, signal);
+const config = await files.readAsJSON<AppConfig>(jsonFile, {
+  maxFileSize: 2 * 1024 * 1024,
+  signal,
+});
 
-// 下载为 JSON / XML
-file.downloadJSON(data, "config.json");
-file.downloadXML(data, { rootName: "users", fileName: "users.xml" });
-
-// 读取文件
-const json = await file.readAsJSON<Config>(jsonFile);
-const text = await file.readAsText(txtFile);
+files.downloadXML(data, {
+  rootName: "users",
+  invalidTagStrategy: "reject",
+  maxDepth: 30,
+  maxNodes: 10_000,
+  signal,
+});
 ```
 
-### 6. useImage - 图片处理 <sup>v1.1</sup>
+XML 会转义文本、拒绝 XML 1.0 非法控制字符、检测循环引用、深度/节点上限和清洗后标签冲突。JSON 序列化失败、解析失败和顶层不可序列化值会转换为结构化错误。Base64 会严格校验字符、填充与输出大小。
 
-基于浏览器 Canvas API，零外部依赖。
+## 图片
 
-```typescript
-import { useImage } from "@robot-admin/file-utils";
-import type {
-  CompressOptions,
-  CropOptions,
-  ImageInfo,
-} from "@robot-admin/file-utils";
+```ts
+import { useImage } from "@robot-admin/file-utils/image";
 
 const image = useImage();
 
-// 压缩图片
-const compressed = await image.compress(file, { quality: 0.6, maxWidth: 1200 });
-
-// 裁剪图片
-const cropped = await image.crop(file, { x: 0, y: 0, width: 300, height: 300 });
-
-// 格式转换（png → webp）
-const webp = await image.convert(file, "webp");
-
-// 缩放图片（宽 800px，高自动）
-const resized = await image.resize(file, 800);
-
-// 获取图片信息
-const info = await image.getInfo(file);
-// → { width: 1920, height: 1080, type: 'image/png', size: 204800 }
-```
-
-### 7. useChunkUpload / useChunkDownload - 大文件分片 <sup>v2.0</sup>
-
-支持并发控制、失败重试、SHA-256 秒传指纹、进度追踪、中止操作。指纹由文件
-首尾采样块与文件大小共同计算，保持标准 64 位十六进制格式；它用于断点续传
-身份识别，不等同于完整文件内容校验。
-
-```typescript
-import { useChunkUpload, useChunkDownload } from "@robot-admin/file-utils";
-import type { ChunkUploadOptions } from "@robot-admin/file-utils";
-
-// === 分片上传 ===
-const {
-  state: uploadState,
-  upload,
-  abort: abortUpload,
-} = useChunkUpload({
-  chunkSize: 5 * 1024 * 1024, // 5MB 分片
-  concurrent: 3, // 3 路并发
-  retries: 3, // 每个分片最多尝试 3 次（包含首次请求）
+const compressed = await image.compress(file, {
+  quality: 0.8,
+  maxWidth: 1600,
+  maxHeight: 1600,
+  type: "image/webp",
+  maxPixels: 20_000_000,
+  signal,
 });
 
-await upload(
+const cropped = await image.crop(file, {
+  x: 0,
+  y: 0,
+  width: 400,
+  height: 400,
+  signal,
+});
+```
+
+支持 `compress`、`crop`、`convert`、`resize`、`getInfo`、`toBase64`。库校验 MIME、文件大小、质量、整数尺寸、裁剪边界、像素上限和浏览器实际输出 MIME。JPEG 默认用白色填充透明区域，可通过 `backgroundColor` 修改。
+
+Canvas 解码仍会消耗浏览器内存；处理不可信超大图片时应在上传网关同步限制字节数和图像尺寸。
+
+## 可续传分片上传
+
+```ts
+import { useChunkUpload } from "@robot-admin/file-utils/chunk";
+
+const uploader = useChunkUpload({
+  chunkSize: 5 * 1024 * 1024,
+  concurrent: 3,
+  retries: 3, // 首次失败后的额外重试次数；0 表示不重试
+  retryDelay: (attempt) => attempt * 1000,
+});
+
+const result = await uploader.upload(
   file,
   async (chunk, index, total, hash, signal) => {
-    // 第 5 个参数可直接交给 fetch/axios，使 abort() 能取消在途请求
     await api.uploadChunk({ chunk, index, total, hash, signal });
   },
-  async (fileName, totalChunks, hash) => {
-    await api.mergeChunks({ fileName, totalChunks, hash });
+  async (fileName, total, hash, signal) => {
+    await api.mergeChunks({ fileName, total, hash, signal });
+  },
+  {
+    signal: controller.signal,
+    completedChunks: serverState.completedChunks,
+    onProgress: ({ loaded, total, percent, speed, eta }) =>
+      updateProgress({ loaded, total, percent, speed, eta }),
   },
 );
+```
 
-// 响应式进度
-console.log(uploadState.value.progress); // 0-100
-console.log(uploadState.value.speed); // bytes/sec
+同一实例拒绝并发上传。进度按实际字节计算，断点续传会跳过 `completedChunks`，分片失败会取消其他 worker，外部取消会传递到上传和合并回调。返回值包含稳定的 sampled SHA-256 标识、分片总数和完成索引。
 
-// === 分片下载 ===
-const { state: dlState, download, abort: abortDl } = useChunkDownload();
+sampled SHA-256 混合文件首尾各 1 MiB 与文件大小，用于上传身份和秒传协商，不是完整文件校验。需要合规完整性校验时，应在服务端合并后计算全文件哈希。
 
-await download("https://example.com/large.zip", "large.zip", {
-  onProgress: (p) => console.log(`${p}%`),
+## 真流式分片下载
+
+无 sink 时会使用有上限的内存缓冲，并触发浏览器下载：
+
+```ts
+const downloader = files.chunkDownload();
+
+await downloader.download(url, "large.zip", {
+  maxBufferedSize: 128 * 1024 * 1024,
+  signal,
+  onProgressDetail: updateProgress,
 });
 ```
 
-## 🏗️ 架构设计
+大文件应传入 sink，数据会逐块写入，不在库内累积：
 
-```
-@robot-admin/file-utils
-├── configureFileUtils()   ← 全局配置（解耦 UI 框架）
-│
-│  ── v1.0 核心模块 ──
-├── useExcel()             ← Excel 读写 / 模板      [xlsx]
-├── useDownload()          ← 通用文件下载            [零依赖]
-├── useJSZip()             ← 压缩导出 / 4 种预设     [jszip, file-saver]
-│
-│  ── v1.1 扩展模块 ──
-├── useCSV()               ← CSV 解析 / 生成         [零依赖]
-├── useFile()              ← Base64 / JSON / XML     [零依赖]
-├── useImage()             ← 压缩 / 裁剪 / 格式转换   [零依赖, Canvas API]
-│
-│  ── v2.0 高级模块 ──
-├── useChunkUpload()       ← 分片上传 / 并发 / 重试   [零依赖]
-└── useChunkDownload()     ← 流式下载 / 进度          [零依赖]
-```
+```ts
+import {
+  createWritableStreamSink,
+  useChunkDownload,
+} from "@robot-admin/file-utils/chunk";
 
-## 📋 依赖说明
+const fileHandle = await window.showSaveFilePicker({
+  suggestedName: "large.zip",
+});
+const writable = await fileHandle.createWritable();
+const sink = createWritableStreamSink(writable);
 
-| 依赖         | 类型           | 用途                                           |
-| ------------ | -------------- | ---------------------------------------------- |
-| `xlsx`       | dependency     | Excel 读写（仅 useExcel）                      |
-| `jszip`      | dependency     | 文件压缩（仅 useJSZip）                        |
-| `file-saver` | dependency     | 文件保存（仅 useJSZip）                        |
-| `vue`        | peerDependency | 响应式状态（useExcel / useJSZip / useChunk\*） |
-
-> `xlsx`、`jszip`、`file-saver` 会作为依赖安装，但不会被重复打入本包产物；应用
-> 打包器可以统一去重。useDownload、useCSV、useFile、useImage 为纯函数，不依赖
-> Vue，可在任意 JS/TS 项目中使用。
-
-## 从 v1.x 升级到 v2.0.0
-
-v2.0.0 的主要不兼容点是错误传播与 CSV 的严格语义，请在升级前检查：
-
-| 变更 | 迁移方式 |
-|------|----------|
-| ZIP 高层导出失败后会抛出错误 | 在需要恢复 UI 或自定义提示的位置使用 `try/catch` |
-| CSV 生成统一使用 RFC 4180 的 `\r\n` | 若快照或后端严格比较换行符，请同步预期值 |
-| CSV 解析拒绝畸形引号和重复表头 | 在导入界面捕获 `SyntaxError` 并提示用户修正源文件 |
-| 分片上传回调新增第 5 个 `AbortSignal` | 旧的四参数回调仍可运行；建议把 signal 传给实际网络请求 |
-| ZIP 路径清理后不允许重复 | 生成文件列表前确保规范化后的路径唯一 |
-
-此外，分片大小、并发数和重试次数现在必须是大于 0 的整数；不支持
-`crypto.subtle` 的非安全上下文会给出明确错误，不再隐式失败。
-
-## 🔤 TypeScript 支持
-
-所有类型均可按需导入：
-
-```typescript
-import type {
-  // Excel
-  ExcelData,
-  ExcelConfig,
-  ExcelTemplate,
-  // 下载
-  DownloadConfig,
-  FileType,
-  // 压缩
-  ExportState,
-  CodeProjectConfig,
-  ReportConfig,
-  // CSV
-  CSVOptions,
-  // 文件
-  XMLOptions,
-  // 图片
-  CompressOptions,
-  CropOptions,
-  ImageInfo,
-  ImageFormat,
-  // 分片
-  ChunkUploadOptions,
-  ChunkUploadState,
-  ChunkDownloadState,
-} from "@robot-admin/file-utils";
+await useChunkDownload().download(url, "large.zip", {
+  sink,
+  expectedSize: metadata.size,
+  signal,
+  onProgressDetail: ({ loaded, speed, eta }) =>
+    updateProgress({ loaded, speed, eta }),
+});
 ```
 
-## 📄 License
+File System Access API 的浏览器支持有限；也可以提供自定义 `ChunkDownloadSink` 接入 Electron、Tauri、Service Worker 或其他持久化通道。下载完成前会校验 `expectedSize`，失败时调用 sink 的 `abort(reason)`。
 
-MIT © [ChenYu](https://github.com/ChenyCHENYU)
+## 子路径与 Tree-shaking
+
+```ts
+import { useCSV } from "@robot-admin/file-utils/csv";
+import { useExcel } from "@robot-admin/file-utils/excel";
+import { useChunkDownload } from "@robot-admin/file-utils/chunk";
+```
+
+公开子路径：`csv`、`file`、`download`、`image`、`excel`、`zip`、`chunk`、`config`。不要依赖包内部 `src` 或未声明的深层路径。
+
+## SSR 与运行环境
+
+- CSV 解析/生成、XML 构造、部分 File 读取、Excel 读取和 ZIP 构造可在具有对应 Web API 的服务端运行。
+- 浏览器下载、FileReader、Canvas、Clipboard/File System Access 等能力会在缺失时抛出 `NOT_SUPPORTED`。
+- 根模块导入不会主动下载文件或访问 DOM；具体浏览器操作应只在客户端执行。
+- 对 Node 服务端批处理，建议注入 `save`/sink，或使用各底层库的服务端写入 API。
+
+## 从 2.x 升级到 3.x
+
+| 变化 | 迁移建议 |
+| --- | --- |
+| 新增 `createFileUtils()` 隔离实例 | 新应用优先使用；`configureFileUtils()` 继续兼容 |
+| 默认不再输出 console 消息 | 显式传 `onMessage`、`onNotification` 或 `logger` |
+| 所有主要失败统一为 `FileUtilsError` | 按 `error.code` 处理，不依赖不稳定的文本 |
+| CSV/Excel 默认转义潜在公式 | 可信数据才使用 `formulaPolicy: "preserve"` |
+| CSV 默认拒绝列数不一致、空/危险表头 | 修复输入，或按需显式放宽对应选项 |
+| Excel 读取限制工作表、行列、文件大小 | 根据业务上限覆盖，而不是设置无限值 |
+| ZIP 移除 `file-saver`，Excel 报表生成真实 `.xlsx` | 无需改调用；检查旧快照和依赖锁文件 |
+| 分片上传 `retries` 表示额外重试次数 | `0` 表示只尝试一次；按新语义调整配置 |
+| `abort()` 与外部 AbortSignal 会使 Promise 拒绝 | 捕获 `FileUtilsError` 且判断 `code === "ABORTED"` |
+| 分片下载仅在传 sink 时真正不缓冲 | 超大文件接入 `ChunkDownloadSink`；无 sink 时设置合理上限 |
+| xlsx 更新为官方 0.20.3 发布包 | 若企业制品库禁用 URL 依赖，请镜像该 tarball 并使用 lockfile 固化 |
+
+## 开发验证
+
+```bash
+bun run type-check
+bun run test
+bun run build
+```
+
+测试覆盖 RFC 4180、公式与原型污染防护、下载响应归一化、真流式 sink、缓冲上限、上传续传/取消、Excel 危险表头和 ZIP 路径/资源限制。
+
+## License
+
+[MIT](./LICENSE) © ChenYu

@@ -1,23 +1,41 @@
-/**
- * @description 基于 xlsx 库的 Excel 操作封装
- * 已解耦 naive-ui，消息通知通过 configureFileUtils 注入
- */
-
-import { ref, computed, type Ref, type ComputedRef } from "vue";
+import { computed, ref, type ComputedRef, type Ref } from "vue";
 import * as XLSX from "xlsx";
 import type { WorkBook } from "xlsx";
-import { getMessageHandler } from "../config";
+import { getFileUtilsContext, type FileUtilsContext } from "../config";
+import {
+  assertWithinLimit,
+  downloadBlob,
+  FileUtilsError,
+  sanitizeFileName,
+  throwIfAborted,
+} from "../types";
 
-// ==================== 类型定义 ====================
-
+export type ExcelRow = Record<string, unknown>;
 export interface ExcelData {
-  [key: string]: any[];
+  [sheetName: string]: ExcelRow[];
+}
+
+export type SpreadsheetFormulaPolicy = "escape" | "preserve" | "reject";
+
+export interface ExcelReadOptions {
+  signal?: AbortSignal;
+  maxFileSize?: number;
+  maxSheets?: number;
+  maxRows?: number;
+  maxColumns?: number;
+  allowEmptyHeaders?: boolean;
+  dangerousHeaders?: "reject" | "allow";
 }
 
 export interface ExcelConfig {
   fileName?: string;
   sheetName?: string;
   autoFitColumns?: boolean;
+  formulaPolicy?: SpreadsheetFormulaPolicy;
+  signal?: AbortSignal;
+  maxRows?: number;
+  maxColumns?: number;
+  maxOutputSize?: number;
 }
 
 export interface ExcelTemplate {
@@ -26,284 +44,369 @@ export interface ExcelTemplate {
   description?: string;
 }
 
-export interface UseExcelReturn {
-  /** 加载状态 */
-  loading: Ref<boolean>;
-  /** 错误信息 */
-  error: Ref<string | null>;
-  /** 工作簿对象 */
-  workbook: Ref<WorkBook | null>;
-  /** 工作表名称列表 */
-  sheets: ComputedRef<string[]>;
-  /** 所有工作表数据 */
-  data: Ref<ExcelData>;
+export interface UseExcelOptions {
+  context?: FileUtilsContext;
+}
 
-  /** 读取 Excel 文件 */
-  readFile: (file: File) => Promise<ExcelData>;
-  /** 导出为 Excel 文件 */
-  exportToExcel: (data: any[], config?: ExcelConfig) => Promise<void>;
-  /** 导出多个工作表 */
+export interface UseExcelReturn {
+  loading: Ref<boolean>;
+  error: Ref<string | null>;
+  workbook: Ref<WorkBook | null>;
+  sheets: ComputedRef<string[]>;
+  data: Ref<ExcelData>;
+  readFile: (file: File | Blob, options?: ExcelReadOptions) => Promise<ExcelData>;
+  exportToExcel: (data: ExcelRow[], config?: ExcelConfig) => Promise<void>;
   exportMultipleSheets: (
-    sheetsData: Record<string, any[]>,
+    sheetsData: Record<string, ExcelRow[]>,
     fileName?: string,
+    config?: Omit<ExcelConfig, "fileName" | "sheetName">,
   ) => Promise<void>;
-  /** 生成 Excel 模板 */
-  generateTemplate: (template: ExcelTemplate) => Promise<void>;
-  /** 获取预设模板列表 */
+  generateTemplate: (
+    template: ExcelTemplate,
+    config?: Omit<ExcelConfig, "sheetName">,
+  ) => Promise<void>;
   getPresetTemplates: () => ExcelTemplate[];
-  /** 清除数据 */
   clearData: () => void;
-  /** 清除错误 */
   clearError: () => void;
 }
 
-// ==================== 工具函数 ====================
+const DANGEROUS_HEADERS = new Set(["__proto__", "prototype", "constructor"]);
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+const INVALID_SHEET_NAME = /[\\/?*\[\]:]/g;
+const DEFAULT_MAX_SHEETS = 100;
 
-/**
- * @description 处理工作表数据
- */
-const processWorksheetData = (worksheet: XLSX.WorkSheet): any[] => {
-  const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+function protectFormula(
+  value: unknown,
+  policy: SpreadsheetFormulaPolicy,
+): unknown {
+  if (typeof value !== "string" || !FORMULA_PREFIX.test(value)) return value;
+  if (policy === "reject") {
+    throw new FileUtilsError(
+      "INVALID_CONTENT",
+      "Excel 字段可能触发电子表格公式执行",
+      { details: { value: value.slice(0, 100) } },
+    );
+  }
+  return policy === "escape" ? `'${value}` : value;
+}
+
+function cleanExportData(
+  rows: ExcelRow[],
+  policy: SpreadsheetFormulaPolicy,
+): ExcelRow[] {
+  return rows.map((row) => {
+    const cleanRow: ExcelRow = Object.create(null) as ExcelRow;
+    for (const [key, value] of Object.entries(row)) {
+      if (key === "__rowIndex") continue;
+      cleanRow[key] = protectFormula(value, policy);
+    }
+    return cleanRow;
+  });
+}
+
+function validateHeaders(
+  rawHeaders: unknown[],
+  options: ExcelReadOptions,
+): string[] {
+  const headers = rawHeaders.map((header) => String(header ?? "").trim());
+  if (!options.allowEmptyHeaders && headers.some((header) => !header)) {
+    throw new FileUtilsError("INVALID_CONTENT", "Excel 表头不能为空");
+  }
+  const duplicate = headers.find(
+    (header, index) => headers.indexOf(header) !== index,
+  );
+  if (duplicate !== undefined) {
+    throw new FileUtilsError("INVALID_CONTENT", `Excel 存在重复表头：${duplicate}`);
+  }
+  if (
+    options.dangerousHeaders !== "allow" &&
+    headers.some((header) => DANGEROUS_HEADERS.has(header))
+  ) {
+    throw new FileUtilsError("INVALID_CONTENT", "Excel 表头包含危险对象属性名");
+  }
+  return headers;
+}
+
+function getWorksheetDimensions(worksheet: XLSX.WorkSheet): {
+  rows: number;
+  columns: number;
+} {
+  const reference = worksheet["!ref"];
+  if (!reference) return { rows: 0, columns: 0 };
+  let range: XLSX.Range;
+  try {
+    range = XLSX.utils.decode_range(reference);
+  } catch (cause) {
+    throw new FileUtilsError("INVALID_CONTENT", "Excel 工作表范围无效", {
+      cause,
+      details: { reference },
+    });
+  }
+  return {
+    rows: Math.max(0, range.e.r - range.s.r + 1),
+    columns: Math.max(0, range.e.c - range.s.c + 1),
+  };
+}
+
+function processWorksheetData(
+  worksheet: XLSX.WorkSheet,
+  options: ExcelReadOptions,
+  limits: { maxRows: number; maxColumns: number },
+): ExcelRow[] {
+  const dimensions = getWorksheetDimensions(worksheet);
+  assertWithinLimit(dimensions.rows, limits.maxRows + 1, "Excel 行数");
+  assertWithinLimit(dimensions.columns, limits.maxColumns, "Excel 列数");
+
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
     header: 1,
     defval: "",
     blankrows: false,
+    raw: true,
   });
+  if (matrix.length === 0) return [];
 
-  if (jsonData.length === 0) return [];
-
-  const headers = (jsonData[0] as string[]).map((h) => String(h).trim());
-  const rows = jsonData.slice(1) as any[][];
-
-  return rows
+  const headers = validateHeaders(matrix[0], options);
+  return matrix
+    .slice(1)
     .filter((row) =>
       row.some((cell) => cell !== "" && cell !== null && cell !== undefined),
     )
     .map((row, index) => {
-      const obj: any = {};
-      headers.forEach((header, colIndex) => {
-        obj[header] = row[colIndex] !== undefined ? row[colIndex] : "";
+      const record: ExcelRow = Object.create(null) as ExcelRow;
+      headers.forEach((header, column) => {
+        record[header] = row[column] ?? "";
       });
-      obj.__rowIndex = index + 2;
-      return obj;
+      record.__rowIndex = index + 2;
+      return record;
     });
-};
+}
 
-/**
- * @description 清理数据（移除内部字段）
- */
-const cleanExportData = (data: any[]): any[] => {
-  return data.map((row) => {
-    const { __rowIndex, ...cleanRow } = row;
-    return cleanRow;
-  });
-};
-
-/**
- * @description 设置工作表列宽
- */
-const setColumnWidths = (ws: XLSX.WorkSheet, data: any[]): void => {
-  if (data.length === 0) return;
-
-  const colWidths = Object.keys(data[0]).map((key) => {
+function setColumnWidths(worksheet: XLSX.WorkSheet, rows: ExcelRow[]): void {
+  if (rows.length === 0) return;
+  worksheet["!cols"] = Object.keys(rows[0]).map((key) => {
     const maxLength = Math.max(
       key.length,
-      ...data.map((row) => String(row[key] || "").length),
+      ...rows.map((row) => String(row[key] ?? "").length),
     );
-    return { wch: Math.min(Math.max(maxLength, 10), 30) };
+    return { wch: Math.min(Math.max(maxLength, 10), 50) };
   });
-  ws["!cols"] = colWidths;
-};
+}
 
-// ==================== 主 Hook ====================
+function sanitizeSheetName(name: string, fallback = "Sheet1"): string {
+  const safe = String(name).replace(INVALID_SHEET_NAME, "_").trim();
+  return (safe || fallback).slice(0, 31);
+}
 
-/**
- * @description Excel 操作 Hook - 提供读取、导出、模板等完整 Excel 功能
- * @example
- * ```ts
- * import { useExcel } from '@robot-admin/file-utils'
- *
- * const { readFile, exportToExcel, exportMultipleSheets } = useExcel()
- *
- * // 读取文件
- * const data = await readFile(file)
- *
- * // 导出 Excel
- * await exportToExcel(data, { fileName: '导出.xlsx' })
- * ```
- */
-export function useExcel(): UseExcelReturn {
-  const message = getMessageHandler();
+function appendUniqueSheet(
+  workbook: WorkBook,
+  worksheet: XLSX.WorkSheet,
+  requestedName: string,
+): void {
+  const base = sanitizeSheetName(requestedName);
+  let name = base;
+  let counter = 2;
+  while (workbook.SheetNames.includes(name)) {
+    const suffix = `_${counter++}`;
+    name = `${base.slice(0, 31 - suffix.length)}${suffix}`;
+  }
+  XLSX.utils.book_append_sheet(workbook, worksheet, name);
+}
+
+function workbookBlob(workbook: WorkBook, maxOutputSize: number): Blob {
+  const bytes = XLSX.write(workbook, {
+    bookType: "xlsx",
+    type: "array",
+    compression: true,
+  }) as ArrayBuffer;
+  assertWithinLimit(bytes.byteLength, maxOutputSize, "Excel 输出");
+  return new Blob([bytes], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+export function useExcel(options: UseExcelOptions = {}): UseExcelReturn {
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const workbook = ref<WorkBook | null>(null);
-  const data = ref<ExcelData>({});
-
-  const sheets = computed(() => {
-    return workbook.value?.SheetNames || [];
-  });
+  const workbook = ref<WorkBook | null>(null) as Ref<WorkBook | null>;
+  const data = ref<ExcelData>({}) as Ref<ExcelData>;
+  const sheets = computed(() => workbook.value?.SheetNames ?? []);
+  const context = () => getFileUtilsContext(options.context);
 
   const clearError = () => {
     error.value = null;
   };
-
   const clearData = () => {
     workbook.value = null;
     data.value = {};
     clearError();
   };
 
-  const readFile = async (file: File): Promise<ExcelData> => {
+  const run = async <T>(
+    operation: () => Promise<T>,
+    errorCode: "READ_FAILED" | "WRITE_FAILED",
+  ): Promise<T> => {
     loading.value = true;
     clearError();
-
     try {
+      return await operation();
+    } catch (cause) {
+      const failure =
+        cause instanceof FileUtilsError
+          ? cause
+          : new FileUtilsError(errorCode, "Excel 操作失败", { cause });
+      error.value = failure.message;
+      context().message("error", failure.message);
+      throw failure;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const readFile = (
+    file: File | Blob,
+    readOptions: ExcelReadOptions = {},
+  ): Promise<ExcelData> =>
+    run(async () => {
+      const limits = context().limits;
+      throwIfAborted(readOptions.signal);
+      assertWithinLimit(
+        file.size,
+        readOptions.maxFileSize ?? limits.maxFileSize,
+        "Excel 文件大小",
+      );
       const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, {
-        type: "buffer",
+      throwIfAborted(readOptions.signal);
+      const parsed = XLSX.read(buffer, {
+        type: "array",
         cellDates: true,
-        cellNF: true,
+        cellFormula: false,
+        cellHTML: false,
+        cellNF: false,
         cellText: false,
       });
+      assertWithinLimit(
+        parsed.SheetNames.length,
+        readOptions.maxSheets ?? DEFAULT_MAX_SHEETS,
+        "Excel 工作表数量",
+      );
 
-      workbook.value = wb;
-      const result: ExcelData = {};
-
-      wb.SheetNames.forEach((sheetName) => {
-        const worksheet = wb.Sheets[sheetName];
-        result[sheetName] = processWorksheetData(worksheet);
-      });
-
-      data.value = result;
-      message("success", `成功读取 ${wb.SheetNames.length} 个工作表`);
-      return result;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "读取文件失败";
-      error.value = errorMessage;
-      message("error", errorMessage);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  };
-
-  const exportToExcel = async (
-    data: any[],
-    config: ExcelConfig = {},
-  ): Promise<void> => {
-    const {
-      fileName = `导出数据_${new Date().toISOString().split("T")[0]}.xlsx`,
-      sheetName = "Sheet1",
-      autoFitColumns = true,
-    } = config;
-
-    try {
-      loading.value = true;
-
-      const wb = XLSX.utils.book_new();
-      const cleanData = cleanExportData(data);
-      const ws = XLSX.utils.json_to_sheet(cleanData);
-
-      if (autoFitColumns) {
-        setColumnWidths(ws, cleanData);
+      const result: ExcelData = Object.create(null) as ExcelData;
+      for (const sheetName of parsed.SheetNames) {
+        throwIfAborted(readOptions.signal);
+        const worksheet = parsed.Sheets[sheetName];
+        if (!worksheet) continue;
+        result[sheetName] = processWorksheetData(worksheet, readOptions, {
+          maxRows: readOptions.maxRows ?? limits.maxRows,
+          maxColumns: readOptions.maxColumns ?? limits.maxColumns,
+        });
       }
+      workbook.value = parsed;
+      data.value = result;
+      context().message("success", `成功读取 ${parsed.SheetNames.length} 个工作表`);
+      return result;
+    }, "READ_FAILED");
 
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      XLSX.writeFile(wb, fileName);
+  const exportToExcel = (
+    rows: ExcelRow[],
+    config: ExcelConfig = {},
+  ): Promise<void> =>
+    run(async () => {
+      const limits = context().limits;
+      throwIfAborted(config.signal);
+      assertWithinLimit(rows.length, config.maxRows ?? limits.maxRows, "Excel 行数");
+      const cleanRows = cleanExportData(rows, config.formulaPolicy ?? "escape");
+      const columns = cleanRows.length ? Object.keys(cleanRows[0]).length : 0;
+      assertWithinLimit(columns, config.maxColumns ?? limits.maxColumns, "Excel 列数");
+      const output = XLSX.utils.json_to_sheet(cleanRows);
+      if (config.autoFitColumns ?? true) setColumnWidths(output, cleanRows);
+      const nextWorkbook = XLSX.utils.book_new();
+      appendUniqueSheet(nextWorkbook, output, config.sheetName ?? "Sheet1");
+      throwIfAborted(config.signal);
+      const fileName = sanitizeFileName(
+        config.fileName ?? `export_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      downloadBlob(
+        workbookBlob(nextWorkbook, config.maxOutputSize ?? limits.maxOutputSize),
+        fileName,
+      );
+      context().message("success", `${fileName} 导出成功`);
+    }, "WRITE_FAILED");
 
-      message("success", `${fileName} 导出成功！`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "导出失败";
-      error.value = errorMessage;
-      message("error", errorMessage);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  };
+  const exportMultipleSheets = (
+    sheetsData: Record<string, ExcelRow[]>,
+    fileName = `multi-sheet_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    config: Omit<ExcelConfig, "fileName" | "sheetName"> = {},
+  ): Promise<void> =>
+    run(async () => {
+      const limits = context().limits;
+      const entries = Object.entries(sheetsData);
+      assertWithinLimit(entries.length, DEFAULT_MAX_SHEETS, "Excel 工作表数量");
+      if (entries.length === 0) {
+        throw new FileUtilsError("INVALID_ARGUMENT", "至少需要一个工作表");
+      }
+      const nextWorkbook = XLSX.utils.book_new();
+      for (const [sheetName, rows] of entries) {
+        throwIfAborted(config.signal);
+        assertWithinLimit(rows.length, config.maxRows ?? limits.maxRows, "Excel 行数");
+        const cleanRows = cleanExportData(rows, config.formulaPolicy ?? "escape");
+        const columns = cleanRows.length ? Object.keys(cleanRows[0]).length : 0;
+        assertWithinLimit(columns, config.maxColumns ?? limits.maxColumns, "Excel 列数");
+        const output = XLSX.utils.json_to_sheet(cleanRows);
+        if (config.autoFitColumns ?? true) setColumnWidths(output, cleanRows);
+        appendUniqueSheet(nextWorkbook, output, sheetName);
+      }
+      const safeName = sanitizeFileName(fileName);
+      downloadBlob(
+        workbookBlob(nextWorkbook, config.maxOutputSize ?? limits.maxOutputSize),
+        safeName,
+      );
+      context().message("success", `${safeName} 导出成功`);
+    }, "WRITE_FAILED");
 
-  const exportMultipleSheets = async (
-    sheetsData: Record<string, any[]>,
-    fileName = `多表导出_${new Date().toISOString().split("T")[0]}.xlsx`,
-  ): Promise<void> => {
-    try {
-      loading.value = true;
-      const wb = XLSX.utils.book_new();
+  const getPresetTemplates = (): ExcelTemplate[] => [
+    {
+      name: "员工信息",
+      headers: ["姓名", "部门", "职位", "薪资", "入职日期", "联系电话", "邮箱"],
+      description: "员工基本信息登记表",
+    },
+    {
+      name: "商品清单",
+      headers: ["商品名称", "规格型号", "单价", "数量", "总价", "供应商", "备注"],
+      description: "商品库存管理表",
+    },
+    {
+      name: "财务报表",
+      headers: ["日期", "科目", "借方金额", "贷方金额", "摘要", "凭证号"],
+      description: "财务记账凭证",
+    },
+  ];
 
-      Object.entries(sheetsData).forEach(([sheetName, sheetData]) => {
-        const cleanData = cleanExportData(sheetData);
-        const ws = XLSX.utils.json_to_sheet(cleanData);
-        setColumnWidths(ws, cleanData);
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      });
-
-      XLSX.writeFile(wb, fileName);
-      message("success", `${fileName} 导出成功！`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "导出失败";
-      error.value = errorMessage;
-      message("error", errorMessage);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  };
-
-  const getPresetTemplates = (): ExcelTemplate[] => {
-    return [
-      {
-        name: "员工信息",
-        headers: [
-          "姓名",
-          "部门",
-          "职位",
-          "薪资",
-          "入职日期",
-          "联系电话",
-          "邮箱",
-        ],
-        description: "员工基本信息登记表",
-      },
-      {
-        name: "商品清单",
-        headers: [
-          "商品名称",
-          "规格型号",
-          "单价",
-          "数量",
-          "总价",
-          "供应商",
-          "备注",
-        ],
-        description: "商品库存管理表",
-      },
-      {
-        name: "财务报表",
-        headers: ["日期", "科目", "借方金额", "贷方金额", "摘要", "凭证号"],
-        description: "财务记账凭证",
-      },
-    ];
-  };
-
-  const generateTemplate = async (template: ExcelTemplate): Promise<void> => {
-    try {
-      loading.value = true;
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet([template.headers]);
-      ws["!cols"] = template.headers.map(() => ({ wch: 15 }));
-
-      XLSX.utils.book_append_sheet(wb, ws, template.name);
-      XLSX.writeFile(wb, `${template.name}模板.xlsx`);
-
-      message("success", `${template.name}模板下载成功！`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "生成模板失败";
-      error.value = errorMessage;
-      message("error", errorMessage);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  };
+  const generateTemplate = (
+    template: ExcelTemplate,
+    config: Omit<ExcelConfig, "sheetName"> = {},
+  ): Promise<void> =>
+    run(async () => {
+      const limits = context().limits;
+      throwIfAborted(config.signal);
+      assertWithinLimit(
+        template.headers.length,
+        config.maxColumns ?? limits.maxColumns,
+        "Excel 模板列数",
+      );
+      validateHeaders(template.headers, {});
+      const nextWorkbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet([template.headers]);
+      worksheet["!cols"] = template.headers.map(() => ({ wch: 15 }));
+      appendUniqueSheet(nextWorkbook, worksheet, template.name);
+      const safeName = sanitizeFileName(
+        config.fileName ?? `${template.name}模板.xlsx`,
+      );
+      downloadBlob(
+        workbookBlob(nextWorkbook, config.maxOutputSize ?? limits.maxOutputSize),
+        safeName,
+      );
+      context().message("success", `${safeName} 导出成功`);
+    }, "WRITE_FAILED");
 
   return {
     loading,

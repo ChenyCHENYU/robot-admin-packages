@@ -1,73 +1,48 @@
-/**
- * @description 文件处理工具 - Base64/JSON/XML 操作
- * 纯浏览器 API，零外部依赖
- */
-
-import { downloadBlob } from "../types";
-
-// ==================== 类型定义 ====================
+import { getFileUtilsContext, type FileUtilsContext } from "../config";
+import {
+  assertWithinLimit,
+  downloadBlob,
+  FileUtilsError,
+  sanitizeFileName,
+  throwIfAborted,
+} from "../types";
 
 export interface XMLOptions {
-  /** XML 根元素名称，默认 'root' */
   rootName?: string;
-  /** 文件名，默认 'export.xml' */
   fileName?: string;
-  /** 缩进空格数，默认 2 */
   indent?: number;
-  /** 是否包含 XML 声明，默认 true */
   declaration?: boolean;
+  invalidTagStrategy?: "sanitize" | "reject";
+  maxDepth?: number;
+  maxNodes?: number;
+  maxOutputSize?: number;
+  signal?: AbortSignal;
 }
 
-// ==================== 内部工具函数 ====================
+export interface JSONFileOptions {
+  maxFileSize?: number;
+  reviver?: (this: unknown, key: string, value: unknown) => unknown;
+  signal?: AbortSignal;
+}
 
-/**
- * 校验并清洗 XML 标签名。
- * XML 元素名必须以字母或下划线开头，后续可为字母/数字/._-。
- * 非法 key（来自不可信输入）会破坏 XML 结构甚至造成注入，此处回退为安全标签名。
- */
-function sanitizeTagName(name: string): string {
-  if (/^[A-Za-z_][\w.\-]*$/.test(name)) {
-    return name;
+export interface UseFileOptions {
+  context?: FileUtilsContext;
+}
+
+function tagName(name: string, strategy: "sanitize" | "reject"): string {
+  if (/^[A-Za-z_][\w.\-]*$/.test(name)) return name;
+  if (strategy === "reject") {
+    throw new FileUtilsError("INVALID_CONTENT", `无效的 XML 标签名: ${name}`);
   }
-  // 非法标签名：用 _ 前缀转义为合法形式，保留信息但避免破坏 XML
   const escaped = String(name).replace(/[^\w.\-]/g, "_");
   return `_${escaped || "item"}`;
 }
 
-/**
- * @description 将对象转换为 XML 字符串
- */
-function objectToXML(
-  obj: any,
-  tagName: string,
-  level: number,
-  indent: number,
-): string {
-  const pad = " ".repeat(level * indent);
-  // 标签名需校验，防止来自不可信输入的注入
-  const safeTagName = sanitizeTagName(tagName);
-
-  if (Array.isArray(obj)) {
-    return obj
-      .map((item) => objectToXML(item, tagName, level, indent))
-      .join("\n");
+function escapeXML(value: string): string {
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/.test(value)) {
+    throw new FileUtilsError("INVALID_CONTENT", "数据包含 XML 1.0 不允许的控制字符");
   }
-
-  if (typeof obj === "object" && obj !== null) {
-    const children = Object.entries(obj)
-      .map(([key, value]) => objectToXML(value, key, level + 1, indent))
-      .join("\n");
-    return `${pad}<${safeTagName}>\n${children}\n${pad}</${safeTagName}>`;
-  }
-
-  return `${pad}<${safeTagName}>${escapeXML(String(obj))}</${safeTagName}>`;
-}
-
-/**
- * @description XML 特殊字符转义
- */
-function escapeXML(str: string): string {
-  return str
+  return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -75,127 +50,241 @@ function escapeXML(str: string): string {
     .replace(/'/g, "&apos;");
 }
 
-// ==================== 主 Hook ====================
+interface XMLBuildContext {
+  indent: number;
+  strategy: "sanitize" | "reject";
+  maxDepth: number;
+  maxNodes: number;
+  nodes: number;
+  ancestors: WeakSet<object>;
+  signal?: AbortSignal;
+}
 
-/**
- * @description 文件处理工具 - 提供 Base64、JSON、XML 等文件操作能力
- * @example
- * ```ts
- * import { useFile } from '@robot-admin/file-utils'
- *
- * const file = useFile()
- *
- * // Base64 转换
- * const base64 = await file.toBase64(imageFile)
- * const restoredFile = file.fromBase64(base64, 'image.png')
- *
- * // 下载为 JSON
- * file.downloadJSON(data, 'config.json')
- *
- * // 下载为 XML
- * file.downloadXML(data, { rootName: 'users', fileName: 'users.xml' })
- *
- * // 读取文件
- * const json = await file.readAsJSON<Config>(jsonFile)
- * ```
- */
-export function useFile() {
-  /**
-   * @description 将 File/Blob 转为 Base64 字符串
-   */
-  const toBase64 = (file: File | Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
+function objectToXML(
+  value: unknown,
+  name: string,
+  level: number,
+  context: XMLBuildContext,
+): string {
+  throwIfAborted(context.signal);
+  if (level > context.maxDepth) {
+    throw new FileUtilsError("LIMIT_EXCEEDED", "XML 嵌套深度超过限制");
+  }
+  context.nodes += 1;
+  assertWithinLimit(context.nodes, context.maxNodes, "XML 节点数");
+  const pad = " ".repeat(level * context.indent);
+  const safeName = tagName(name, context.strategy);
+
+  if (Array.isArray(value)) {
+    if (context.ancestors.has(value)) {
+      throw new FileUtilsError("INVALID_CONTENT", "XML 数据存在循环引用");
+    }
+    context.ancestors.add(value);
+    const result = value
+      .map((item) => objectToXML(item, name, level, context))
+      .join("\n");
+    context.ancestors.delete(value);
+    return result;
+  }
+
+  if (value !== null && typeof value === "object" && !(value instanceof Date)) {
+    if (context.ancestors.has(value)) {
+      throw new FileUtilsError("INVALID_CONTENT", "XML 数据存在循环引用");
+    }
+    context.ancestors.add(value);
+    const entries = Object.entries(value as Record<string, unknown>);
+    const normalizedNames = new Map<string, string>();
+    for (const [key] of entries) {
+      const normalized = tagName(key, context.strategy);
+      const previous = normalizedNames.get(normalized);
+      if (previous && previous !== key) {
+        throw new FileUtilsError(
+          "INVALID_CONTENT",
+          `XML 标签清洗后发生冲突: ${previous} / ${key}`,
+        );
+      }
+      normalizedNames.set(normalized, key);
+    }
+    const children = entries
+      .filter(([, child]) => child !== undefined)
+      .map(([key, child]) => objectToXML(child, key, level + 1, context))
+      .join("\n");
+    context.ancestors.delete(value);
+    return children
+      ? `${pad}<${safeName}>\n${children}\n${pad}</${safeName}>`
+      : `${pad}<${safeName}/>`;
+  }
+
+  const text = value instanceof Date ? value.toISOString() : value == null ? "" : String(value);
+  return `${pad}<${safeName}>${escapeXML(text)}</${safeName}>`;
+}
+
+export function useFile(options: UseFileOptions = {}) {
+  const context = () => getFileUtilsContext(options.context);
+
+  const toBase64 = (
+    file: File | Blob,
+    maxFileSize = context().limits.maxFileSize,
+    signal?: AbortSignal,
+  ) => {
+    throwIfAborted(signal);
+    assertWithinLimit(file.size, maxFileSize, "Base64 输入文件");
+    if (typeof FileReader === "undefined") {
+      return Promise.reject(
+        new FileUtilsError("NOT_SUPPORTED", "当前环境不支持 FileReader"),
+      );
+    }
+    return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("文件读取失败"));
+      const cleanup = () => signal?.removeEventListener("abort", onAbort);
+      const onAbort = () => reader.abort();
+      reader.onload = () => {
+        cleanup();
+        if (typeof reader.result === "string") resolve(reader.result);
+        else reject(new FileUtilsError("READ_FAILED", "文件读取结果不是字符串"));
+      };
+      reader.onerror = () => {
+        cleanup();
+        reject(
+          new FileUtilsError("READ_FAILED", "文件读取失败", {
+            cause: reader.error,
+          }),
+        );
+      };
+      reader.onabort = () => {
+        cleanup();
+        reject(new FileUtilsError("ABORTED", "文件读取已取消", { cause: signal?.reason }));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
       reader.readAsDataURL(file);
     });
   };
 
-  /**
-   * @description 将 Base64 字符串还原为 File 对象
-   */
   const fromBase64 = (
     base64: string,
     fileName: string,
     mimeType?: string,
+    maxOutputSize = context().limits.maxOutputSize,
   ): File => {
-    let bstr: string;
-    let mime: string;
     try {
-      const arr = base64.split(",");
-      mime =
-        mimeType || arr[0]?.match(/:(.*?);/)?.[1] || "application/octet-stream";
-      bstr = atob(arr.length > 1 ? arr[1] : arr[0]);
-    } catch {
-      throw new Error("无效的 Base64 数据，无法还原为文件");
+      if (typeof atob !== "function" || typeof File === "undefined") {
+        throw new FileUtilsError("NOT_SUPPORTED", "当前环境不支持 Base64 文件转换");
+      }
+      const comma = base64.indexOf(",");
+      const metadata = comma >= 0 ? base64.slice(0, comma) : "";
+      const encoded = comma >= 0 ? base64.slice(comma + 1) : base64;
+      const mime = mimeType ?? metadata.match(/^data:([^;,]+);base64$/i)?.[1] ?? "application/octet-stream";
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 === 1) {
+        throw new Error("Base64 格式不合法");
+      }
+      const binary = atob(encoded);
+      assertWithinLimit(binary.length, maxOutputSize, "Base64 输出文件");
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      return new File([bytes], sanitizeFileName(fileName), { type: mime });
+    } catch (cause) {
+      if (cause instanceof FileUtilsError) throw cause;
+      throw new FileUtilsError("INVALID_CONTENT", "无效的 Base64 数据", { cause });
     }
-    const u8arr = new Uint8Array(bstr.length);
-
-    for (let i = 0; i < bstr.length; i++) {
-      u8arr[i] = bstr.charCodeAt(i);
-    }
-
-    return new File([u8arr], fileName, { type: mime });
   };
 
-  /**
-   * @description 将数据下载为 JSON 文件
-   */
-  const downloadJSON = (data: any, fileName = "export.json"): void => {
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], {
-      type: "application/json;charset=utf-8;",
-    });
-    downloadBlob(blob, fileName);
+  const downloadJSON = (
+    data: unknown,
+    fileName = "export.json",
+    maxOutputSize = context().limits.maxOutputSize,
+    signal?: AbortSignal,
+  ): void => {
+    throwIfAborted(signal);
+    let json: string;
+    try {
+      const serialized = JSON.stringify(data, null, 2);
+      if (serialized === undefined) {
+        throw new TypeError("顶层值不能被 JSON 序列化");
+      }
+      json = serialized;
+    } catch (cause) {
+      throw new FileUtilsError("INVALID_CONTENT", "数据无法序列化为 JSON", { cause });
+    }
+    assertWithinLimit(new Blob([json]).size, maxOutputSize, "JSON 输出");
+    downloadBlob(new Blob([json], { type: "application/json;charset=utf-8" }), fileName);
   };
 
-  /**
-   * @description 将数据下载为 XML 文件
-   */
   const downloadXML = (
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     options: XMLOptions = {},
   ): void => {
-    const {
-      rootName = "root",
-      fileName = "export.xml",
-      indent = 2,
-      declaration = true,
-    } = options;
-
-    let xml = declaration ? '<?xml version="1.0" encoding="UTF-8"?>\n' : "";
-    xml += objectToXML(data, rootName, 0, indent);
-
-    const blob = new Blob([xml], { type: "application/xml;charset=utf-8;" });
-    downloadBlob(blob, fileName);
+    throwIfAborted(options.signal);
+    const buildContext: XMLBuildContext = {
+      indent: options.indent ?? 2,
+      strategy: options.invalidTagStrategy ?? "sanitize",
+      maxDepth: options.maxDepth ?? 100,
+      maxNodes: options.maxNodes ?? 100_000,
+      nodes: 0,
+      ancestors: new WeakSet(),
+      signal: options.signal,
+    };
+    if (
+      !Number.isInteger(buildContext.indent) ||
+      buildContext.indent < 0 ||
+      buildContext.indent > 16
+    ) {
+      throw new RangeError("indent 必须是 0 到 16 之间的整数");
+    }
+    const body = objectToXML(data, options.rootName ?? "root", 0, buildContext);
+    throwIfAborted(options.signal);
+    const xml = `${options.declaration === false ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n'}${body}`;
+    assertWithinLimit(
+      new Blob([xml]).size,
+      options.maxOutputSize ?? context().limits.maxOutputSize,
+      "XML 输出",
+    );
+    downloadBlob(
+      new Blob([xml], { type: "application/xml;charset=utf-8" }),
+      options.fileName ?? "export.xml",
+    );
   };
 
-  /**
-   * @description 读取文件为文本
-   */
-  const readAsText = (file: File): Promise<string> => {
-    return file.text();
+  const readAsText = async (
+    file: File | Blob,
+    maxFileSize = context().limits.maxFileSize,
+    signal?: AbortSignal,
+  ): Promise<string> => {
+    throwIfAborted(signal);
+    assertWithinLimit(file.size, maxFileSize, "文本文件");
+    const text = await file.text();
+    throwIfAborted(signal);
+    return text;
   };
 
-  /**
-   * @description 读取文件为 JSON 对象
-   */
-  const readAsJSON = <T = any>(file: File): Promise<T> => {
-    return file.text().then((text) => {
-      try {
-        return JSON.parse(text) as T;
-      } catch {
-        throw new Error(`文件内容不是合法的 JSON: ${file.name}`);
-      }
-    });
+  const readAsJSON = async <T = unknown>(
+    file: File,
+    options: JSONFileOptions = {},
+  ): Promise<T> => {
+    const text = await readAsText(
+      file,
+      options.maxFileSize ?? context().limits.maxFileSize,
+      options.signal,
+    );
+    try {
+      return JSON.parse(text, options.reviver) as T;
+    } catch (cause) {
+      throw new FileUtilsError(
+        "INVALID_CONTENT",
+        `文件内容不是合法的 JSON: ${file.name}`,
+        { cause },
+      );
+    }
   };
 
-  /**
-   * @description 读取文件为 ArrayBuffer
-   */
-  const readAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
-    return file.arrayBuffer();
+  const readAsArrayBuffer = async (
+    file: File | Blob,
+    maxFileSize = context().limits.maxFileSize,
+    signal?: AbortSignal,
+  ): Promise<ArrayBuffer> => {
+    throwIfAborted(signal);
+    assertWithinLimit(file.size, maxFileSize, "二进制文件");
+    const buffer = await file.arrayBuffer();
+    throwIfAborted(signal);
+    return buffer;
   };
 
   return {

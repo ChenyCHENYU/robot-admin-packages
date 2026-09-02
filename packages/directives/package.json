@@ -20,9 +20,13 @@
   ],
   "author": "ChenYu <ycyplus@gmail.com>",
   "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "url": "git+https://github.com/ChenyCHENYU/robot-admin-packages.git",
     "directory": "packages/directives"
   },
   "main": "./dist/index.js",
@@ -30,27 +34,149 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    }
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./copy": {
+      "import": {
+        "types": "./dist/copy.d.mts",
+        "default": "./dist/copy.mjs"
+      },
+      "require": {
+        "types": "./dist/copy.d.ts",
+        "default": "./dist/copy.js"
+      }
+    },
+    "./debounce": {
+      "import": {
+        "types": "./dist/debounce.d.mts",
+        "default": "./dist/debounce.mjs"
+      },
+      "require": {
+        "types": "./dist/debounce.d.ts",
+        "default": "./dist/debounce.js"
+      }
+    },
+    "./throttle": {
+      "import": {
+        "types": "./dist/throttle.d.mts",
+        "default": "./dist/throttle.mjs"
+      },
+      "require": {
+        "types": "./dist/throttle.d.ts",
+        "default": "./dist/throttle.js"
+      }
+    },
+    "./drag": {
+      "import": {
+        "types": "./dist/drag.d.mts",
+        "default": "./dist/drag.mjs"
+      },
+      "require": {
+        "types": "./dist/drag.d.ts",
+        "default": "./dist/drag.js"
+      }
+    },
+    "./longpress": {
+      "import": {
+        "types": "./dist/longpress.d.mts",
+        "default": "./dist/longpress.mjs"
+      },
+      "require": {
+        "types": "./dist/longpress.d.ts",
+        "default": "./dist/longpress.js"
+      }
+    },
+    "./permission": {
+      "import": {
+        "types": "./dist/permission.d.mts",
+        "default": "./dist/permission.mjs"
+      },
+      "require": {
+        "types": "./dist/permission.d.ts",
+        "default": "./dist/permission.js"
+      }
+    },
+    "./watermark": {
+      "import": {
+        "types": "./dist/watermark.d.mts",
+        "default": "./dist/watermark.mjs"
+      },
+      "require": {
+        "types": "./dist/watermark.d.ts",
+        "default": "./dist/watermark.js"
+      }
+    },
+    "./lazy": {
+      "import": {
+        "types": "./dist/lazy.d.mts",
+        "default": "./dist/lazy.mjs"
+      },
+      "require": {
+        "types": "./dist/lazy.d.ts",
+        "default": "./dist/lazy.js"
+      }
+    },
+    "./loading": {
+      "import": {
+        "types": "./dist/loading.d.mts",
+        "default": "./dist/loading.mjs"
+      },
+      "require": {
+        "types": "./dist/loading.d.ts",
+        "default": "./dist/loading.js"
+      }
+    },
+    "./tooltip": {
+      "import": {
+        "types": "./dist/tooltip.d.mts",
+        "default": "./dist/tooltip.mjs"
+      },
+      "require": {
+        "types": "./dist/tooltip.d.ts",
+        "default": "./dist/tooltip.js"
+      }
+    },
+    "./click-outside": {
+      "import": {
+        "types": "./dist/click-outside.d.mts",
+        "default": "./dist/click-outside.mjs"
+      },
+      "require": {
+        "types": "./dist/click-outside.d.ts",
+        "default": "./dist/click-outside.js"
+      }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
+    "type-check": "tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "peerDependencies": {
     "vue": ">=3.3.0"
   },
   "devDependencies": {
-    "vue": "^3.5.13",
+    "happy-dom": "^20.12.2",
+    "vitest": "^4.1.11",
+    "vue": "^3.5.42",
     "typescript": "^5.8.0",
     "tsup": "^8.1.0"
   },

@@ -3,7 +3,16 @@
  * 支持 CSV 文件读取、生成、下载，兼容 Excel 的 UTF-8 BOM
  */
 
-import { downloadBlob } from "../types";
+import {
+  getFileUtilsContext,
+  type FileUtilsContext,
+} from "../config";
+import {
+  assertWithinLimit,
+  downloadBlob,
+  FileUtilsError,
+  throwIfAborted,
+} from "../types";
 
 // ==================== 类型定义 ====================
 
@@ -16,6 +25,21 @@ export interface CSVOptions {
   skipEmptyLines?: boolean;
   /** 是否添加 BOM（Excel 兼容），默认 true */
   withBOM?: boolean;
+  /** Spreadsheet formula injection policy. Default: escape. */
+  formulaPolicy?: "escape" | "preserve" | "reject";
+  strictColumnCount?: boolean;
+  allowEmptyHeaders?: boolean;
+  dangerousHeaders?: "reject" | "allow";
+  maxRows?: number;
+  maxColumns?: number;
+  maxFieldLength?: number;
+  maxOutputSize?: number;
+  maxFileSize?: number;
+  signal?: AbortSignal;
+}
+
+export interface UseCSVOptions {
+  context?: FileUtilsContext;
 }
 
 // ==================== 内部工具函数 ====================
@@ -29,7 +53,11 @@ function validateDelimiter(delimiter: string): void {
 /**
  * @description 按 RFC 4180 解析完整 CSV 文档（支持引号字段内换行）
  */
-function parseCSVRecords(content: string, delimiter: string): string[][] {
+function parseCSVRecords(
+  content: string,
+  delimiter: string,
+  options: CSVOptions,
+): string[][] {
   validateDelimiter(delimiter);
   if (content.length === 0) return [];
 
@@ -39,20 +67,27 @@ function parseCSVRecords(content: string, delimiter: string): string[][] {
   let inQuotes = false;
   let afterQuote = false;
   let recordStarted = false;
+  const maxRows = options.maxRows!;
+  const maxColumns = options.maxColumns!;
+  const maxFieldLength = options.maxFieldLength!;
 
   const finishField = () => {
+    assertWithinLimit(field.length, maxFieldLength, "CSV 字段长度");
     record.push(field);
+    assertWithinLimit(record.length, maxColumns, "CSV 列数");
     field = "";
     afterQuote = false;
   };
   const finishRecord = () => {
     finishField();
     records.push(record);
+    assertWithinLimit(records.length, maxRows + 1, "CSV 行数");
     record = [];
     recordStarted = false;
   };
 
   for (let i = 0; i < content.length; i++) {
+    if ((i & 4095) === 0) throwIfAborted(options.signal);
     const char = content[i];
 
     if (inQuotes) {
@@ -66,6 +101,7 @@ function parseCSVRecords(content: string, delimiter: string): string[][] {
         }
       } else {
         field += char;
+        assertWithinLimit(field.length, maxFieldLength, "CSV 字段长度");
       }
       continue;
     }
@@ -99,6 +135,7 @@ function parseCSVRecords(content: string, delimiter: string): string[][] {
     }
 
     field += char;
+    assertWithinLimit(field.length, maxFieldLength, "CSV 字段长度");
     recordStarted = true;
   }
 
@@ -125,6 +162,24 @@ function escapeCSVField(field: string, delimiter: string): string {
   return field;
 }
 
+const DANGEROUS_HEADERS = new Set(["__proto__", "prototype", "constructor"]);
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
+function protectFormula(
+  value: string,
+  policy: NonNullable<CSVOptions["formulaPolicy"]>,
+): string {
+  if (!FORMULA_PREFIX.test(value)) return value;
+  if (policy === "reject") {
+    throw new FileUtilsError(
+      "INVALID_CONTENT",
+      "CSV 字段可能触发电子表格公式执行",
+      { details: { value: value.slice(0, 100) } },
+    );
+  }
+  return policy === "escape" ? `'${value}` : value;
+}
+
 // ==================== 主 Hook ====================
 
 /**
@@ -145,7 +200,16 @@ function escapeCSVField(field: string, delimiter: string): string {
  * const fileData = await csv.readFile(file)
  * ```
  */
-export function useCSV() {
+export function useCSV(factoryOptions: UseCSVOptions = {}) {
+  const context = () => getFileUtilsContext(factoryOptions.context);
+  const withLimits = (options: CSVOptions): CSVOptions => ({
+    maxRows: context().limits.maxRows,
+    maxColumns: context().limits.maxColumns,
+    maxFieldLength: context().limits.maxFieldLength,
+    maxOutputSize: context().limits.maxOutputSize,
+    maxFileSize: context().limits.maxFileSize,
+    ...options,
+  });
   /**
    * @description 解析 CSV 字符串为对象数组
    */
@@ -153,13 +217,15 @@ export function useCSV() {
     content: string,
     options: CSVOptions = {},
   ): Record<string, any>[] => {
-    const { delimiter = ",", skipEmptyLines = true } = options;
+    const effective = withLimits(options);
+    throwIfAborted(effective.signal);
+    const { delimiter = ",", skipEmptyLines = true } = effective;
 
     validateDelimiter(delimiter);
 
     // 只移除文档开头的 UTF-8 BOM
     const cleanContent = content.replace(/^\uFEFF/, "");
-    let records = parseCSVRecords(cleanContent, delimiter);
+    let records = parseCSVRecords(cleanContent, delimiter, effective);
 
     if (skipEmptyLines) {
       records = records.filter(
@@ -170,7 +236,7 @@ export function useCSV() {
     if (records.length === 0) return [];
 
     const headers =
-      options.headers ||
+      effective.headers ||
       records[0].map((header) => header.trim());
     const duplicateHeader = headers.find(
       (header, index) => headers.indexOf(header) !== index,
@@ -178,12 +244,26 @@ export function useCSV() {
     if (duplicateHeader !== undefined) {
       throw new SyntaxError(`CSV 存在重复表头: ${duplicateHeader}`);
     }
-    const startIndex = options.headers ? 0 : 1;
+    if (!effective.allowEmptyHeaders && headers.some((header) => !header)) {
+      throw new SyntaxError("CSV 表头不能为空");
+    }
+    if (
+      effective.dangerousHeaders !== "allow" &&
+      headers.some((header) => DANGEROUS_HEADERS.has(header))
+    ) {
+      throw new SyntaxError("CSV 表头包含危险对象属性名");
+    }
+    const startIndex = effective.headers ? 0 : 1;
 
     return records
       .slice(startIndex)
       .map((values) => {
-        const obj: Record<string, any> = {};
+        if ((effective.strictColumnCount ?? true) && values.length !== headers.length) {
+          throw new SyntaxError(
+            `CSV 列数不一致：期望 ${headers.length} 列，实际 ${values.length} 列`,
+          );
+        }
+        const obj = Object.create(null) as Record<string, any>;
         headers.forEach((h, i) => {
           obj[h] = values[i] !== undefined ? values[i] : "";
         });
@@ -198,21 +278,48 @@ export function useCSV() {
     data: Record<string, any>[],
     options: CSVOptions = {},
   ): string => {
+    const effective = withLimits(options);
+    throwIfAborted(effective.signal);
     if (!data.length) return "";
 
-    const { delimiter = "," } = options;
+    const { delimiter = "," } = effective;
     validateDelimiter(delimiter);
-    const headers = options.headers || Object.keys(data[0]);
+    const headers = effective.headers || Object.keys(data[0]);
+    assertWithinLimit(
+      data.length,
+      effective.maxRows!,
+      "CSV 行数",
+    );
+    assertWithinLimit(
+      headers.length,
+      effective.maxColumns!,
+      "CSV 列数",
+    );
+    const policy = effective.formulaPolicy ?? "escape";
 
     const rows = [
-      headers.map((h) => escapeCSVField(h, delimiter)).join(delimiter),
-      ...data.map((row) =>
-        headers
-          .map((h) => escapeCSVField(String(row[h] ?? ""), delimiter))
-          .join(delimiter),
-      ),
+      headers
+        .map((h) => escapeCSVField(protectFormula(h, policy), delimiter))
+        .join(delimiter),
+      ...data.map((row, index) => {
+        if ((index & 255) === 0) throwIfAborted(effective.signal);
+        return headers
+          .map((h) =>
+            escapeCSVField(
+              protectFormula(String(row[h] ?? ""), policy),
+              delimiter,
+            ),
+          )
+          .join(delimiter);
+      }),
     ];
-    return rows.join("\r\n");
+    const output = rows.join("\r\n");
+    assertWithinLimit(
+      new Blob([output]).size,
+      effective.maxOutputSize!,
+      "CSV 输出",
+    );
+    return output;
   };
 
   /**
@@ -237,8 +344,12 @@ export function useCSV() {
     file: File,
     options?: CSVOptions,
   ): Promise<Record<string, any>[]> => {
+    const effective = withLimits(options ?? {});
+    throwIfAborted(effective.signal);
+    assertWithinLimit(file.size, effective.maxFileSize!, "CSV 文件大小");
     const text = await file.text();
-    return parse(text, options);
+    throwIfAborted(effective.signal);
+    return parse(text, effective);
   };
 
   return { parse, generate, download, readFile };

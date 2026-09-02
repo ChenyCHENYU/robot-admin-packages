@@ -1,370 +1,232 @@
-/*
- * @Author: ChenYu ycyplus@gmail.com
- * @Date: 2025-06-25 17:45:29
- * @LastEditors: ChenYu ycyplus@gmail.com
- * @LastEditTime: 2025-06-25 18:59:11
- * @FilePath: \Robot_Admin\src\directives\modules\watermark.ts
- * @Description: 水印指令
- * Copyright (c) 2025 by CHENY, All Rights Reserved 😎.
- */
+import type { Directive } from "vue";
 
-import type { Directive, DirectiveBinding } from 'vue'
-
-// 类型定义
 export interface WatermarkOptions {
-  text?: string
-  textColor?: string
-  font?: string
-  fontSize?: number
-  textXGap?: number
-  textYGap?: number
-  rotate?: number
-  opacity?: number
-  zIndex?: number
-  preventDelete?: boolean
-  onUpdate?: (el: HTMLElement) => void
-  onError?: (error: Error) => void
+  text?: string | readonly string[];
+  textColor?: string;
+  /** @deprecated Use fontFamily. */
+  font?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  textXGap?: number;
+  textYGap?: number;
+  gap?: readonly [number, number];
+  rotate?: number;
+  opacity?: number;
+  zIndex?: number;
+  preventDelete?: boolean;
+  onUpdate?: (el: HTMLElement) => void;
+  onError?: (error: Error) => void;
 }
 
-export interface WatermarkBinding extends Omit<DirectiveBinding, 'value'> {
-  value?: string | WatermarkOptions
+export type WatermarkBinding = string | readonly string[] | WatermarkOptions;
+
+interface NormalizedOptions extends WatermarkOptions {
+  text: readonly string[];
+  textColor: string;
+  fontFamily: string;
+  fontSize: number;
+  textXGap: number;
+  textYGap: number;
+  rotate: number;
+  opacity: number;
+  zIndex: number;
+  preventDelete: boolean;
 }
 
-// 扩展 HTMLElement 类型定义
-declare global {
-  interface HTMLElement {
-    _watermarkResizeObserver?: ResizeObserver
-    _watermarkMutationObserver?: MutationObserver
-    _watermarkOptions?: Required<WatermarkOptions>
-  }
+interface WatermarkState {
+  options: NormalizedOptions;
+  overlay?: HTMLElement;
+  observer?: MutationObserver;
+  originalPosition: string;
+  changedPosition: boolean;
 }
 
-// 缓存生成的水印图片
-const watermarkCache = new Map<string, string>()
+const states = new WeakMap<HTMLElement, WatermarkState>();
+const watermarkCache = new Map<string, string>();
+const MAX_CACHE_ENTRIES = 100;
 
-/**
- * * @description 生成缓存键
- * ? @param options - 水印配置选项
- * ! @return 缓存键字符串
- */
-function getCacheKey(options: Required<WatermarkOptions>): string {
-  const {
-    text,
-    textColor,
-    font,
-    fontSize,
-    textXGap,
-    textYGap,
-    rotate,
-    opacity,
-  } = options
-  return `${text}-${textColor}-${font}-${fontSize}-${textXGap}-${textYGap}-${rotate}-${opacity}`
+function positive(value: number, name: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${name} 必须是大于 0 的有限数值`);
+  }
+  return value;
 }
 
-/**
- * * @description 解析指令参数配置
- * ? @param value - 指令绑定的值，可以是字符串、配置对象或 undefined
- * ! @return 解析后的配置对象
- */
-function parseOptions(
-  value: string | WatermarkOptions | undefined
-): Required<WatermarkOptions> {
-  // 默认配置
-  const defaultOptions: Required<WatermarkOptions> = {
-    text: 'Robot Admin',
-    textColor: 'rgba(120, 120, 120, 0.4)',
-    font: 'Microsoft JhengHei',
-    fontSize: 16,
-    textXGap: 160,
-    textYGap: 80,
-    rotate: -20,
-    opacity: 1,
-    zIndex: 1000,
-    preventDelete: true,
-    onUpdate: () => {},
-    onError: () => {},
+function parseOptions(value: WatermarkBinding | undefined): NormalizedOptions {
+  let raw: WatermarkOptions;
+  if (typeof value === "string") raw = { text: value };
+  else if (Array.isArray(value)) raw = { text: [...value] };
+  else raw = (value ?? {}) as WatermarkOptions;
+  const gap = raw.gap;
+  const opacity = raw.opacity ?? 1;
+  if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+    throw new RangeError("opacity 必须位于 0 到 1 之间");
   }
-
-  // 如果没有传参数，返回默认配置
-  if (!value) {
-    return defaultOptions
-  }
-
-  // 如果是字符串，只设置文本内容
-  if (typeof value === 'string') {
-    return {
-      ...defaultOptions,
-      text: value,
-    }
-  }
-
-  // 如果是对象配置，合并默认配置
   return {
-    ...defaultOptions,
-    ...value,
+    ...raw,
+    text: Array.isArray(raw.text)
+      ? raw.text.map(String)
+      : [String(raw.text ?? "Robot Admin")],
+    textColor: raw.textColor ?? "rgba(120, 120, 120, 0.4)",
+    fontFamily: raw.fontFamily ?? raw.font ?? "sans-serif",
+    fontSize: positive(raw.fontSize ?? 16, "fontSize"),
+    textXGap: positive(gap?.[0] ?? raw.textXGap ?? 160, "textXGap"),
+    textYGap: positive(gap?.[1] ?? raw.textYGap ?? 80, "textYGap"),
+    rotate: Number.isFinite(raw.rotate) ? (raw.rotate as number) : -20,
+    opacity,
+    zIndex: Number.isFinite(raw.zIndex) ? (raw.zIndex as number) : 1000,
+    preventDelete: raw.preventDelete ?? false,
+  };
+}
+
+function visualKey(options: NormalizedOptions): string {
+  return JSON.stringify({
+    text: options.text,
+    textColor: options.textColor,
+    fontFamily: options.fontFamily,
+    fontSize: options.fontSize,
+    textXGap: options.textXGap,
+    textYGap: options.textYGap,
+    rotate: options.rotate,
+    opacity: options.opacity,
+  });
+}
+
+function cacheSet(key: string, value: string): void {
+  if (watermarkCache.has(key)) watermarkCache.delete(key);
+  watermarkCache.set(key, value);
+  if (watermarkCache.size > MAX_CACHE_ENTRIES) {
+    const oldest = watermarkCache.keys().next().value;
+    if (oldest) watermarkCache.delete(oldest);
   }
 }
 
-/**
- * * @description 生成水印base64图片
- * ? @param options - 水印配置选项
- * ! @return base64图片字符串
- */
-function createWatermarkImage(options: Required<WatermarkOptions>): string {
-  const cacheKey = getCacheKey(options)
-
-  // 检查缓存
-  if (watermarkCache.has(cacheKey)) {
-    return watermarkCache.get(cacheKey)!
+function createImage(options: NormalizedOptions, doc: Document): string {
+  const key = visualKey(options);
+  const cached = watermarkCache.get(key);
+  if (cached) {
+    watermarkCache.delete(key);
+    watermarkCache.set(key, cached);
+    return cached;
   }
+  const canvas = doc.createElement("canvas");
+  canvas.width = Math.ceil(options.textXGap);
+  canvas.height = Math.ceil(options.textYGap);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("当前环境不支持 Canvas 2D 上下文");
+  context.globalAlpha = options.opacity;
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate((options.rotate * Math.PI) / 180);
+  context.font = `${options.fontSize}px ${options.fontFamily}`;
+  context.fillStyle = options.textColor;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  const lineHeight = options.fontSize * 1.4;
+  const offset = ((options.text.length - 1) * lineHeight) / 2;
+  options.text.forEach((line, index) => {
+    context.fillText(line, 0, index * lineHeight - offset);
+  });
+  const image = canvas.toDataURL("image/png");
+  cacheSet(key, image);
+  return image;
+}
 
+function observe(el: HTMLElement, state: WatermarkState): void {
+  state.observer?.disconnect();
+  if (!state.options.preventDelete || !state.overlay) return;
+  const Observer = el.ownerDocument.defaultView?.MutationObserver;
+  if (!Observer) return;
+  state.observer = new Observer((mutations) => {
+    const overlay = state.overlay;
+    if (!overlay) return;
+    const tampered = mutations.some((mutation) => {
+      if (mutation.type === "attributes") return mutation.target === overlay;
+      return [...mutation.removedNodes].some(
+        (node) => node === overlay || (node instanceof Element && node.contains(overlay)),
+      );
+    });
+    if (tampered) render(el, state);
+  });
+  state.observer.observe(el, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["class", "style"],
+  });
+}
+
+function render(el: HTMLElement, state: WatermarkState): void {
   try {
-    const canvas = document.createElement('canvas')
-    const {
-      textXGap,
-      textYGap,
-      fontSize,
-      font,
-      textColor,
-      rotate,
-      opacity,
-      text,
-    } = options
-
-    canvas.width = textXGap
-    canvas.height = textYGap
-
-    const ctx = canvas.getContext('2d')!
-
-    // 设置透明度
-    ctx.globalAlpha = opacity
-
-    // 保存当前状态
-    ctx.save()
-
-    // 移动到中心点
-    ctx.translate(textXGap / 2, textYGap / 2)
-
-    // 旋转
-    ctx.rotate((rotate * Math.PI) / 180)
-
-    // 设置字体
-    ctx.font = `${fontSize}px ${font}`
-    ctx.fillStyle = textColor
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-
-    // 绘制文字
-    ctx.fillText(text, 0, 0)
-
-    // 恢复状态
-    ctx.restore()
-
-    const base64 = canvas.toDataURL('image/png')
-
-    // 缓存结果
-    watermarkCache.set(cacheKey, base64)
-
-    return base64
-  } catch (error) {
-    console.error('生成水印图片失败:', error)
-    return ''
-  }
-}
-
-/**
- * * @description 创建水印元素
- * ? @param el - 目标元素
- * ? @param options - 水印配置选项
- * ! @return 水印元素
- */
-function createWatermarkElement(
-  el: HTMLElement,
-  options: Required<WatermarkOptions>
-): HTMLElement {
-  const watermarkEl = document.createElement('div')
-  const base64 = createWatermarkImage(options)
-
-  if (!base64) {
-    options.onError(new Error('生成水印图片失败'))
-    return watermarkEl
-  }
-
-  watermarkEl.className = 'vue-watermark'
-  watermarkEl.style.cssText = `
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    background-image: url(${base64});
-    background-repeat: repeat;
-    z-index: ${options.zIndex};
-    user-select: none;
-  `
-
-  // 防删除保护
-  if (options.preventDelete) {
-    const observer = new MutationObserver(mutations => {
-      mutations.forEach(mutation => {
-        if (mutation.type === 'childList') {
-          const removedNodes = Array.from(mutation.removedNodes)
-          if (removedNodes.includes(watermarkEl)) {
-            console.warn('水印被删除，正在恢复...')
-            if (el.contains(watermarkEl) === false) {
-              el.appendChild(watermarkEl)
-            }
-          }
-        }
-      })
-    })
-
-    observer.observe(el, {
-      childList: true,
-      subtree: true,
-    })
-
-    // 保存observer到元素上
-    el._watermarkMutationObserver = observer
-  }
-
-  return watermarkEl
-}
-
-/**
- * * @description 更新水印
- * ? @param el - 目标元素
- * ? @param options - 水印配置选项
- * ! @return void
- */
-function updateWatermark(
-  el: HTMLElement,
-  options: Required<WatermarkOptions>
-): void {
-  try {
-    // 确保父元素是相对定位
-    const computedStyle = getComputedStyle(el)
-    if (computedStyle.position === 'static') {
-      el.style.position = 'relative'
+    state.observer?.disconnect();
+    state.overlay?.remove();
+    if (getComputedStyle(el).position === "static") {
+      el.style.position = "relative";
+      state.changedPosition = true;
     }
-
-    // 移除旧的水印
-    const oldWatermark = el.querySelector('.vue-watermark') as HTMLElement
-    if (oldWatermark) {
-      oldWatermark.remove()
-    }
-
-    // 清理旧的 MutationObserver
-    if (el._watermarkMutationObserver) {
-      el._watermarkMutationObserver.disconnect()
-      delete el._watermarkMutationObserver
-    }
-
-    // 创建新的水印
-    const watermarkEl = createWatermarkElement(el, options)
-    el.appendChild(watermarkEl)
-
-    // 触发更新回调
-    options.onUpdate(el)
-  } catch (error) {
-    options.onError(error as Error)
+    const overlay = el.ownerDocument.createElement("div");
+    overlay.className = "ra-watermark";
+    Object.assign(overlay.style, {
+      position: "absolute",
+      inset: "0",
+      pointerEvents: "none",
+      backgroundImage: `url(${JSON.stringify(createImage(state.options, el.ownerDocument))})`,
+      backgroundRepeat: "repeat",
+      zIndex: String(state.options.zIndex),
+      userSelect: "none",
+    });
+    overlay.setAttribute("aria-hidden", "true");
+    el.appendChild(overlay);
+    state.overlay = overlay;
+    observe(el, state);
+    state.options.onUpdate?.(el);
+  } catch (cause) {
+    const error = cause instanceof Error ? cause : new Error(String(cause));
+    if (state.options.onError) state.options.onError(error);
+    else throw error;
   }
 }
 
-/**
- * * @description 清理水印相关资源
- * ? @param el - 目标元素
- * ! @return void
- */
-function cleanupWatermark(el: HTMLElement): void {
-  // 清理ResizeObserver
-  if (el._watermarkResizeObserver) {
-    el._watermarkResizeObserver.disconnect()
-    delete el._watermarkResizeObserver
-  }
-
-  // 清理MutationObserver
-  if (el._watermarkMutationObserver) {
-    el._watermarkMutationObserver.disconnect()
-    delete el._watermarkMutationObserver
-  }
-
-  // 移除水印元素
-  const watermarkEl = el.querySelector('.vue-watermark')
-  if (watermarkEl) {
-    watermarkEl.remove()
-  }
-
-  // 清理缓存的选项
-  delete el._watermarkOptions
-}
-
-// 指令实现
 const watermarkDirective: Directive<
   HTMLElement,
-  string | WatermarkOptions | undefined
+  WatermarkBinding | undefined
 > = {
-  /**
-   * * @description 指令挂载时的钩子函数
-   * ? @param el - 绑定指令的 HTML 元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  mounted(el: HTMLElement, binding: WatermarkBinding): void {
-    const options = parseOptions(binding.value)
-
-    // 初始化水印
-    updateWatermark(el, options)
-
-    // 使用ResizeObserver监听尺寸变化（读取最新的 options，避免闭包过期）
-    const resizeObserver = new ResizeObserver(() => {
-      updateWatermark(el, el._watermarkOptions || options)
-    })
-
-    resizeObserver.observe(el)
-
-    // 保存到元素上
-    el._watermarkResizeObserver = resizeObserver
-    el._watermarkOptions = options
+  mounted(el, binding) {
+    const state: WatermarkState = {
+      options: parseOptions(binding.value),
+      originalPosition: el.style.position,
+      changedPosition: false,
+    };
+    states.set(el, state);
+    render(el, state);
   },
-
-  /**
-   * * @description 指令更新时的钩子函数
-   * ? @param el - 绑定指令的 HTML 元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  updated(el: HTMLElement, binding: WatermarkBinding): void {
-    const newOptions = parseOptions(binding.value)
-    const oldOptions = el._watermarkOptions
-
-    // 只有当选项真正改变时才更新
+  updated(el, binding) {
+    const state = states.get(el);
+    if (!state) return;
+    const previous = state.options;
+    const next = parseOptions(binding.value);
+    state.options = next;
     if (
-      !oldOptions ||
-      JSON.stringify(newOptions) !== JSON.stringify(oldOptions)
+      visualKey(previous) !== visualKey(next) ||
+      previous.zIndex !== next.zIndex ||
+      previous.preventDelete !== next.preventDelete
     ) {
-      updateWatermark(el, newOptions)
-      el._watermarkOptions = newOptions
+      render(el, state);
     }
   },
-
-  /**
-   * * @description 指令卸载时的钩子函数
-   * ? @param el - 绑定指令的 HTML 元素
-   * ! @return void
-   */
-  unmounted(el: HTMLElement): void {
-    cleanupWatermark(el)
+  unmounted(el) {
+    const state = states.get(el);
+    if (!state) return;
+    state.observer?.disconnect();
+    state.overlay?.remove();
+    if (state.changedPosition && el.style.position === "relative") {
+      el.style.position = state.originalPosition;
+    }
+    states.delete(el);
   },
-}
+};
 
-/**
- * * @description: 清理缓存 工具函数
- */
 export function clearWatermarkCache(): void {
-  watermarkCache.clear()
+  watermarkCache.clear();
 }
 
-// 默认导出
-export default watermarkDirective
+export default watermarkDirective;

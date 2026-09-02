@@ -1,175 +1,158 @@
-/*
- * @Author: ChenYu ycyplus@gmail.com
- * @Date: 2026-02-24
- * @Description: 点击外部区域指令
- * Copyright (c) 2026 by CHENY, All Rights Reserved 😎.
- */
-
 import type { Directive } from "vue";
 
-/**
- * * @description ClickOutside 指令配置选项接口
- */
 export interface ClickOutsideOptions {
-  /** 点击外部时的回调 */
-  handler: (event: MouseEvent | TouchEvent) => void;
-  /** 是否启用 */
+  handler: (event: PointerEvent) => void;
   enabled?: boolean;
-  /** 排除的元素选择器列表（点击这些元素不触发） */
-  exclude?: string[];
+  exclude?: readonly (string | Element)[];
+  onError?: (error: Error) => void;
 }
 
-/**
- * * @description 指令绑定值类型
- */
 export type ClickOutsideBinding =
-  | ((event: MouseEvent | TouchEvent) => void)
+  | ((event: PointerEvent) => void)
   | ClickOutsideOptions;
 
-/**
- * * @description 扩展的 HTML 元素类型
- */
-interface ElType extends HTMLElement {
-  _clickOutsideHandler?: (event: MouseEvent | TouchEvent) => void;
-  _clickOutsideOptions?: ClickOutsideOptions;
-  _clickOutsideTimer?: ReturnType<typeof setTimeout>;
+interface Entry {
+  el: HTMLElement;
+  options: ClickOutsideOptions & { enabled: boolean };
+  timer?: ReturnType<typeof setTimeout>;
+  registered: boolean;
 }
 
-/**
- * * @description 解析指令参数
- * ? @param value - 指令绑定值
- * ! @return 标准化配置
- */
+interface DocumentRegistry {
+  entries: Set<Entry>;
+  listener: (event: PointerEvent) => void;
+}
+
+const states = new WeakMap<HTMLElement, Entry>();
+const registries = new WeakMap<Document, DocumentRegistry>();
+
+function isElementNode(node: unknown): node is Element {
+  return (
+    typeof node === "object" &&
+    node !== null &&
+    (node as Node).nodeType === 1 &&
+    typeof (node as Element).matches === "function"
+  );
+}
+
 function parseOptions(
   value: ClickOutsideBinding | undefined,
-): ClickOutsideOptions {
-  if (!value) return { handler: () => {}, enabled: false };
-  if (typeof value === "function") return { handler: value, enabled: true };
-  return { enabled: true, ...value };
+): ClickOutsideOptions & { enabled: boolean } {
+  if (!value) return { handler: () => undefined, enabled: false };
+  return typeof value === "function"
+    ? { handler: value, enabled: true }
+    : { enabled: true, ...value };
 }
 
-/**
- * * @description 检查事件目标是否在排除列表中
- * ? @param target - 事件目标元素
- * ? @param exclude - 排除的选择器列表
- * ! @return 是否应排除
- */
-function isExcluded(target: EventTarget | null, exclude?: string[]): boolean {
-  if (!exclude?.length || !(target instanceof Element)) return false;
-  return exclude.some((selector) => target.closest(selector));
+function isExcluded(
+  event: PointerEvent,
+  exclude: readonly (string | Element)[] | undefined,
+  onError?: (error: Error) => void,
+): boolean {
+  if (!exclude?.length) return false;
+  const path = event.composedPath();
+  for (const item of exclude) {
+    if (typeof item !== "string") {
+      if (path.includes(item)) return true;
+      continue;
+    }
+    try {
+      if (
+        path.some((node) => isElementNode(node) && node.matches(item))
+      ) {
+        return true;
+      }
+    } catch (cause) {
+      onError?.(
+        cause instanceof Error
+          ? cause
+          : new Error(`无效的 exclude 选择器: ${item}`),
+      );
+    }
+  }
+  return false;
 }
 
-/**
- * * @description 绑定外部点击事件
- * ? @param el - 目标元素
- * ? @param options - 配置选项
- * ! @return void
- */
-function bindListener(el: ElType, options: ClickOutsideOptions): void {
-  // 先清理旧的
-  unbindListener(el);
-
-  el._clickOutsideOptions = options;
-
-  if (!options.enabled) return;
-
-  const handler = (event: Event) => {
-    const currentOptions = el._clickOutsideOptions;
-    if (!currentOptions?.enabled) return;
-    const target = event.target as Node | null;
-    // 点击发生在元素内部 → 不触发
-    if (!target || el.contains(target)) return;
-    // 在排除列表中 → 不触发
-    if (isExcluded(target, currentOptions.exclude)) return;
-    currentOptions.handler(event as MouseEvent | TouchEvent);
+function ensureRegistry(doc: Document): DocumentRegistry {
+  const existing = registries.get(doc);
+  if (existing) return existing;
+  const registry = {} as DocumentRegistry;
+  registry.entries = new Set();
+  registry.listener = (event) => {
+    const path = event.composedPath();
+    for (const entry of [...registry.entries]) {
+      if (!entry.options.enabled || path.includes(entry.el)) continue;
+      if (
+        isExcluded(event, entry.options.exclude, entry.options.onError)
+      ) {
+        continue;
+      }
+      try {
+        entry.options.handler(event);
+      } catch (cause) {
+        const error =
+          cause instanceof Error ? cause : new Error(String(cause));
+        if (entry.options.onError) entry.options.onError(error);
+        else queueMicrotask(() => {
+          throw error;
+        });
+      }
+    }
   };
-
-  el._clickOutsideHandler = handler as ElType["_clickOutsideHandler"];
-
-  // 使用捕获阶段 + 延迟绑定（避免挂载当帧的点击事件被误捕获）
-  // 记录定时器句柄，卸载时可清理，防止"同 tick 卸载导致监听泄漏"
-  el._clickOutsideTimer = setTimeout(() => {
-    el._clickOutsideTimer = undefined;
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("touchstart", handler, { passive: true });
-  }, 0);
+  doc.addEventListener("pointerdown", registry.listener, true);
+  registries.set(doc, registry);
+  return registry;
 }
 
-/**
- * * @description 解绑事件
- * ? @param el - 目标元素
- * ! @return void
- */
-function unbindListener(el: ElType): void {
-  // 若延迟绑定尚未执行（同 tick 卸载），取消定时器避免泄漏监听
-  if (el._clickOutsideTimer !== undefined) {
-    clearTimeout(el._clickOutsideTimer);
-    el._clickOutsideTimer = undefined;
-  }
-  if (el._clickOutsideHandler) {
-    document.removeEventListener("mousedown", el._clickOutsideHandler);
-    document.removeEventListener("touchstart", el._clickOutsideHandler);
-    el._clickOutsideHandler = undefined;
+function register(entry: Entry): void {
+  if (entry.registered || !entry.options.enabled) return;
+  ensureRegistry(entry.el.ownerDocument).entries.add(entry);
+  entry.registered = true;
+}
+
+function unregister(entry: Entry): void {
+  if (entry.timer) clearTimeout(entry.timer);
+  entry.timer = undefined;
+  if (!entry.registered) return;
+  const doc = entry.el.ownerDocument;
+  const registry = registries.get(doc);
+  registry?.entries.delete(entry);
+  entry.registered = false;
+  if (registry && registry.entries.size === 0) {
+    doc.removeEventListener("pointerdown", registry.listener, true);
+    registries.delete(doc);
   }
 }
 
-/**
- * * @description Vue 点击外部区域指令
- * * @description 监听 mousedown + touchstart，支持排除元素和条件控制
- *
- * @example
- * ```vue
- * <!-- 基础用法 -->
- * <div v-click-outside="handleClose">下拉内容</div>
- *
- * <!-- 带条件 -->
- * <div v-click-outside="{ handler: close, enabled: isOpen }">内容</div>
- *
- * <!-- 排除元素 -->
- * <div v-click-outside="{ handler: close, exclude: ['.trigger-btn'] }">
- *   内容
- * </div>
- * ```
- */
 const clickOutsideDirective: Directive<
   HTMLElement,
   ClickOutsideBinding | undefined
 > = {
-  /**
-   * * @description 指令挂载时绑定事件监听
-   * ? @param el - 绑定指令的 DOM 元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  mounted(el: ElType, binding) {
-    bindListener(el, parseOptions(binding.value));
+  mounted(el, binding) {
+    const entry: Entry = {
+      el,
+      options: parseOptions(binding.value),
+      registered: false,
+    };
+    states.set(el, entry);
+    entry.timer = setTimeout(() => {
+      entry.timer = undefined;
+      register(entry);
+    });
   },
-
-  /**
-   * * @description 指令更新时重新绑定
-   * ? @param el - 绑定指令的 DOM 元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  updated(el: ElType, binding) {
-    const options = parseOptions(binding.value);
-    const prev = el._clickOutsideOptions;
-
-    // enabled 切换时才变更监听；handler/exclude 由闭包实时读取最新配置
-    if (options.enabled !== prev?.enabled) {
-      bindListener(el, options);
-    } else {
-      el._clickOutsideOptions = options;
-    }
+  updated(el, binding) {
+    const entry = states.get(el);
+    if (!entry) return;
+    const wasEnabled = entry.options.enabled;
+    entry.options = parseOptions(binding.value);
+    if (wasEnabled && !entry.options.enabled) unregister(entry);
+    else if (!wasEnabled && entry.options.enabled) register(entry);
   },
-
-  /**
-   * * @description 指令卸载时清理事件
-   * ? @param el - 绑定指令的 DOM 元素
-   * ! @return void
-   */
-  unmounted(el: ElType) {
-    unbindListener(el);
+  unmounted(el) {
+    const entry = states.get(el);
+    if (!entry) return;
+    unregister(entry);
+    states.delete(el);
   },
 };
 

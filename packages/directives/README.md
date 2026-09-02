@@ -1,1011 +1,338 @@
 # @robot-admin/directives
 
-<div align="center">
-
-🎯 **开箱即用的 Vue3 自定义指令集合**
+面向 Vue 3 的通用交互指令集。提供 11 个指令、完整 TypeScript 类型、按需子路径导入、应用级权限与消息适配器，以及可预测的挂载、更新和卸载行为。
 
 [![npm version](https://img.shields.io/npm/v/@robot-admin/directives.svg)](https://www.npmjs.com/package/@robot-admin/directives)
-[![license](https://img.shields.io/npm/l/@robot-admin/directives.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/@robot-admin/directives.svg)](./LICENSE)
 
-</div>
+## 能力与约束
 
-## ✨ 特性
+- Vue `>=3.3`，无运行时 UI 框架依赖。
+- ESM、CommonJS、完整声明文件和显式子路径导出。
+- 指令状态使用 `WeakMap` 隔离；卸载时清理计时器、Observer、全局监听器和临时 DOM。
+- 优先采用 Pointer Events，并补齐键盘、ARIA、焦点和 reduced-motion 行为。
+- Loading/Tooltip 样式按 `Document` 注入，可通过 `styleNonce` 适配 CSP。
+- 权限、复制提示均可在应用安装时注入，适合多应用和微前端场景。
 
-- 🚀 **开箱即用** - 一行代码全局注册 11 个常用指令
-- 🎯 **按需引入** - 支持单指令导入，Tree-shaking 友好
-- 💪 **TypeScript** - 完整类型定义和智能提示
-- 🔌 **零依赖** - 仅依赖 Vue 3.3+
-- 📦 **体积小巧** - 打包后 ~45KB (gzip < 14KB)
-- 🎨 **灵活配置** - 简单/高级两种用法
-- 🛡️ **安全与可回收** - loading 文本不注入 HTML，异步监听与 Observer 在卸载时完整清理
+当前主版本：`2.x`。
 
-当前版本：`1.1.1`。
-
----
-
-## 📦 快速开始
-
-### 安装
+## 安装
 
 ```bash
 npm install @robot-admin/directives
-# or
+# 或
 bun add @robot-admin/directives
 ```
 
-### 全局注册（推荐）
+## 注册
 
-```typescript
-// main.ts
+推荐使用标准 Vue 插件 API：
+
+```ts
 import { createApp } from "vue";
-import { setupDirectives } from "@robot-admin/directives";
+import { createDirectives } from "@robot-admin/directives";
 
 const app = createApp(App);
-setupDirectives(app);
+
+app.use(
+  createDirectives({
+    prefix: "", // 可设置为 "ra-"，对应 v-ra-copy
+    notify: (type, message) => uiMessage[type](message),
+    permission: {
+      getAuthData: () => permissionStore.permissionMap,
+      onDenied: (reason, element) => auditDenied(reason, element),
+    },
+  }),
+);
+
 app.mount("#app");
 ```
 
-### 按需引入
+兼容入口仍可使用：
 
-```vue
-<script setup>
-import { vCopy, vDebounce } from "@robot-admin/directives";
-</script>
+```ts
+import { setupDirectives } from "@robot-admin/directives";
 
-<template>
-  <button v-copy="'复制内容'">复制</button>
-  <button v-debounce="300" @click="handleClick">防抖按钮</button>
-</template>
+setupDirectives(app, options);
 ```
 
-### 快速体验
+按需注册时可从根入口或子路径导入：
+
+```ts
+import { vDebounce } from "@robot-admin/directives";
+import vPermission from "@robot-admin/directives/permission";
+
+app.directive("debounce", vDebounce);
+app.directive("permission", vPermission);
+```
+
+可用子路径：`copy`、`debounce`、`throttle`、`drag`、`longpress`、`permission`、`watermark`、`lazy`、`loading`、`tooltip`、`click-outside`。
+
+## 指令一览
+
+| 指令 | 主要用途 | 关键能力 |
+| --- | --- | --- |
+| `v-copy` | 复制文本 | 动态文本、Clipboard 降级、键盘操作、消息适配 |
+| `v-debounce` | 防抖 | handler-owned 模式、leading/trailing、动态事件 |
+| `v-throttle` | 节流 | handler-owned 模式、leading/trailing、动态事件 |
+| `v-drag` | 拖拽 | Pointer Events、边界、轴向、网格、回调 |
+| `v-longpress` | 长按 | 指针与键盘、移动容差、进度、取消 |
+| `v-permission` | 权限控制 | 应用级 Provider、AND/OR、通配符、三种降级 |
+| `v-watermark` | 水印 | 多行、缓存、响应更新、可选防删除 |
+| `v-lazy` | 懒加载 | 图片/背景、占位与错误图、竞态取消 |
+| `v-loading` | 加载遮罩 | 最小展示时长、全屏、ARIA、CSP |
+| `v-tooltip` | 提示 | hover/focus/Escape、视口翻转、ellipsis |
+| `v-click-outside` | 外部点击 | Shadow DOM、排除项、Document 级共享监听 |
+
+## 推荐事件模式
+
+`v-debounce` 和 `v-throttle` 推荐由指令直接持有 handler，原始事件通过参数传入。这样不会依赖阻断并重新派发 DOM 事件：
 
 ```vue
 <script setup lang="ts">
-import { ref } from "vue";
+const search = (event: Event) => {
+  const value = (event.target as HTMLInputElement).value;
+  // 请求搜索接口
+};
 
-const searchText = ref("");
-const handleSearch = (text: string) => {
-  console.log("搜索:", text);
+const save = () => {
+  // 保存
 };
-const isOpen = ref(true);
-const close = () => {
-  isOpen.value = false;
-};
-const loading = ref(false);
 </script>
 
 <template>
-  <div class="demo-container">
-    <!-- 复制指令 -->
-    <button v-copy="'订单号: 202602150001'">复制订单号</button>
+  <input
+    v-debounce:input="{
+      handler: search,
+      delay: 300,
+      trailing: true,
+    }"
+  />
 
-    <!-- 防抖搜索 -->
-    <input
-      v-model="searchText"
-      v-debounce="500"
-      @input="handleSearch(searchText)"
-      placeholder="防抖搜索"
-    />
-
-    <!-- 权限按钮 -->
-    <button v-permission="'admin'">管理员功能</button>
-
-    <!-- 水印内容 -->
-    <div v-watermark="'机密文件'" style="height: 300px">敏感内容区域</div>
-
-    <!-- 图片懒加载 -->
-    <img v-lazy="'/images/photo.jpg'" />
-
-    <!-- 局部 Loading -->
-    <div v-loading="loading" style="height: 200px">表格内容</div>
-
-    <!-- Tooltip（溢出自动显示） -->
-    <span v-tooltip.ellipsis="'完整文本'" style="width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-      很长的文本内容
-    </span>
-
-    <!-- 点击外部关闭 -->
-    <div v-click-outside="close" v-if="isOpen">下拉框内容</div>
-  </div>
+  <button
+    v-throttle:click="{
+      handler: save,
+      delay: 1000,
+      leading: true,
+      trailing: false,
+    }"
+  >
+    保存
+  </button>
 </template>
 ```
 
----
+`v-debounce="300" @click="save"` 与 `v-throttle="300" @click="save"` 仍作为兼容模式保留，新代码建议迁移到 handler-owned 模式。
 
-## 📚 指令列表
+## 使用示例
 
-| 指令             | 功能             | 使用场景                         |
-| ---------------- | ---------------- | -------------------------------- |
-| **v-copy**       | 复制文本到剪贴板 | 一键复制订单号、邀请码、分享链接 |
-| **v-debounce**   | 防抖处理         | 搜索输入框、表单提交按钮         |
-| **v-throttle**   | 节流处理         | 滚动加载、频繁点击的按钮         |
-| **v-drag**       | 元素拖拽         | 模态框拖动、看板卡片排序         |
-| **v-longpress**  | 长按触发         | 删除操作二次确认、长按复制       |
-| **v-permission** | 权限控制         | 按钮/功能的权限显隐              |
-| **v-watermark**  | 水印添加         | 敏感内容防截图、版权保护         |
-| **v-lazy**       | 图片懒加载       | 图片列表、长页面图片性能优化     |
-| **v-loading**    | 局部 Loading      | 表格/卡片/区域加载状态遮罩       |
-| **v-tooltip**    | 轻量级 Tooltip   | 文字溢出提示、图标说明           |
-| **v-click-outside** | 点击外部区域  | 下拉框/Popover 关闭、模态框关闭  |
-
----
-
-## 📖 详细文档
-
-### v-copy - 复制指令
-
-快速复制文本到剪贴板，支持自定义提示和回调。
-
-**基础用法**
-
-```vue
-<!-- 复制字符串 -->
-<button v-copy="'Hello World'">复制</button>
-
-<!-- 复制元素文本内容 -->
-<div v-copy>点击复制这段文本</div>
-```
-
-**高级配置**
+### 复制
 
 ```vue
 <button
   v-copy="{
-    text: '要复制的内容',
-    successMessage: '复制成功！',
-    errorMessage: '复制失败',
-    onSuccess: (text) => console.log('已复制:', text),
-    onError: (err) => console.error(err),
-    messageInstance: message, // naive-ui 的 message 实例
+    text: async () => order.shareUrl,
+    successMessage: '链接已复制',
+    statusDuration: 500,
+    onSuccess: (text) => audit(text),
+    onError: (error) => report(error),
   }"
 >
-  复制
+  复制链接
 </button>
 ```
 
-**参数说明**
+普通元素会自动获得 `role="button"`、`tabindex="0"` 和 Enter/Space 键支持；卸载时恢复原属性。`messageInstance` 仅为兼容旧版保留，推荐使用安装级 `notify`。
 
-| 参数              | 类型                     | 默认值       | 说明                   |
-| ----------------- | ------------------------ | ------------ | ---------------------- |
-| `text`            | `string`                 | 元素文本     | 要复制的文本内容       |
-| `successMessage`  | `string`                 | `'复制成功'` | 成功提示信息           |
-| `errorMessage`    | `string`                 | `'复制失败'` | 失败提示信息           |
-| `onSuccess`       | `(text: string) => void` | -            | 复制成功回调           |
-| `onError`         | `(error: Error) => void` | -            | 复制失败回调           |
-| `messageInstance` | `any`                    | -            | UI 组件的 message 实例 |
-
----
-
-### v-debounce - 防抖指令
-
-防止短时间内重复触发事件，适用于搜索输入、表单提交等场景。
-
-**基础用法**
+### 权限
 
 ```vue
-<!-- 默认 300ms 防抖 -->
-<button v-debounce @click="handleSubmit">提交</button>
+<button v-permission="'orders:read'">查看订单</button>
 
-<!-- 自定义延迟时间 -->
-<button v-debounce="500" @click="handleSubmit">提交</button>
-```
-
-**高级配置**
-
-```vue
-<button
-  v-debounce="{
-    delay: 500,
-    immediate: true, // 首次立即执行
-  }"
-  @click="handleSubmit"
->
-  立即提交
-</button>
-```
-
-**参数说明**
-
-| 参数        | 类型      | 默认值  | 说明                 |
-| ----------- | --------- | ------- | -------------------- |
-| `delay`     | `number`  | `300`   | 防抖延迟时间（毫秒） |
-| `immediate` | `boolean` | `false` | 是否首次立即执行     |
-
----
-
-### v-throttle - 节流指令
-
-限制事件触发频率，适用于滚动、窗口调整大小等高频事件。
-
-**基础用法**
-
-```vue
-<!-- 默认 300ms 节流 -->
-<button v-throttle @click="handleClick">点击</button>
-
-<!-- 自定义间隔时间 -->
-<div v-throttle="1000" @scroll="handleScroll">滚动区域</div>
-```
-
-**参数说明**
-
-| 参数    | 类型     | 默认值 | 说明                 |
-| ------- | -------- | ------ | -------------------- |
-| `delay` | `number` | `300`  | 节流间隔时间（毫秒） |
-
----
-
-### v-drag - 拖拽指令
-
-使元素可拖拽移动，支持边界限制。
-
-**基础用法**
-
-```vue
-<!-- 自由拖拽 -->
-<div v-drag>拖动我</div>
-
-<!-- 仅标题栏可拖拽 -->
-<div>
-  <div v-drag="{ handle: '.header' }">
-    <div class="header">拖拽此处</div>
-    <div class="body">内容区域</div>
-  </div>
-</div>
-```
-
-**高级配置**
-
-```vue
-<div
-  v-drag="{
-    boundary: true, // 限制在父容器内
-    handle: '.drag-handle', // 拖拽手柄选择器
-  }"
->
-  受限拖拽元素
-</div>
-```
-
-**参数说明**
-
-| 参数       | 类型      | 默认值  | 说明                  |
-| ---------- | --------- | ------- | --------------------- |
-| `boundary` | `boolean` | `false` | 是否限制在父容器内    |
-| `handle`   | `string`  | -       | 拖拽手柄的 CSS 选择器 |
-
----
-
-### v-longpress - 长按指令
-
-长按触发回调，适用于删除确认、长按复制等场景。
-
-**基础用法**
-
-```vue
-<script setup>
-const handleLongPress = () => {
-  console.log("长按触发");
-};
-</script>
-
-<button v-longpress="handleLongPress">长按我</button>
-```
-
-**高级配置**
-
-```vue
-<button
-  v-longpress="{
-    duration: 1000, // 长按 1 秒触发
-    callback: handleLongPress,
-  }"
->
-  长按 1 秒
-</button>
-```
-
-**参数说明**
-
-| 参数       | 类型         | 默认值 | 说明                 |
-| ---------- | ------------ | ------ | -------------------- |
-| `duration` | `number`     | `500`  | 长按触发时间（毫秒） |
-| `callback` | `() => void` | -      | 长按触发的回调函数   |
-
----
-
-### v-permission - 权限指令
-
-根据用户权限控制元素的显示/隐藏/禁用。
-
-**基础用法**
-
-```vue
-<!-- 单个权限 -->
-<button v-permission="'admin'">管理员可见</button>
-
-<!-- 多个权限（OR 模式） -->
-<button v-permission="['admin', 'editor']">编辑权限可见</button>
-```
-
-**高级配置**
-
-```vue
 <button
   v-permission="{
-    permissions: ['admin', 'super'],
-    mode: 'AND', // 需要同时拥有多个权限
-    fallback: 'disable', // 无权限时禁用而非隐藏
-    authData: userPermissions, // 自定义权限数据源
+    permissions: ['orders:read', 'orders:approve'],
+    mode: 'AND',
+    fallback: 'disable',
+    onDenied: (reason) => log(reason),
   }"
 >
-  需要多权限
+  审批订单
 </button>
 ```
 
-**参数说明**
+权限映射示例：
 
-| 参数          | 类型                      | 默认值   | 说明               |
-| ------------- | ------------------------- | -------- | ------------------ |
-| `permissions` | `string \| string[]`      | -        | 所需权限标识       |
-| `mode`        | `'OR' \| 'AND'`           | `'OR'`   | 多权限判断模式     |
-| `fallback`    | `'hide' \| 'disable'`     | `'hide'` | 无权限时的处理方式 |
-| `authData`    | `Record<string, boolean>` | -        | 自定义权限数据     |
-
----
-
-### v-watermark - 水印指令
-
-为元素添加防篡改水印，适用于敏感内容保护。
-
-**基础用法**
-
-```vue
-<!-- 文本水印 -->
-<div v-watermark="'机密文件'">内容区域</div>
-
-<!-- 多行水印 -->
-<div v-watermark="['机密文件', '请勿外传']">内容区域</div>
+```ts
+const permissionMap = {
+  "orders:read": true,
+  "users:*": true, // 匹配 users:read、users:write 等
+};
 ```
 
-**高级配置**
+`fallback` 可为：
+
+- `hide`：隐藏元素，默认值。
+- `disable`：禁用表单控件；普通元素禁用指针交互。
+- `show`：保留可见性，同时使用禁用状态和半透明提示。
+
+未提供权限数据时采用拒绝默认值。权限恢复或指令卸载后，元素原有的 `display`、`opacity`、`pointer-events`、`disabled` 和 `aria-disabled` 会被准确还原。
+
+### 拖拽与长按
+
+```vue
+<section
+  v-drag="{
+    handle: '.card-title',
+    boundary: true,
+    axis: 'both',
+    grid: [8, 8],
+    onEnd: (_element, position) => savePosition(position),
+  }"
+>
+  <header class="card-title">拖动</header>
+</section>
+
+<button
+  v-longpress="{
+    duration: 800,
+    movementTolerance: 10,
+    onProgress: (progress) => setProgress(progress),
+    onTrigger: removeItem,
+  }"
+>
+  长按删除
+</button>
+```
+
+`v-drag` 的 `boundary` 支持 `true`（父元素）、CSS 选择器或 `HTMLElement`；`axis` 支持 `x`、`y`、`both`。
+
+### 水印与懒加载
 
 ```vue
 <div
   v-watermark="{
-    text: '内部资料',
-    textColor: 'rgba(0, 0, 0, 0.15)',
-    fontSize: 16,
-    fontFamily: 'Microsoft YaHei',
-    rotate: -30, // 旋转角度
-    gap: [100, 100], // 水印间距
-    zIndex: 9999,
-    preventDelete: true, // 防止删除（MutationObserver）
+    text: [user.name, user.employeeNo],
+    fontFamily: 'sans-serif',
+    fontSize: 15,
+    gap: [120, 100],
+    rotate: -25,
+    opacity: 0.15,
+    preventDelete: true,
   }"
 >
-  带水印的内容
+  敏感内容
 </div>
-```
 
-**参数说明**
-
-| 参数            | 类型                 | 默认值            | 说明                      |
-| --------------- | -------------------- | ----------------- | ------------------------- |
-| `text`          | `string \| string[]` | -                 | 水印文本内容              |
-| `textColor`     | `string`             | `rgba(0,0,0,.15)` | 水印文字颜色              |
-| `fontSize`      | `number`             | `16`              | 水印字体大小              |
-| `fontFamily`    | `string`             | `sans-serif`      | 水印字体                  |
-| `rotate`        | `number`             | `-30`             | 水印旋转角度              |
-| `gap`           | `[number, number]`   | `[100, 100]`      | 水印间距 [x, y]           |
-| `zIndex`        | `number`             | `9999`            | 水印层级                  |
-| `preventDelete` | `boolean`            | `false`           | 防止删除（监听 DOM 变化） |
-
----
-
-### v-lazy - 图片懒加载指令
-
-基于 IntersectionObserver，元素进入可视区域时才加载图片，支持占位图和错误兜底。
-
-**基础用法**
-
-```vue
-<!-- 图片懒加载 -->
-<img v-lazy="imageUrl" />
-
-<!-- 背景图懒加载 -->
-<div v-lazy:background="bannerUrl" />
-```
-
-**高级配置**
-
-```vue
 <img
   v-lazy="{
     src: imageUrl,
     loading: '/placeholder.svg',
     error: '/fallback.png',
     rootMargin: '300px 0px',
+    threshold: 0.1,
+    onError: report,
   }"
 />
+
+<div v-lazy:background="bannerUrl" />
 ```
 
-**参数说明**
+`preventDelete` 会启用 `MutationObserver`，只建议用于确有防篡改需求的区域。懒加载在不支持 `IntersectionObserver` 时会立即加载，并使用 generation 标记阻止旧异步请求覆盖新绑定值。
 
-| 参数         | 类型     | 默认值      | 说明                        |
-| ------------ | -------- | ----------- | --------------------------- |
-| `src`        | `string` | -           | 图片源地址                  |
-| `loading`    | `string` | 透明 SVG    | 加载中占位图                |
-| `error`      | `string` | 透明 SVG    | 加载失败兜底图              |
-| `rootMargin` | `string` | `200px 0px` | 预加载偏移量                |
-| `threshold`  | `number` | `0`         | 可见面积阈值 0-1            |
-
-**CSS 类名**
-
-| 类名             | 说明          |
-| ---------------- | ------------- |
-| `.v-lazy-loading` | 加载中        |
-| `.v-lazy-loaded`  | 加载完成      |
-| `.v-lazy-error`   | 加载失败      |
-
----
-
-### v-loading - 局部 Loading 指令
-
-Element Plus 风格的局部加载遮罩，支持自定义文本、最小展示时间和全屏模式。
-
-**基础用法**
-
-```vue
-<!-- 布尔值控制 -->
-<div v-loading="isLoading">
-  <table>...</table>
-</div>
-```
-
-**高级配置**
+### Loading、Tooltip 与外部点击
 
 ```vue
 <div
   v-loading="{
-    value: tableLoading,
-    text: '数据加载中...',
-    background: 'rgba(0, 0, 0, 0.5)',
-    spinnerColor: '#36ad6a',
-    spinnerSize: 40,
-    minDuration: 500,
+    value: loading,
+    text: '加载中…',
+    minDuration: 300,
+    spinnerSize: 32,
+    ariaLabel: '订单列表加载中',
+    styleNonce: cspNonce,
   }"
 >
-  内容区域
+  <!-- content -->
 </div>
 
-<!-- 全屏 loading -->
-<div v-loading="{ value: globalLoading, fullscreen: true }">
-  页面内容
-</div>
-```
-
-**参数说明**
-
-| 参数           | 类型      | 默认值                     | 说明                       |
-| -------------- | --------- | -------------------------- | -------------------------- |
-| `value`        | `boolean` | `false`                    | 是否显示 loading           |
-| `text`         | `string`  | -                          | 加载提示文本               |
-| `background`   | `string`  | `rgba(255,255,255,0.7)`    | 遮罩背景色                 |
-| `spinnerColor` | `string`  | `#409eff`                  | Spinner 颜色               |
-| `spinnerSize`  | `number`  | `32`                       | Spinner 大小（px）         |
-| `minDuration`  | `number`  | `0`                        | 最小展示时间（ms，防闪烁） |
-| `fullscreen`   | `boolean` | `false`                    | 是否全屏模式               |
-
----
-
-### v-tooltip - 轻量级 Tooltip 指令
-
-纯 DOM 实现的 tooltip，不依赖组件，支持文字溢出自动触发和方向修饰符。
-
-**基础用法**
-
-```vue
-<!-- 基础提示 -->
-<span v-tooltip="'这是提示文本'">悬停查看</span>
-
-<!-- 指定方向 -->
-<span v-tooltip.bottom="'底部提示'">文字</span>
-<span v-tooltip.left="'左侧提示'">文字</span>
-```
-
-**文字溢出自动触发**
-
-```vue
-<!-- 仅当文字被 ellipsis 截断时才显示 tooltip -->
-<span
-  v-tooltip.ellipsis="'这是一段很长很长的完整文本内容'"
-  style="width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
->
-  这是一段很长很长的完整文本内容
-</span>
-```
-
-**高级配置**
-
-```vue
-<span
-  v-tooltip="{
-    content: '提示内容',
-    placement: 'right',
-    showDelay: 300,
-    hideDelay: 200,
-  }"
->
-  悬停查看
-</span>
-```
-
-**参数说明**
-
-| 参数        | 类型                                 | 默认值  | 说明                            |
-| ----------- | ------------------------------------ | ------- | ------------------------------- |
-| `content`   | `string`                             | -       | 提示文本内容                    |
-| `placement` | `'top'\|'bottom'\|'left'\|'right'`   | `'top'` | 弹出方向（也可用修饰符指定）    |
-| `showDelay` | `number`                             | `200`   | 显示延迟（ms）                  |
-| `hideDelay` | `number`                             | `100`   | 隐藏延迟（ms）                  |
-| `ellipsis`  | `boolean`                            | `false` | 仅文字溢出时显示（也可用修饰符）|
-| `disabled`  | `boolean`                            | `false` | 是否禁用                        |
-
-**修饰符**
-
-| 修饰符      | 说明                          |
-| ----------- | ----------------------------- |
-| `.top`      | 顶部弹出（默认）             |
-| `.bottom`   | 底部弹出                     |
-| `.left`     | 左侧弹出                     |
-| `.right`    | 右侧弹出                     |
-| `.ellipsis` | 仅文字溢出时显示             |
-
----
-
-### v-click-outside - 点击外部区域指令
-
-监听元素外部的点击事件，适用于关闭下拉框、Popover、模态框等场景。
-
-**基础用法**
-
-```vue
-<script setup>
-const isOpen = ref(true)
-const handleClose = () => { isOpen.value = false }
-</script>
-
-<div v-click-outside="handleClose" v-if="isOpen">
-  下拉框内容
-</div>
-```
-
-**带条件控制**
-
-```vue
-<div v-click-outside="{ handler: close, enabled: isOpen }">
-  仅在打开时监听外部点击
-</div>
-```
-
-**排除元素**
-
-```vue
-<!-- 点击 .trigger-btn 不会触发关闭 -->
-<button class="trigger-btn" @click="toggle">切换</button>
-<div v-click-outside="{ handler: close, exclude: ['.trigger-btn'] }">
-  内容区域
-</div>
-```
-
-**参数说明**
-
-| 参数      | 类型                                   | 默认值 | 说明                              |
-| --------- | -------------------------------------- | ------ | --------------------------------- |
-| `handler` | `(event: MouseEvent\|TouchEvent)=>void`| -      | 点击外部时的回调函数              |
-| `enabled` | `boolean`                              | `true` | 是否启用监听                      |
-| `exclude` | `string[]`                             | -      | 排除的元素选择器（点击不触发）    |
-
----
-
-## 👍 最佳实践
-
-### 1. 指令组合使用
-
-```vue
-<!-- 防抖 + 权限控制 + 复制 -->
 <button
-  v-permission="'admin'"
-  v-debounce="500"
-  v-copy="orderNumber"
-  @click="handleSubmit"
+  v-tooltip="{
+    content: '重新同步数据',
+    placement: 'top',
+    showDelay: 150,
+    maxWidth: 320,
+    styleNonce: cspNonce,
+  }"
 >
-  提交订单
+  同步
 </button>
+
+<aside
+  v-click-outside="{
+    handler: close,
+    exclude: ['[data-popover-trigger]', triggerElement],
+    onError: report,
+  }"
+>
+  <!-- popover -->
+</aside>
 ```
 
-### 2. 与 UI 组件库集成
+Loading 文本通过 `textContent` 渲染。Tooltip 使用 `role="tooltip"` 和 `aria-describedby`，支持键盘焦点与 Escape。Click-outside 使用 `composedPath()`，可正确处理 Shadow DOM。
 
-```typescript
-// main.ts - 与 Naive UI 集成
-import { createApp } from "vue";
-import { createDiscreteApi } from "naive-ui";
-import { setupDirectives } from "@robot-admin/directives";
+## TypeScript
 
-const app = createApp(App);
-const { message } = createDiscreteApi(["message"]);
-
-// 全局提供 message 实例供 v-copy 使用
-app.provide("$message", message);
-
-setupDirectives(app);
-```
-
-```vue
-<!-- 在组件中使用 -->
-<script setup>
-import { inject } from "vue";
-const message = inject("$message");
-</script>
-
-<template>
-  <button v-copy="{ text: '内容', messageInstance: message }">
-    复制（使用 Naive UI 提示）
-  </button>
-</template>
-```
-
-### 3. 动态权限控制
-
-```vue
-<script setup>
-import { computed } from "vue";
-import { useUserStore } from "@/stores/user";
-
-const userStore = useUserStore();
-const userPermissions = computed(() => userStore.permissions);
-</script>
-
-<template>
-  <!-- 动态权限数据 -->
-  <button
-    v-permission="{
-      permissions: ['delete:user'],
-      authData: userPermissions,
-      fallback: 'disable',
-    }"
-  >
-    删除用户
-  </button>
-</template>
-```
-
-### 4. 响应式水印
-
-```vue
-<script setup>
-import { computed } from "vue";
-import { useUserStore } from "@/stores/user";
-
-const userStore = useUserStore();
-const watermarkText = computed(() => [
-  userStore.username,
-  new Date().toLocaleDateString(),
-]);
-</script>
-
-<template>
-  <!-- 水印会随用户信息自动更新 -->
-  <div v-watermark="watermarkText">敏感内容</div>
-</template>
-```
-
-### 5. 性能优化建议
-
-- ✅ **全局注册推荐**：如果项目中多处使用，推荐全局注册
-- ✅ **按需引入优化**：单页应用特定页面可按需引入
-- ✅ **防抖节流参数**：根据实际网络延迟和用户体验调整延迟时间
-- ✅ **水印防删除**：`preventDelete: true` 会启用 MutationObserver，注意性能影响
-- ⚠️ **避免过度使用**：不要在列表循环中使用复杂指令（如水印）
-
----
-
-## �🔧 TypeScript 支持
-
-完整的类型定义和智能提示：
-
-```typescript
+```ts
 import type {
+  ClickOutsideOptions,
   CopyOptions,
-  CopyBinding,
   DebounceOptions,
-  ThrottleOptions,
+  DirectivesPluginOptions,
   DragOptions,
+  LazyOptions,
+  LoadingOptions,
   LongPressOptions,
   PermissionOptions,
-  WatermarkOptions,
-  WatermarkBinding,
-  LazyOptions,
-  LazyBinding,
-  LoadingOptions,
-  LoadingBinding,
+  PermissionProvider,
+  ThrottleOptions,
   TooltipOptions,
-  TooltipBinding,
-  ClickOutsideOptions,
-  ClickOutsideBinding,
+  WatermarkOptions,
 } from "@robot-admin/directives";
-
-// 示例：类型化配置
-const copyConfig: CopyOptions = {
-  text: "Hello World",
-  successMessage: "复制成功",
-  onSuccess: (text) => console.log(text),
-};
 ```
 
----
+## SSR、CSP 与浏览器说明
 
-## 🛠️ 开发与调试
+- 指令生命周期只在客户端执行；Nuxt 中应在 `.client.ts` 插件注册。
+- 根模块导入不会主动访问 `window` 或 `document`。
+- Clipboard API 在安全上下文中使用，失败时回退至浏览器兼容复制路径。
+- Loading/Tooltip 的内联样式标签可传 `styleNonce`；水印使用 Canvas data URL，应同步评估站点 CSP。
+- Pointer Events、IntersectionObserver、ResizeObserver 和 MutationObserver 均采用能力检测或在卸载时释放。
 
-### 本地开发
+## 从 1.x 升级到 2.x
+
+| 变化 | 迁移建议 |
+| --- | --- |
+| 推荐 `app.use(createDirectives(options))` | `setupDirectives(app)` 仍可用，可逐步迁移 |
+| 防抖/节流新增 handler-owned 模式 | 使用 `v-debounce:event="{ handler }"`，兼容模式仍保留 |
+| 权限支持应用级 Provider，缺失数据时拒绝 | 安装时配置 `permission.getAuthData`，或绑定中传 `authData` |
+| 拖拽改用 Pointer Events | 回调事件类型改为 `PointerEvent`；触摸设备不再需要独立适配 |
+| 长按回调统一为 `onTrigger` | 直接函数绑定仍可用，旧配置请改为 `onTrigger` |
+| 子路径导入正式公开 | 避免访问包内 `src` 或未声明的深层路径 |
+| Copy 的 `messageInstance` 标为 deprecated | 使用插件 `notify` 或 `onSuccess`/`onError` |
+
+2.x 会更严格校验负延时、非法尺寸、阈值和网格配置；捕获 `RangeError` 可将配置错误接入应用监控。
+
+## 开发验证
 
 ```bash
-# 克隆 monorepo
-git clone https://github.com/ChenyCHENYU/robot-admin-packages.git
-cd robot-admin-packages/packages/directives
-
-# 安装依赖
-bun install
-
-# 开发模式（监听文件变化）
-bun run dev
-
-# 构建生产包
+bun run type-check
+bun run test
 bun run build
 ```
 
-### 在主项目中调试
+测试覆盖权限恢复、事件防抖与清理、外部点击排除、复制与无障碍属性、插件注册以及 Loading 的安全 DOM 构造。
 
-```bash
-# 保持 Robot_Admin 与 robot-admin-packages 为同级目录
-cd ../../../Robot_Admin
-bun run dev:local
-```
+## License
 
-Robot_Admin 的 `dev:local` 会启用 `USE_LOCAL_PACKAGES=true`，由 Vite alias 直接
-解析 Monorepo 源码，无需 `bun link`。其他项目可参考
-[localPackagesAlias.ts](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/src/config/vite/localPackagesAlias.ts)
-配置同等能力。
-
----
-
-## 🚀 扩展指南
-
-### 添加新指令
-
-1. **创建指令文件** `src/directives/your-directive.ts`
-
-```typescript
-import type { Directive, DirectiveBinding } from "vue";
-
-// 定义配置类型
-export interface YourDirectiveOptions {
-  // 配置选项
-}
-
-// 定义指令值类型
-export type YourDirectiveBinding = string | YourDirectiveOptions;
-
-// 实现指令逻辑
-const vYourDirective: Directive = {
-  mounted(el: HTMLElement, binding: DirectiveBinding<YourDirectiveBinding>) {
-    // 指令挂载时的逻辑
-  },
-  updated(el: HTMLElement, binding: DirectiveBinding<YourDirectiveBinding>) {
-    // 指令更新时的逻辑
-  },
-  unmounted(el: HTMLElement) {
-    // 指令卸载时的清理逻辑
-  },
-};
-
-export default vYourDirective;
-```
-
-2. **注册到导出** `src/index.ts`
-
-```typescript
-// 导出指令
-export { default as vYourDirective } from "./directives/your-directive";
-// 导出类型
-export type {
-  YourDirectiveOptions,
-  YourDirectiveBinding,
-} from "./directives/your-directive";
-```
-
-3. **添加到全局注册** `src/install.ts`
-
-```typescript
-import vYourDirective from "./directives/your-directive";
-
-const directivesMap = {
-  // ...existing directives
-  "your-directive": vYourDirective,
-};
-```
-
-4. **更新 README 文档** 添加使用示例和说明
-
-5. **构建并测试**
-
-```bash
-bun run build
-# 在主项目中测试
-```
-
-### 贡献新指令
-
-欢迎贡献常用的业务指令！提交前请确保：
-
-- ✅ 指令具有通用性，适用于多种业务场景
-- ✅ 完整的 TypeScript 类型定义
-- ✅ 清晰的代码注释和 JSDoc 文档
-- ✅ 测试验证跨浏览器兼容性
-- ✅ 更新 README 文档和使用示例
-
----
-
-## 🗺️ 路线图
-
-### v1.x（当前版本）
-
-- ✅ 11 个核心指令（copy / debounce / throttle / drag / longpress / permission / watermark / lazy / loading / tooltip / click-outside）
-- ✅ 完整 TypeScript 支持
-- ✅ 零依赖设计
-- ✅ 关键指令自动化测试覆盖
-- ✅ `v-loading` 使用安全 DOM 构造，用户文本按纯文本渲染
-- ✅ `v-click-outside` 同 tick 卸载时也会取消延迟监听，避免 document 监听泄漏
-- ✅ `v-watermark` ResizeObserver 始终读取最新绑定配置
-
-### v2.0（规划中）
-
-- [ ] **v-infinite-scroll** - 无限滚动指令
-- [ ] 支持自定义指令配置（全局默认值）
-- [ ] 提供 Vue 模板类型增强（Volar 插件）
-
-### 未来计划
-
-- [ ] 指令组合器（Compose API）
-- [ ] 扩充浏览器交互与无障碍测试矩阵
-- [ ] 在线 Playground 演示
-- [ ] 性能监控和优化
-
-**🎉 欢迎提交 [Issue](https://github.com/ChenyCHENYU/robot-admin-packages/issues) 或 [PR](https://github.com/ChenyCHENYU/robot-admin-packages/pulls) 参与建设！**
-
----
-
-## ❓ 常见问题
-
-### Q1: 如何解决 TypeScript 类型提示不生效？
-
-**A:** 确保安装了 `@vue/runtime-core` 类型扩展。在项目根目录创建 `global.d.ts`：
-
-```typescript
-// global.d.ts
-import "@robot-admin/directives";
-
-declare module "@vue/runtime-core" {
-  export interface GlobalDirectives {
-    vCopy: (typeof import("@robot-admin/directives"))["vCopy"];
-    vDebounce: (typeof import("@robot-admin/directives"))["vDebounce"];
-    vThrottle: (typeof import("@robot-admin/directives"))["vThrottle"];
-    vDrag: (typeof import("@robot-admin/directives"))["vDrag"];
-    vLongpress: (typeof import("@robot-admin/directives"))["vLongpress"];
-    vPermission: (typeof import("@robot-admin/directives"))["vPermission"];
-    vWatermark: (typeof import("@robot-admin/directives"))["vWatermark"];
-    vLazy: (typeof import("@robot-admin/directives"))["vLazy"];
-    vLoading: (typeof import("@robot-admin/directives"))["vLoading"];
-    vTooltip: (typeof import("@robot-admin/directives"))["vTooltip"];
-    vClickOutside: (typeof import("@robot-admin/directives"))["vClickOutside"];
-  }
-}
-```
-
-### Q2: v-permission 指令如何与 Pinia/Vuex 集成？
-
-**A:** 通过 `authData` 参数传入响应式权限数据：
-
-```vue
-<script setup>
-import { computed } from "vue";
-import { useAuthStore } from "@/stores/auth";
-
-const authStore = useAuthStore();
-const permissions = computed(() => authStore.permissions);
-</script>
-
-<template>
-  <button v-permission="{ permissions: 'admin', authData: permissions }">
-    管理功能
-  </button>
-</template>
-```
-
-### Q3: v-copy 复制失败怎么办？
-
-**A:** 可能原因：
-
-1. **HTTPS 要求**：现代浏览器要求 HTTPS 才能使用剪贴板 API
-2. **权限问题**：用户未授予剪贴板权限
-3. **降级方案**：包已自动降级到 `document.execCommand` 方式
-
-调试方法：
-
-```vue
-<button
-  v-copy="{
-    text: '内容',
-    onError: (err) => console.error('复制失败:', err),
-  }"
->
-  复制
-</button>
-```
-
-### Q4: 水印被删除怎么办？
-
-**A:** 启用 `preventDelete` 选项：
-
-```vue
-<div v-watermark="{ text: '水印', preventDelete: true }">内容</div>
-```
-
-**注意**：此功能使用 MutationObserver 监听 DOM 变化，会有轻微性能开销。
-
-### Q5: 如何在 Nuxt/Vite SSR 中使用？
-
-**A:** 指令仅在客户端执行，需添加客户端判断：
-
-```typescript
-// plugins/directives.client.ts (Nuxt)
-import { setupDirectives } from "@robot-admin/directives";
-
-export default defineNuxtPlugin((nuxtApp) => {
-  setupDirectives(nuxtApp.vueApp);
-});
-```
-
-```typescript
-// main.ts (Vite SSR)
-import { setupDirectives } from "@robot-admin/directives";
-
-if (typeof window !== "undefined") {
-  setupDirectives(app);
-}
-```
-
-### Q6: 指令性能优化建议？
-
-**A:**
-
-- ✅ 避免在 `v-for` 循环中大量使用复杂指令（如水印）
-- ✅ 防抖/节流延迟时间根据实际需求调整（不宜过小）
-- ✅ 拖拽指令在长列表中慎用，考虑虚拟滚动
-- ✅ 权限指令使用计算属性缓存权限判断结果
-
----
-
-## 📄 许可证
-
-[MIT](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE) © 2026 [ChenYu](https://github.com/ChenyCHENYU)
-
----
-
-## 🔗 相关链接
-
-- **NPM**: https://www.npmjs.com/package/@robot-admin/directives
-- **GitHub**: https://github.com/ChenyCHENYU/robot-admin-packages
-- **主项目**: https://github.com/ChenyCHENYU/Robot_Admin
-- **问题反馈**: https://github.com/ChenyCHENYU/robot-admin-packages/issues
+[MIT](./LICENSE) © ChenYu

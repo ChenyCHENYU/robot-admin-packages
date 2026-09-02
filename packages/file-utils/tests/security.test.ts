@@ -51,7 +51,8 @@ describe("chunk fingerprint", () => {
   it("rejects invalid uploader limits before starting work", () => {
     expect(() => useChunkUpload({ chunkSize: 0 })).toThrow("chunkSize");
     expect(() => useChunkUpload({ concurrent: 0 })).toThrow("concurrent");
-    expect(() => useChunkUpload({ retries: 0 })).toThrow("retries");
+    expect(() => useChunkUpload({ retries: -1 })).toThrow("retries");
+    expect(() => useChunkUpload({ retries: 0 })).not.toThrow();
   });
 
   it("propagates abort to active upload callbacks without reporting completion", async () => {
@@ -75,7 +76,7 @@ describe("chunk fingerprint", () => {
 
     while (!callbackSignal) await new Promise((resolve) => setTimeout(resolve, 0));
     abort();
-    await pending;
+    await expect(pending).rejects.toMatchObject({ code: "ABORTED" });
 
     expect(callbackSignal.aborted).toBe(true);
     expect(state.value.aborted).toBe(true);

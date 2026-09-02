@@ -3,6 +3,14 @@
  * 基于浏览器原生 Canvas API，零外部依赖
  */
 
+import { getFileUtilsContext, type FileUtilsContext } from "../config";
+import {
+  assertWithinLimit,
+  FileUtilsError,
+  throwIfAborted,
+} from "../types";
+import { useFile } from "../file";
+
 // ==================== 类型定义 ====================
 
 export interface CompressOptions {
@@ -14,6 +22,11 @@ export interface CompressOptions {
   maxHeight?: number;
   /** 输出格式，默认 image/jpeg */
   type?: "image/jpeg" | "image/png" | "image/webp";
+  /** JPEG transparency fill. Default: white. */
+  backgroundColor?: string;
+  maxPixels?: number;
+  maxFileSize?: number;
+  signal?: AbortSignal;
 }
 
 export interface CropOptions {
@@ -25,6 +38,9 @@ export interface CropOptions {
   width: number;
   /** 裁剪高度 */
   height: number;
+  maxPixels?: number;
+  maxFileSize?: number;
+  signal?: AbortSignal;
 }
 
 export interface ImageInfo {
@@ -40,6 +56,10 @@ export interface ImageInfo {
 
 export type ImageFormat = "png" | "jpeg" | "webp";
 
+export interface UseImageOptions {
+  context?: FileUtilsContext;
+}
+
 // ==================== 内部工具函数 ====================
 
 /**
@@ -48,7 +68,10 @@ export type ImageFormat = "png" | "jpeg" | "webp";
 function get2DContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    throw new Error("无法获取 Canvas 2D 上下文（环境不支持或上下文数量超限）");
+    throw new FileUtilsError(
+      "NOT_SUPPORTED",
+      "无法获取 Canvas 2D 上下文（环境不支持或上下文数量超限）",
+    );
   }
   return ctx;
 }
@@ -56,20 +79,47 @@ function get2DContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 /**
  * @description 从 File/Blob 加载 HTMLImageElement
  */
-function loadImage(source: File | Blob): Promise<HTMLImageElement> {
+function loadImage(
+  source: File | Blob,
+  signal?: AbortSignal,
+): Promise<HTMLImageElement> {
+  if (
+    typeof Image === "undefined" ||
+    typeof globalThis.URL?.createObjectURL !== "function"
+  ) {
+    return Promise.reject(
+      new FileUtilsError("NOT_SUPPORTED", "当前环境不支持浏览器图片解码"),
+    );
+  }
+  if (source.type && !source.type.startsWith("image/")) {
+    return Promise.reject(
+      new FileUtilsError("INVALID_CONTENT", `不支持的图片 MIME 类型: ${source.type}`),
+    );
+  }
+  throwIfAborted(signal);
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(source);
 
-    img.onload = () => {
+    const cleanup = () => {
       URL.revokeObjectURL(url);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      img.src = "";
+      reject(new FileUtilsError("ABORTED", "图片处理已取消", { cause: signal?.reason }));
+    };
+    img.onload = () => {
+      cleanup();
       resolve(img);
     };
     img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("图片加载失败"));
+      cleanup();
+      reject(new FileUtilsError("READ_FAILED", "图片加载失败"));
     };
 
+    signal?.addEventListener("abort", onAbort, { once: true });
     img.src = url;
   });
 }
@@ -85,11 +135,40 @@ function canvasToBlob(
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) =>
-        blob ? resolve(blob) : reject(new Error("Canvas 转 Blob 失败")),
+        blob
+          ? resolve(blob)
+          : reject(new FileUtilsError("WRITE_FAILED", "Canvas 转 Blob 失败")),
       type,
       quality,
     );
   });
+}
+
+function assertDimension(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0 || !Number.isInteger(value)) {
+    throw new RangeError(`${name} 必须是大于 0 的整数`);
+  }
+}
+
+function assertCoordinate(value: number, name: string): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(`${name} 必须是大于或等于 0 的有限数值`);
+  }
+}
+
+function assertPixelLimit(
+  width: number,
+  height: number,
+  maximum: number,
+): void {
+  assertDimension(width, "width");
+  assertDimension(height, "height");
+  if (width * height > maximum) {
+    throw new FileUtilsError(
+      "LIMIT_EXCEEDED",
+      `图片像素数超过限制：${width}×${height} > ${maximum}`,
+    );
+  }
 }
 
 // ==================== 主 Hook ====================
@@ -116,7 +195,21 @@ function canvasToBlob(
  * console.log(info.width, info.height, info.size)
  * ```
  */
-export function useImage() {
+export function useImage(options: UseImageOptions = {}) {
+  const context = () => getFileUtilsContext(options.context);
+  const createCanvas = (): HTMLCanvasElement => {
+    if (!globalThis.document?.createElement) {
+      throw new FileUtilsError("NOT_SUPPORTED", "当前环境不支持 Canvas");
+    }
+    return document.createElement("canvas");
+  };
+  const validateInput = (file: File | Blob, maxFileSize?: number) => {
+    assertWithinLimit(
+      file.size,
+      maxFileSize ?? context().limits.maxFileSize,
+      "图片文件大小",
+    );
+  };
   /**
    * @description 压缩图片
    */
@@ -124,9 +217,25 @@ export function useImage() {
     file: File | Blob,
     options: CompressOptions = {},
   ): Promise<Blob> => {
-    const { quality = 0.8, maxWidth, maxHeight, type = "image/jpeg" } = options;
+    const {
+      quality = 0.8,
+      maxWidth,
+      maxHeight,
+      type = "image/jpeg",
+      backgroundColor = "#fff",
+      maxPixels,
+      maxFileSize,
+      signal,
+    } = options;
+    validateInput(file, maxFileSize);
+    if (!Number.isFinite(quality) || quality < 0 || quality > 1) {
+      throw new RangeError("quality 必须位于 0 到 1 之间");
+    }
+    if (maxWidth !== undefined) assertDimension(maxWidth, "maxWidth");
+    if (maxHeight !== undefined) assertDimension(maxHeight, "maxHeight");
 
-    const img = await loadImage(file);
+    const img = await loadImage(file, signal);
+    assertPixelLimit(img.width, img.height, maxPixels ?? context().limits.maxImagePixels);
     let { width, height } = img;
 
     // 按比例缩放
@@ -139,14 +248,24 @@ export function useImage() {
       height = maxHeight;
     }
 
-    const canvas = document.createElement("canvas");
+    assertPixelLimit(width, height, maxPixels ?? context().limits.maxImagePixels);
+    const canvas = createCanvas();
     canvas.width = width;
     canvas.height = height;
 
     const ctx = get2DContext(canvas);
+    if (type === "image/jpeg") {
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, width, height);
+    }
     ctx.drawImage(img, 0, 0, width, height);
-
-    return canvasToBlob(canvas, type, quality);
+    throwIfAborted(signal);
+    const blob = await canvasToBlob(canvas, type, quality);
+    throwIfAborted(signal);
+    if (blob.type && blob.type !== type) {
+      throw new FileUtilsError("NOT_SUPPORTED", `浏览器不支持输出格式: ${type}`);
+    }
+    return blob;
   };
 
   /**
@@ -156,9 +275,23 @@ export function useImage() {
     file: File | Blob,
     options: CropOptions,
   ): Promise<Blob> => {
-    const img = await loadImage(file);
+    const { signal, maxPixels } = options;
+    validateInput(file, options.maxFileSize);
+    const img = await loadImage(file, signal);
+    assertDimension(options.width, "width");
+    assertDimension(options.height, "height");
+    assertCoordinate(options.x, "x");
+    assertCoordinate(options.y, "y");
+    if (options.x + options.width > img.width || options.y + options.height > img.height) {
+      throw new RangeError("裁剪区域超出图片边界");
+    }
+    assertPixelLimit(
+      options.width,
+      options.height,
+      maxPixels ?? context().limits.maxImagePixels,
+    );
 
-    const canvas = document.createElement("canvas");
+    const canvas = createCanvas();
     canvas.width = options.width;
     canvas.height = options.height;
 
@@ -175,7 +308,10 @@ export function useImage() {
       options.height,
     );
 
-    return canvasToBlob(canvas, "image/png");
+    throwIfAborted(signal);
+    const blob = await canvasToBlob(canvas, "image/png");
+    throwIfAborted(signal);
+    return blob;
   };
 
   /**
@@ -184,10 +320,22 @@ export function useImage() {
   const convert = async (
     file: File | Blob,
     format: ImageFormat,
+    options: {
+      quality?: number;
+      maxPixels?: number;
+      maxFileSize?: number;
+      signal?: AbortSignal;
+    } = {},
   ): Promise<Blob> => {
-    const img = await loadImage(file);
+    validateInput(file, options.maxFileSize);
+    const img = await loadImage(file, options.signal);
+    assertPixelLimit(
+      img.width,
+      img.height,
+      options.maxPixels ?? context().limits.maxImagePixels,
+    );
 
-    const canvas = document.createElement("canvas");
+    const canvas = createCanvas();
     canvas.width = img.width;
     canvas.height = img.height;
 
@@ -195,9 +343,18 @@ export function useImage() {
     ctx.drawImage(img, 0, 0);
 
     const mimeType = `image/${format}`;
-    const quality = format === "jpeg" ? 0.92 : undefined;
+    const quality = format === "jpeg" ? (options.quality ?? 0.92) : undefined;
+    if (quality !== undefined && (!Number.isFinite(quality) || quality < 0 || quality > 1)) {
+      throw new RangeError("quality 必须位于 0 到 1 之间");
+    }
 
-    return canvasToBlob(canvas, mimeType, quality);
+    throwIfAborted(options.signal);
+    const blob = await canvasToBlob(canvas, mimeType, quality);
+    throwIfAborted(options.signal);
+    if (blob.type && blob.type !== mimeType) {
+      throw new FileUtilsError("NOT_SUPPORTED", `浏览器不支持输出格式: ${mimeType}`);
+    }
+    return blob;
   };
 
   /**
@@ -207,25 +364,54 @@ export function useImage() {
     file: File | Blob,
     width: number,
     height?: number,
+    options: {
+      maxPixels?: number;
+      maxFileSize?: number;
+      signal?: AbortSignal;
+    } = {},
   ): Promise<Blob> => {
-    const img = await loadImage(file);
-    const targetHeight = height || Math.round((img.height * width) / img.width);
+    validateInput(file, options.maxFileSize);
+    assertDimension(width, "width");
+    if (height !== undefined) assertDimension(height, "height");
+    const img = await loadImage(file, options.signal);
+    const targetHeight = height ?? Math.round((img.height * width) / img.width);
+    assertPixelLimit(
+      width,
+      targetHeight,
+      options.maxPixels ?? context().limits.maxImagePixels,
+    );
 
-    const canvas = document.createElement("canvas");
+    const canvas = createCanvas();
     canvas.width = width;
     canvas.height = targetHeight;
 
     const ctx = get2DContext(canvas);
     ctx.drawImage(img, 0, 0, width, targetHeight);
 
-    return canvasToBlob(canvas, "image/png");
+    throwIfAborted(options.signal);
+    const blob = await canvasToBlob(canvas, "image/png");
+    throwIfAborted(options.signal);
+    return blob;
   };
 
   /**
    * @description 获取图片信息
    */
-  const getInfo = async (file: File | Blob): Promise<ImageInfo> => {
-    const img = await loadImage(file);
+  const getInfo = async (
+    file: File | Blob,
+    readOptions: {
+      maxPixels?: number;
+      maxFileSize?: number;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<ImageInfo> => {
+    validateInput(file, readOptions.maxFileSize);
+    const img = await loadImage(file, readOptions.signal);
+    assertPixelLimit(
+      img.width,
+      img.height,
+      readOptions.maxPixels ?? context().limits.maxImagePixels,
+    );
     return {
       width: img.width,
       height: img.height,
@@ -237,14 +423,15 @@ export function useImage() {
   /**
    * @description 图片转 Base64（复用 file 模块实现）
    */
-  const toBase64 = (file: File | Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("图片读取失败"));
-      reader.readAsDataURL(file);
-    });
-  };
+  const toBase64 = (
+    file: File | Blob,
+    readOptions: { maxFileSize?: number; signal?: AbortSignal } = {},
+  ): Promise<string> =>
+    useFile({ context: options.context }).toBase64(
+      file,
+      readOptions.maxFileSize ?? context().limits.maxFileSize,
+      readOptions.signal,
+    );
 
   return { compress, crop, convert, resize, getInfo, toBase64 };
 }

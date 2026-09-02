@@ -1,197 +1,177 @@
-/*
- * @Author: ChenYu ycyplus@gmail.com
- * @Date: 2026-02-24
- * @Description: 图片懒加载指令
- * Copyright (c) 2026 by CHENY, All Rights Reserved 😎.
- */
-
 import type { Directive } from "vue";
 
-/**
- * * @description 懒加载指令配置选项接口
- */
 export interface LazyOptions {
-  /** 图片源地址 */
   src: string;
-  /** 加载中占位图 */
   loading?: string;
-  /** 加载失败兜底图 */
   error?: string;
-  /** 预加载偏移量（提前多少像素开始加载） */
   rootMargin?: string;
-  /** 可见面积阈值 0-1 */
-  threshold?: number;
+  threshold?: number | readonly number[];
+  root?: Element | Document | null;
+  crossOrigin?: "anonymous" | "use-credentials";
+  referrerPolicy?: ReferrerPolicy;
+  onLoad?: (src: string) => void;
+  onError?: (error: Error, src: string) => void;
 }
 
-/**
- * * @description 指令绑定值类型
- */
 export type LazyBinding = string | LazyOptions;
 
-/**
- * * @description 扩展的 HTML 元素类型
- */
-interface ElType extends HTMLElement {
-  _lazyObserver?: IntersectionObserver;
-  _lazySrc?: string;
-  _lazyLoading?: string;
-  _lazyError?: string;
-  _lazyMode?: "img" | "background";
+interface NormalizedOptions extends LazyOptions {
+  loading: string;
+  error: string;
+  rootMargin: string;
+  threshold: number | readonly number[];
+  root: Element | Document | null;
 }
 
-/** 默认 1px 透明占位图 */
+interface LazyState {
+  options: NormalizedOptions;
+  mode: "img" | "background";
+  observer?: IntersectionObserver;
+  loader?: HTMLImageElement;
+  generation: number;
+}
+
+const states = new WeakMap<HTMLElement, LazyState>();
 const PLACEHOLDER =
   'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
 
-/**
- * * @description 解析指令参数
- * ? @param value - 指令绑定值
- * ! @return 标准化配置
- */
-function parseOptions(value: LazyBinding | undefined): Required<LazyOptions> {
-  const defaults: Required<LazyOptions> = {
-    src: "",
-    loading: PLACEHOLDER,
-    error: PLACEHOLDER,
-    rootMargin: "200px 0px",
-    threshold: 0,
+function parseOptions(value: LazyBinding | undefined): NormalizedOptions {
+  const raw = typeof value === "string" ? { src: value } : (value ?? { src: "" });
+  const threshold = raw.threshold ?? 0;
+  const values = Array.isArray(threshold) ? threshold : [threshold];
+  if (values.some((item) => !Number.isFinite(item) || item < 0 || item > 1)) {
+    throw new RangeError("threshold 必须位于 0 到 1 之间");
+  }
+  return {
+    ...raw,
+    loading: raw.loading ?? PLACEHOLDER,
+    error: raw.error ?? PLACEHOLDER,
+    rootMargin: raw.rootMargin ?? "200px 0px",
+    threshold,
+    root: raw.root ?? null,
   };
-
-  if (!value) return defaults;
-  if (typeof value === "string") return { ...defaults, src: value };
-  return { ...defaults, ...value };
 }
 
-/**
- * * @description 设置元素的图片源
- * ? @param el - 目标元素
- * ? @param src - 图片地址
- * ! @return void
- */
-function setSource(el: ElType, src: string): void {
-  if (el._lazyMode === "background") {
-    el.style.backgroundImage = `url(${src})`;
+function setSource(el: HTMLElement, state: LazyState, src: string): void {
+  if (state.mode === "background") {
+    el.style.backgroundImage = `url(${JSON.stringify(src)})`;
   } else {
     (el as HTMLImageElement).src = src;
   }
 }
 
-/**
- * * @description 加载图片并应用到元素
- * ? @param el - 目标元素
- * ! @return void
- */
-function loadImage(el: ElType): void {
-  const src = el._lazySrc;
-  if (!src) return;
-
-  const img = new Image();
-
-  img.onload = () => {
-    setSource(el, src);
-    el.classList.remove("v-lazy-loading");
-    el.classList.add("v-lazy-loaded");
-  };
-
-  img.onerror = () => {
-    if (el._lazyError) setSource(el, el._lazyError);
-    el.classList.remove("v-lazy-loading");
-    el.classList.add("v-lazy-error");
-  };
-
-  img.src = src;
+function stop(state: LazyState): void {
+  state.observer?.disconnect();
+  state.observer = undefined;
+  if (state.loader) {
+    state.loader.onload = null;
+    state.loader.onerror = null;
+    state.loader.src = "";
+    state.loader = undefined;
+  }
 }
 
-/**
- * * @description 创建 IntersectionObserver 监听元素可见性
- * ? @param el - 目标元素
- * ? @param options - 懒加载配置
- * ! @return void
- */
-function observe(el: ElType, options: Required<LazyOptions>): void {
-  // 清理旧的 observer
-  el._lazyObserver?.disconnect();
+function load(el: HTMLElement, state: LazyState): void {
+  const { src } = state.options;
+  if (!src) return;
+  const generation = ++state.generation;
+  const ImageConstructor = el.ownerDocument.defaultView?.Image;
+  if (!ImageConstructor) {
+    const error = new Error("当前环境不支持图片加载");
+    if (state.options.error) setSource(el, state, state.options.error);
+    el.classList.remove("ra-lazy-loading", "ra-lazy-loaded");
+    el.classList.add("ra-lazy-error");
+    state.options.onError?.(error, src);
+    return;
+  }
+  const image = new ImageConstructor();
+  state.loader = image;
+  if (state.options.crossOrigin) image.crossOrigin = state.options.crossOrigin;
+  if (state.options.referrerPolicy) {
+    image.referrerPolicy = state.options.referrerPolicy;
+  }
+  image.onload = () => {
+    if (generation !== state.generation || states.get(el) !== state) return;
+    setSource(el, state, src);
+    el.classList.remove("ra-lazy-loading", "ra-lazy-error");
+    el.classList.add("ra-lazy-loaded");
+    state.loader = undefined;
+    state.options.onLoad?.(src);
+  };
+  image.onerror = () => {
+    if (generation !== state.generation || states.get(el) !== state) return;
+    if (state.options.error) setSource(el, state, state.options.error);
+    el.classList.remove("ra-lazy-loading", "ra-lazy-loaded");
+    el.classList.add("ra-lazy-error");
+    state.loader = undefined;
+    state.options.onError?.(new Error(`图片加载失败: ${src}`), src);
+  };
+  image.src = src;
+}
 
-  el._lazySrc = options.src;
-  el._lazyLoading = options.loading;
-  el._lazyError = options.error;
+function observe(el: HTMLElement, state: LazyState): void {
+  stop(state);
+  state.generation += 1;
+  el.classList.remove("ra-lazy-loaded", "ra-lazy-error");
+  el.classList.add("ra-lazy-loading");
+  if (state.options.loading) setSource(el, state, state.options.loading);
 
-  // 设置占位图
-  setSource(el, options.loading);
-  el.classList.add("v-lazy-loading");
-
-  el._lazyObserver = new IntersectionObserver(
+  if (typeof IntersectionObserver === "undefined") {
+    load(el, state);
+    return;
+  }
+  state.observer = new IntersectionObserver(
     (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          loadImage(el);
-          el._lazyObserver?.disconnect();
-          el._lazyObserver = undefined;
-          break;
-        }
+      if (entries.some((entry) => entry.isIntersecting)) {
+        state.observer?.disconnect();
+        state.observer = undefined;
+        load(el, state);
       }
     },
     {
-      rootMargin: options.rootMargin,
-      threshold: options.threshold,
+      root: state.options.root,
+      rootMargin: state.options.rootMargin,
+      threshold: state.options.threshold as number | number[],
     },
   );
-
-  el._lazyObserver.observe(el);
+  state.observer.observe(el);
 }
 
-/**
- * * @description Vue 图片懒加载指令
- * * @description 基于 IntersectionObserver，元素进入可视区域时加载图片
- *
- * @example
- * ```vue
- * <!-- 基础用法 -->
- * <img v-lazy="imageUrl" />
- *
- * <!-- 背景图 -->
- * <div v-lazy:background="bannerUrl" />
- *
- * <!-- 完整配置 -->
- * <img v-lazy="{ src: url, loading: placeholder, error: fallback }" />
- * ```
- */
 const lazyDirective: Directive<HTMLElement, LazyBinding | undefined> = {
-  /**
-   * * @description 指令挂载时初始化观察器
-   * ? @param el - 绑定指令的 DOM 元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  mounted(el: ElType, binding) {
-    el._lazyMode = binding.arg === "background" ? "background" : "img";
-    const options = parseOptions(binding.value);
-    observe(el, options);
+  mounted(el, binding) {
+    const state: LazyState = {
+      options: parseOptions(binding.value),
+      mode: binding.arg === "background" ? "background" : "img",
+      generation: 0,
+    };
+    states.set(el, state);
+    observe(el, state);
   },
-
-  /**
-   * * @description 指令更新时重新观察
-   * ? @param el - 绑定指令的 DOM 元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  updated(el: ElType, binding) {
-    const options = parseOptions(binding.value);
-    // 仅在 src 变化时重新观察
-    if (options.src !== el._lazySrc) {
-      el.classList.remove("v-lazy-loaded", "v-lazy-error");
-      observe(el, options);
-    }
+  updated(el, binding) {
+    const state = states.get(el);
+    if (!state) return;
+    const next = parseOptions(binding.value);
+    const nextMode = binding.arg === "background" ? "background" : "img";
+    const changed =
+      state.options.src !== next.src ||
+      state.options.loading !== next.loading ||
+      state.options.error !== next.error ||
+      state.options.root !== next.root ||
+      state.options.rootMargin !== next.rootMargin ||
+      JSON.stringify(state.options.threshold) !== JSON.stringify(next.threshold) ||
+      state.options.crossOrigin !== next.crossOrigin ||
+      state.options.referrerPolicy !== next.referrerPolicy ||
+      state.mode !== nextMode;
+    state.options = next;
+    state.mode = nextMode;
+    if (changed) observe(el, state);
   },
-
-  /**
-   * * @description 指令卸载时清理观察器
-   * ? @param el - 绑定指令的 DOM 元素
-   * ! @return void
-   */
-  unmounted(el: ElType) {
-    el._lazyObserver?.disconnect();
-    el._lazyObserver = undefined;
+  unmounted(el) {
+    const state = states.get(el);
+    if (!state) return;
+    state.generation += 1;
+    stop(state);
+    states.delete(el);
   },
 };
 

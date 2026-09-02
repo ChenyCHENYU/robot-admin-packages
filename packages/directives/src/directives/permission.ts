@@ -1,217 +1,182 @@
-/*
- * @Author: ChenYu ycyplus@gmail.com
- * @Date: 2025-06-26 16:29:59
- * @LastEditors: ChenYu ycyplus@gmail.com
- * @LastEditTime: 2025-06-26 17:41:44
- * @FilePath: \Robot_Admin\src\directives\modules\permission.ts
- * @Description: 权限指令
- * Copyright (c) 2025 by CHENY, All Rights Reserved 😎.
- */
+import type { Directive } from "vue";
 
-import type { Directive } from 'vue'
+export type PermissionMode = "AND" | "OR";
+export type PermissionFallback = "hide" | "disable" | "show";
+export type PermissionRecord = Readonly<Record<string, unknown>>;
 
-/**
- * * @description 权限检查配置选项接口
- */
 export interface PermissionOptions {
-  permissions?: string | string[]
-  authData?: Record<string, any>
-  mode?: 'AND' | 'OR'
-  fallback?: 'hide' | 'disable' | 'show'
-  onDenied?: (reason: string) => void
+  permissions?: string | readonly string[];
+  authData?: PermissionRecord;
+  mode?: PermissionMode;
+  fallback?: PermissionFallback;
+  onDenied?: (reason: string) => void;
 }
 
-/**
- * * @description 扩展的HTML元素类型
- */
-interface ElType extends HTMLElement {
-  _originalDisplay?: string
-  _originalDisabled?: boolean
+export type PermissionBinding =
+  | string
+  | readonly string[]
+  | PermissionOptions;
+
+export interface PermissionProvider {
+  getAuthData?: () => PermissionRecord | undefined;
+  check?: (
+    permissions: readonly string[],
+    mode: PermissionMode,
+    element: HTMLElement,
+  ) => boolean;
+  onDenied?: (reason: string, element: HTMLElement) => void;
 }
 
-/**
- * * @description 解析指令参数
- * ? @param value - 指令绑定值
- * ! @return 标准化的权限配置选项
- */
-function parseOptions(
-  value: string | string[] | PermissionOptions | undefined
-): PermissionOptions {
-  if (!value) return { fallback: 'hide' }
-  if (typeof value === 'string') return { permissions: value, fallback: 'hide' }
-  if (Array.isArray(value)) return { permissions: value, fallback: 'hide' }
-  return { fallback: 'hide', ...value }
+interface PermissionState {
+  display: string;
+  opacity: string;
+  pointerEvents: string;
+  ariaDisabled: string | null;
+  disabled?: boolean;
+  lastDeniedReason?: string;
 }
 
-/**
- * * @description 检查通配符权限
- * ? @param permission - 权限名称
- * ? @param authData - 权限数据
- * ! @return 是否匹配
- */
-function checkWildcard(
-  permission: string,
-  authData: Record<string, any>
-): boolean {
-  const keys = Object.keys(authData || {})
-  for (const key of keys) {
-    if (key.endsWith('*') && permission.startsWith(key.slice(0, -1))) {
-      return !!authData[key]
-    }
+const states = new WeakMap<HTMLElement, PermissionState>();
+
+function normalizePermissions(
+  permissions: string | readonly string[] | undefined,
+): readonly string[] {
+  if (!permissions) return [];
+  return (Array.isArray(permissions) ? permissions : [permissions])
+    .map((permission) => String(permission).trim())
+    .filter(Boolean);
+}
+
+function parseOptions(value: PermissionBinding | undefined): PermissionOptions {
+  if (!value) return { fallback: "hide", mode: "OR" };
+  if (typeof value === "string" || Array.isArray(value)) {
+    return { permissions: value, fallback: "hide", mode: "OR" };
   }
-  return false
+  return { fallback: "hide", mode: "OR", ...value };
 }
 
-/**
- * * @description 检查单个权限
- * ? @param permission - 权限名称
- * ? @param authData - 权限数据
- * ! @return 是否有权限
- */
 function checkSinglePermission(
   permission: string,
-  authData: Record<string, any>
+  authData: PermissionRecord,
 ): boolean {
-  if (!authData || typeof authData !== 'object') return false
-  return !!authData[permission] || checkWildcard(permission, authData)
+  if (Boolean(authData[permission])) return true;
+  for (const [key, allowed] of Object.entries(authData)) {
+    if (
+      allowed &&
+      key.endsWith("*") &&
+      permission.startsWith(key.slice(0, -1))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
-/**
- * * @description 检查权限列表
- * ? @param permissions - 权限列表
- * ? @param authData - 权限数据
- * ? @param mode - 检查模式
- * ! @return 是否有权限
- */
-function hasPermission(
-  permissions: string | string[],
-  authData: Record<string, any>,
-  mode: 'AND' | 'OR' = 'OR'
+export function hasPermission(
+  permissions: string | readonly string[],
+  authData: PermissionRecord,
+  mode: PermissionMode = "OR",
 ): boolean {
-  const permList = Array.isArray(permissions) ? permissions : [permissions]
-  if (permList.length === 0) return true
-
-  let matchCount = 0
-  for (const perm of permList) {
-    if (checkSinglePermission(perm, authData)) {
-      matchCount++
-    }
-  }
-
-  return mode === 'AND' ? matchCount === permList.length : matchCount > 0
+  const required = normalizePermissions(permissions);
+  if (required.length === 0) return true;
+  return mode === "AND"
+    ? required.every((permission) =>
+        checkSinglePermission(permission, authData),
+      )
+    : required.some((permission) => checkSinglePermission(permission, authData));
 }
 
-/**
- * * @description 恢复元素原始状态
- * ? @param el - 目标DOM元素
- * ! @return void
- */
-function restoreElement(el: ElType): void {
-  if (el._originalDisplay !== undefined) {
-    el.style.display = el._originalDisplay
-    el._originalDisplay = undefined
-  }
-
-  if (el._originalDisabled !== undefined && 'disabled' in el) {
-    ;(el as any).disabled = el._originalDisabled
-    el._originalDisabled = undefined
-  }
-
-  el.style.opacity = ''
-  el.style.pointerEvents = ''
+function captureState(el: HTMLElement): PermissionState {
+  const existing = states.get(el);
+  if (existing) return existing;
+  const state: PermissionState = {
+    display: el.style.display,
+    opacity: el.style.opacity,
+    pointerEvents: el.style.pointerEvents,
+    ariaDisabled: el.getAttribute("aria-disabled"),
+    disabled:
+      "disabled" in el ? Boolean((el as HTMLButtonElement).disabled) : undefined,
+  };
+  states.set(el, state);
+  return state;
 }
 
-/**
- * * @description 应用权限限制
- * ? @param el - 目标DOM元素
- * ? @param fallback - 降级策略
- * ! @return void
- */
-function applyRestriction(el: ElType, fallback: string): void {
-  if (fallback === 'hide') {
-    if (el._originalDisplay === undefined) {
-      el._originalDisplay = el.style.display || ''
-    }
-    el.style.display = 'none'
-  } else if (fallback === 'disable') {
-    if ('disabled' in el && el._originalDisabled === undefined) {
-      el._originalDisabled = (el as any).disabled || false
-      ;(el as any).disabled = true
-    }
-  } else if (fallback === 'show') {
-    el.style.opacity = '0.5'
-    el.style.pointerEvents = 'none'
+function restoreElement(el: HTMLElement, state: PermissionState): void {
+  el.style.display = state.display;
+  el.style.opacity = state.opacity;
+  el.style.pointerEvents = state.pointerEvents;
+  if (state.ariaDisabled === null) el.removeAttribute("aria-disabled");
+  else el.setAttribute("aria-disabled", state.ariaDisabled);
+  if (state.disabled !== undefined && "disabled" in el) {
+    (el as HTMLButtonElement).disabled = state.disabled;
   }
 }
 
-/**
- * * @description 应用权限检查结果
- * ? @param el - 目标DOM元素
- * ? @param options - 权限配置选项
- * ! @return void
- */
-function applyPermission(el: ElType, options: PermissionOptions): void {
-  const { permissions, authData, mode, fallback, onDenied } = options
-
-  // 没有权限数据时默认拒绝
-  if (!authData) {
-    applyRestriction(el, fallback || 'hide')
-    onDenied?.('权限数据未提供')
-    return
+function applyRestriction(
+  el: HTMLElement,
+  fallback: PermissionFallback,
+): void {
+  if (fallback === "hide") {
+    el.style.display = "none";
+    return;
   }
-
-  // 没有权限要求时默认允许
-  if (!permissions) {
-    restoreElement(el)
-    return
-  }
-
-  if (hasPermission(permissions, authData, mode)) {
-    restoreElement(el)
-  } else {
-    applyRestriction(el, fallback || 'hide')
-    onDenied?.('权限不足')
-  }
+  el.setAttribute("aria-disabled", "true");
+  if ("disabled" in el) (el as HTMLButtonElement).disabled = true;
+  else el.style.pointerEvents = "none";
+  if (fallback === "show") el.style.opacity = "0.5";
 }
 
-/**
- * * @description Vue权限指令
- */
-const permissionDirective: Directive<
-  HTMLElement,
-  string | string[] | PermissionOptions | undefined
-> = {
-  /**
-   * * @description 指令挂载时的处理逻辑
-   * ? @param el - 绑定指令的DOM元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  mounted(el: ElType, binding) {
-    const options = parseOptions(binding.value)
-    applyPermission(el, options)
-  },
+function applyPermission(
+  el: HTMLElement,
+  options: PermissionOptions,
+  provider: PermissionProvider,
+): void {
+  const state = captureState(el);
+  restoreElement(el, state);
+  const required = normalizePermissions(options.permissions);
+  if (required.length === 0) {
+    state.lastDeniedReason = undefined;
+    return;
+  }
 
-  /**
-   * * @description 指令更新时的处理逻辑
-   * ? @param el - 绑定指令的DOM元素
-   * ? @param binding - 指令绑定对象
-   * ! @return void
-   */
-  updated(el: ElType, binding) {
-    const options = parseOptions(binding.value)
-    applyPermission(el, options)
-  },
+  const mode = options.mode ?? "OR";
+  const authData = options.authData ?? provider.getAuthData?.();
+  let allowed = false;
+  let reason = "权限不足";
+  if (provider.check) allowed = provider.check(required, mode, el);
+  else if (authData) allowed = hasPermission(required, authData, mode);
+  else reason = "权限数据未提供";
 
-  /**
-   * * @description 指令卸载时的清理逻辑
-   * ? @param el - 绑定指令的DOM元素
-   * ! @return void
-   */
-  unmounted(el: ElType) {
-    el._originalDisplay = undefined
-    el._originalDisabled = undefined
-  },
+  if (allowed) {
+    state.lastDeniedReason = undefined;
+    return;
+  }
+
+  applyRestriction(el, options.fallback ?? "hide");
+  if (state.lastDeniedReason !== reason) {
+    options.onDenied?.(reason);
+    provider.onDenied?.(reason, el);
+  }
+  state.lastDeniedReason = reason;
 }
 
-export default permissionDirective
+export function createPermissionDirective(
+  provider: PermissionProvider = {},
+): Directive<HTMLElement, PermissionBinding | undefined> {
+  return {
+    mounted(el, binding) {
+      captureState(el);
+      applyPermission(el, parseOptions(binding.value), provider);
+    },
+    updated(el, binding) {
+      applyPermission(el, parseOptions(binding.value), provider);
+    },
+    unmounted(el) {
+      const state = states.get(el);
+      if (state) restoreElement(el, state);
+      states.delete(el);
+    },
+  };
+}
+
+export default createPermissionDirective();

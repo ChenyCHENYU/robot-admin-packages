@@ -1,399 +1,550 @@
-/**
- * @description 大文件分片上传/下载工具
- * 支持并发控制、断点续传、进度追踪、失败重试
- * 基于浏览器原生 API，零外部依赖
- */
-
-import { ref, computed } from "vue";
-import { downloadBlob } from "../types";
-
-// ==================== 类型定义 ====================
+import { computed, ref } from "vue";
+import { getFileUtilsContext, type FileUtilsContext } from "../config";
+import {
+  assertWithinLimit,
+  downloadBlob,
+  FileUtilsError,
+  sanitizeFileName,
+  throwIfAborted,
+  type FileProgress,
+} from "../types";
 
 export interface ChunkUploadOptions {
-  /** 分片大小（字节），默认 2MB */
   chunkSize?: number;
-  /** 并发上传数，默认 3 */
   concurrent?: number;
-  /** 失败重试次数，默认 3 */
+  /** Number of retries after the first attempt. Default: 3. */
   retries?: number;
+  retryDelay?: number | ((attempt: number, error: unknown) => number);
+  maxFileSize?: number;
+  context?: FileUtilsContext;
+}
+
+export interface ChunkUploadRunOptions {
+  signal?: AbortSignal;
+  completedChunks?: Iterable<number>;
+  onProgress?: (progress: FileProgress) => void;
 }
 
 export interface ChunkUploadState {
-  /** 上传进度 0-100 */
   progress: number;
-  /** 是否正在上传 */
   uploading: boolean;
-  /** 当前已完成的分片索引 */
   currentChunk: number;
-  /** 总分片数 */
+  completedChunks: number[];
   totalChunks: number;
-  /** 上传速度（字节/秒） */
+  uploadedBytes: number;
   speed: number;
-  /** 是否已中止 */
   aborted: boolean;
+  error: string | null;
+}
+
+export interface ChunkUploadResult {
+  hash: string;
+  totalChunks: number;
+  completedChunks: number[];
 }
 
 export interface ChunkDownloadState {
-  /** 下载进度 0-100 */
   progress: number;
-  /** 是否正在下载 */
   downloading: boolean;
-  /** 是否已中止 */
+  loaded: number;
+  total?: number;
+  speed: number;
   aborted: boolean;
+  error: string | null;
 }
 
-/** 分片上传回调函数 */
+export interface ChunkDownloadSink {
+  write(chunk: Uint8Array): void | Promise<void>;
+  close(): void | Promise<void>;
+  abort?(reason?: unknown): void | Promise<void>;
+}
+
+export interface ChunkDownloadOptions {
+  onProgress?: (percent: number) => void;
+  onProgressDetail?: (progress: FileProgress) => void;
+  signal?: AbortSignal;
+  requestInit?: Omit<RequestInit, "signal">;
+  sink?: ChunkDownloadSink;
+  expectedSize?: number;
+  maxBufferedSize?: number;
+  mimeType?: string;
+}
+
+export interface ChunkDownloadResult {
+  bytes: number;
+  fileName: string;
+  blob?: Blob;
+}
+
+export interface UseChunkDownloadOptions {
+  context?: FileUtilsContext;
+  fetch?: typeof globalThis.fetch;
+  save?: (blob: Blob, fileName: string) => void;
+}
+
 export type ChunkUploadFn = (
   chunk: Blob,
   index: number,
   total: number,
   hash: string,
   signal: AbortSignal,
-) => Promise<any>;
+) => Promise<unknown>;
 
-/** 分片合并回调函数 */
 export type ChunkMergeFn = (
   fileName: string,
   totalChunks: number,
   hash: string,
-) => Promise<any>;
-
-// ==================== 内部工具函数 ====================
-
-/**
- * @description 计算文件哈希（使用首尾块 + 文件大小）
- */
-async function calculateFileHash(file: File): Promise<string> {
-  const chunkSize = 1024 * 1024; // 取首尾各 1MB 用于计算
-  const chunks: ArrayBuffer[] = [];
-
-  // 首块
-  chunks.push(
-    await file.slice(0, Math.min(chunkSize, file.size)).arrayBuffer(),
-  );
-
-  // 尾块（如果文件大于 1MB）
-  if (file.size > chunkSize) {
-    chunks.push(
-      await file.slice(Math.max(0, file.size - chunkSize)).arrayBuffer(),
-    );
-  }
-
-  // 合并首尾块，并预留 8 字节将文件大小真正纳入 SHA-256 输入
-  const contentLength = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
-  const combined = new Uint8Array(contentLength + 8);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(new Uint8Array(chunk), offset);
-    offset += chunk.byteLength;
-  }
-
-  new DataView(combined.buffer).setBigUint64(
-    contentLength,
-    BigInt(file.size),
-    false,
-  );
-
-  // 使用 SubtleCrypto 计算 SHA-256；非安全上下文（http 非 localhost）需调用方降级处理
-  if (typeof crypto === "undefined" || !crypto.subtle?.digest) {
-    throw new Error("当前环境不支持 crypto.subtle（需 HTTPS 或 localhost）");
-  }
-  // 文件大小已写入 combined 尾部，因此返回值仍保持标准 64 位十六进制 SHA-256 格式
-  const hashBuffer = await crypto.subtle.digest("SHA-256", combined);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/**
- * @description 并发控制执行器
- */
-async function executeWithConcurrency(
-  tasks: Array<() => Promise<void>>,
-  concurrent: number,
-  onError?: (error: unknown) => void,
-): Promise<void> {
-  let nextTaskIndex = 0;
-  let hasError = false;
-  let firstError: unknown;
-
-  const worker = async () => {
-    while (!hasError) {
-      const taskIndex = nextTaskIndex++;
-      if (taskIndex >= tasks.length) return;
-
-      try {
-        await tasks[taskIndex]();
-      } catch (error) {
-        if (!hasError) {
-          hasError = true;
-          firstError = error;
-          onError?.(error);
-        }
-      }
-    }
-  };
-
-  const workerCount = Math.min(concurrent, tasks.length);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-
-  if (hasError) throw firstError;
-}
+  signal?: AbortSignal,
+) => Promise<unknown>;
 
 function assertPositiveInteger(value: number, name: string): void {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new RangeError(`${name} 必须是大于 0 的整数`);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new FileUtilsError(
+      "INVALID_ARGUMENT",
+      `${name} 必须是大于 0 的安全整数`,
+    );
   }
 }
 
-function waitForRetry(ms: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return Promise.resolve(false);
+function assertNonNegativeInteger(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new FileUtilsError(
+      "INVALID_ARGUMENT",
+      `${name} 必须是大于等于 0 的安全整数`,
+    );
+  }
+}
 
-  return new Promise((resolve) => {
+function abortedError(signal: AbortSignal): FileUtilsError {
+  return new FileUtilsError("ABORTED", "操作已取消", { cause: signal.reason });
+}
+
+function linkAbortSignal(
+  external: AbortSignal | undefined,
+  controller: AbortController,
+): () => void {
+  if (!external) return () => undefined;
+  const relay = () => controller.abort(external.reason);
+  if (external.aborted) relay();
+  else external.addEventListener("abort", relay, { once: true });
+  return () => external.removeEventListener("abort", relay);
+}
+
+function waitForRetry(ms: number, signal: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       signal.removeEventListener("abort", onAbort);
-      resolve(true);
-    }, ms);
+      resolve();
+    }, Math.max(0, ms));
     const onAbort = () => {
       clearTimeout(timer);
-      resolve(false);
+      reject(abortedError(signal));
     };
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
-// ==================== 分片上传 ====================
+function chunkByteLength(fileSize: number, chunkSize: number, index: number): number {
+  const start = index * chunkSize;
+  return Math.max(0, Math.min(chunkSize, fileSize - start));
+}
 
-/**
- * @description 大文件分片上传 Hook
- * @example
- * ```ts
- * import { useChunkUpload } from '@robot-admin/file-utils'
- *
- * const { state, upload, abort } = useChunkUpload({ chunkSize: 5 * 1024 * 1024 })
- *
- * await upload(
- *   file,
- *   async (chunk, index, total, hash) => {
- *     // 上传单个分片到服务器
- *     await api.uploadChunk({ chunk, index, total, hash })
- *   },
- *   async (fileName, totalChunks, hash) => {
- *     // 通知服务器合并分片
- *     await api.mergeChunks({ fileName, totalChunks, hash })
- *   }
- * )
- *
- * // 中止上传
- * abort()
- * ```
- */
+/** A stable sampled SHA-256 identifier. It is an upload identity, not a full-file integrity checksum. */
+export async function calculateFileHash(
+  file: Blob,
+  signal?: AbortSignal,
+): Promise<string> {
+  throwIfAborted(signal);
+  const sampleSize = 1024 * 1024;
+  const samples = [
+    await file.slice(0, Math.min(sampleSize, file.size)).arrayBuffer(),
+  ];
+  if (file.size > sampleSize) {
+    samples.push(
+      await file.slice(Math.max(0, file.size - sampleSize)).arrayBuffer(),
+    );
+  }
+  throwIfAborted(signal);
+  const contentLength = samples.reduce((total, sample) => total + sample.byteLength, 0);
+  const combined = new Uint8Array(contentLength + 8);
+  let offset = 0;
+  for (const sample of samples) {
+    combined.set(new Uint8Array(sample), offset);
+    offset += sample.byteLength;
+  }
+  new DataView(combined.buffer).setBigUint64(contentLength, BigInt(file.size), false);
+  if (!globalThis.crypto?.subtle?.digest) {
+    throw new FileUtilsError(
+      "NOT_SUPPORTED",
+      "当前环境不支持 Web Crypto SHA-256（浏览器中需要 HTTPS 或 localhost）",
+    );
+  }
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", combined);
+  throwIfAborted(signal);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
 export function useChunkUpload(options: ChunkUploadOptions = {}) {
-  const {
-    chunkSize = 2 * 1024 * 1024, // 2MB
-    concurrent = 3,
-    retries = 3,
-  } = options;
-
+  const chunkSize = options.chunkSize ?? 2 * 1024 * 1024;
+  const concurrent = options.concurrent ?? 3;
+  const retries = options.retries ?? 3;
   assertPositiveInteger(chunkSize, "chunkSize");
   assertPositiveInteger(concurrent, "concurrent");
-  assertPositiveInteger(retries, "retries");
+  assertNonNegativeInteger(retries, "retries");
 
   let activeController: AbortController | null = null;
-  let uploadInProgress = false;
-
   const state = ref<ChunkUploadState>({
     progress: 0,
     uploading: false,
     currentChunk: 0,
+    completedChunks: [],
     totalChunks: 0,
+    uploadedBytes: 0,
     speed: 0,
     aborted: false,
+    error: null,
   });
 
   const upload = async (
     file: File,
     uploadFn: ChunkUploadFn,
     mergeFn?: ChunkMergeFn,
-  ): Promise<void> => {
-    if (uploadInProgress) {
-      throw new Error("已有分片上传任务正在执行");
+    runOptions: ChunkUploadRunOptions = {},
+  ): Promise<ChunkUploadResult> => {
+    if (activeController) {
+      throw new FileUtilsError("INVALID_ARGUMENT", "已有分片上传任务正在执行");
+    }
+    const context = getFileUtilsContext(options.context);
+    assertWithinLimit(
+      file.size,
+      options.maxFileSize ?? context.limits.maxFileSize,
+      "上传文件大小",
+    );
+    if (file.size === 0) {
+      throw new FileUtilsError("INVALID_ARGUMENT", "不能分片上传空文件");
     }
 
-    uploadInProgress = true;
     const controller = new AbortController();
     activeController = controller;
+    const unlink = linkAbortSignal(runOptions.signal, controller);
     const { signal } = controller;
     const totalChunks = Math.ceil(file.size / chunkSize);
+    const resumed = new Set<number>();
+    for (const index of runOptions.completedChunks ?? []) {
+      if (!Number.isSafeInteger(index) || index < 0 || index >= totalChunks) {
+        activeController = null;
+        unlink();
+        throw new FileUtilsError(
+          "INVALID_ARGUMENT",
+          `已完成分片索引无效：${index}`,
+        );
+      }
+      resumed.add(index);
+    }
+    let uploadedBytes = Array.from(resumed).reduce(
+      (total, index) => total + chunkByteLength(file.size, chunkSize, index),
+      0,
+    );
+    const completed = new Set(resumed);
+    const startedAt = performance.now();
+
+    const report = () => {
+      const elapsed = Math.max((performance.now() - startedAt) / 1000, 0.001);
+      const percent = Math.min(100, (uploadedBytes / file.size) * 100);
+      const speed = Math.max(0, uploadedBytes / elapsed);
+      state.value.progress = Math.round(percent);
+      state.value.currentChunk = completed.size;
+      state.value.completedChunks = Array.from(completed).sort((a, b) => a - b);
+      state.value.uploadedBytes = uploadedBytes;
+      state.value.speed = speed;
+      runOptions.onProgress?.({
+        phase: "upload",
+        loaded: uploadedBytes,
+        total: file.size,
+        percent,
+        speed,
+        eta: speed > 0 ? (file.size - uploadedBytes) / speed : undefined,
+      });
+    };
 
     state.value = {
-      progress: 0,
+      progress: Math.round((uploadedBytes / file.size) * 100),
       uploading: true,
-      currentChunk: 0,
+      currentChunk: completed.size,
+      completedChunks: Array.from(completed).sort((a, b) => a - b),
       totalChunks,
+      uploadedBytes,
       speed: 0,
       aborted: false,
+      error: null,
     };
 
     try {
-      const hash = await calculateFileHash(file);
-      if (signal.aborted) return;
+      throwIfAborted(signal);
+      const hash = await calculateFileHash(file, signal);
+      const pending = Array.from({ length: totalChunks }, (_, index) => index).filter(
+        (index) => !completed.has(index),
+      );
+      let cursor = 0;
+      let firstError: unknown;
 
-      const startTime = Date.now();
-      let completedChunks = 0;
-      let uploadedBytes = 0;
-
-      // 创建分片任务
-      const tasks: Array<() => Promise<void>> = [];
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
-        const chunk = file.slice(start, end);
-
-        tasks.push(async () => {
-          if (signal.aborted) return;
-
-          let attempt = 0;
-          while (attempt < retries && !signal.aborted) {
-            try {
-              await uploadFn(chunk, i, totalChunks, hash, signal);
-              if (signal.aborted) return;
-
-              completedChunks++;
-              uploadedBytes += chunk.size;
-              state.value.currentChunk = completedChunks;
-              state.value.progress = Math.round(
-                (completedChunks / totalChunks) * 100,
-              );
-
-              const elapsed = (Date.now() - startTime) / 1000;
-              state.value.speed = elapsed > 0 ? uploadedBytes / elapsed : 0;
-              return;
-            } catch (err) {
-              if (signal.aborted) return;
-              attempt++;
-              if (attempt >= retries) throw err;
-              if (!(await waitForRetry(1000 * attempt, signal))) return;
+      const uploadIndex = async (index: number) => {
+        const start = index * chunkSize;
+        const chunk = file.slice(start, Math.min(start + chunkSize, file.size));
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          throwIfAborted(signal);
+          try {
+            await uploadFn(chunk, index, totalChunks, hash, signal);
+            throwIfAborted(signal);
+            completed.add(index);
+            uploadedBytes += chunk.size;
+            report();
+            return;
+          } catch (cause) {
+            if (signal.aborted) throw abortedError(signal);
+            if (attempt >= retries) throw cause;
+            const retryDelay =
+              typeof options.retryDelay === "function"
+                ? options.retryDelay(attempt + 1, cause)
+                : (options.retryDelay ?? 1000) * (attempt + 1);
+            if (!Number.isFinite(retryDelay) || retryDelay < 0) {
+              throw new FileUtilsError("INVALID_ARGUMENT", "retryDelay 返回值无效");
             }
+            await waitForRetry(retryDelay, signal);
           }
-        });
-      }
+        }
+      };
 
-      // 并发上传
-      await executeWithConcurrency(tasks, concurrent, (error) => {
-        controller.abort(error);
-      });
+      const worker = async () => {
+        while (!signal.aborted) {
+          const position = cursor++;
+          if (position >= pending.length) return;
+          try {
+            await uploadIndex(pending[position]);
+          } catch (cause) {
+            if (firstError === undefined) {
+              firstError = cause;
+              controller.abort(cause);
+            }
+            return;
+          }
+        }
+      };
 
-      // 合并分片
-      if (mergeFn && !signal.aborted) {
-        await mergeFn(file.name, totalChunks, hash);
-      }
-
-      if (!signal.aborted) state.value.progress = 100;
-    } catch (err) {
-      if (!state.value.aborted) {
-        throw err;
-      }
+      await Promise.all(
+        Array.from({ length: Math.min(concurrent, pending.length) }, () => worker()),
+      );
+      if (firstError !== undefined) throw firstError;
+      throwIfAborted(signal);
+      if (mergeFn) await mergeFn(file.name, totalChunks, hash, signal);
+      throwIfAborted(signal);
+      uploadedBytes = file.size;
+      report();
+      return {
+        hash,
+        totalChunks,
+        completedChunks: Array.from(completed).sort((a, b) => a - b),
+      };
+    } catch (cause) {
+      const failure =
+        cause instanceof FileUtilsError
+          ? cause
+          : new FileUtilsError(
+              signal.aborted ? "ABORTED" : "NETWORK_ERROR",
+              signal.aborted ? "分片上传已取消" : "分片上传失败",
+              { cause },
+            );
+      state.value.aborted = failure.code === "ABORTED";
+      state.value.error = failure.message;
+      throw failure;
     } finally {
+      unlink();
       if (activeController === controller) activeController = null;
-      uploadInProgress = false;
       state.value.uploading = false;
     }
   };
 
-  const abort = () => {
-    state.value.aborted = true;
-    state.value.uploading = false;
-    activeController?.abort(new Error("分片上传已中止"));
+  const abort = (reason: unknown = new Error("用户取消分片上传")) => {
+    activeController?.abort(reason);
   };
 
+  return { state: computed(() => state.value), upload, abort };
+}
+
+export function createWritableStreamSink(
+  stream: WritableStream<Uint8Array>,
+): ChunkDownloadSink {
+  const writer = stream.getWriter();
   return {
-    state: computed(() => state.value),
-    upload,
-    abort,
+    write: (chunk) => writer.write(chunk),
+    close: () => writer.close(),
+    abort: (reason) => writer.abort(reason),
   };
 }
 
-// ==================== 分片下载 ====================
-
-/**
- * @description 大文件分片下载 Hook（流式读取 + 进度追踪）
- * @example
- * ```ts
- * import { useChunkDownload } from '@robot-admin/file-utils'
- *
- * const { state, download, abort } = useChunkDownload()
- *
- * await download('https://example.com/large-file.zip', 'large-file.zip')
- *
- * // 中止下载
- * abort()
- * ```
- */
-export function useChunkDownload() {
-  let abortController: AbortController | null = null;
-
+export function useChunkDownload(defaults: UseChunkDownloadOptions = {}) {
+  let activeController: AbortController | null = null;
   const state = ref<ChunkDownloadState>({
     progress: 0,
     downloading: false,
+    loaded: 0,
+    speed: 0,
     aborted: false,
+    error: null,
   });
 
   const download = async (
     url: string,
     fileName: string,
-    options: { onProgress?: (progress: number) => void } = {},
-  ): Promise<void> => {
-    abortController = new AbortController();
-    state.value = { progress: 0, downloading: true, aborted: false };
+    options: ChunkDownloadOptions = {},
+  ): Promise<ChunkDownloadResult> => {
+    if (activeController) {
+      throw new FileUtilsError("INVALID_ARGUMENT", "已有分片下载任务正在执行");
+    }
+    const fetcher = defaults.fetch ?? globalThis.fetch;
+    if (typeof fetcher !== "function") {
+      throw new FileUtilsError("NOT_SUPPORTED", "当前环境不支持 fetch");
+    }
+    const context = getFileUtilsContext(defaults.context);
+    const controller = new AbortController();
+    activeController = controller;
+    const unlink = linkAbortSignal(options.signal, controller);
+    const { signal } = controller;
+    const safeName = sanitizeFileName(fileName);
+    const startedAt = performance.now();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+
+    state.value = {
+      progress: 0,
+      downloading: true,
+      loaded: 0,
+      speed: 0,
+      aborted: false,
+      error: null,
+    };
 
     try {
-      const response = await fetch(url, { signal: abortController.signal });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const contentLength = Number(response.headers.get("content-length") || 0);
-      const reader = response.body?.getReader();
-
-      if (!reader) throw new Error("ReadableStream 不受支持");
+      throwIfAborted(signal);
+      const response = await fetcher(url, {
+        ...options.requestInit,
+        signal,
+      });
+      if (!response.ok) {
+        throw new FileUtilsError(
+          "NETWORK_ERROR",
+          `下载请求失败：HTTP ${response.status}`,
+          { details: { status: response.status, url } },
+        );
+      }
+      const headerValue = response.headers.get("content-length");
+      const headerLength = headerValue === null ? Number.NaN : Number(headerValue);
+      const total =
+        options.expectedSize ??
+        (Number.isSafeInteger(headerLength) && headerLength >= 0
+          ? headerLength
+          : undefined);
+      if (options.expectedSize !== undefined) {
+        assertNonNegativeInteger(options.expectedSize, "expectedSize");
+      }
+      const maxBufferedSize =
+        options.maxBufferedSize ?? context.limits.maxBufferedDownloadSize;
+      assertPositiveInteger(maxBufferedSize, "maxBufferedSize");
+      if (!options.sink && total !== undefined) {
+        assertWithinLimit(total, maxBufferedSize, "缓冲下载大小");
+      }
+      reader = response.body?.getReader();
+      if (!reader) {
+        throw new FileUtilsError("NOT_SUPPORTED", "响应不支持 ReadableStream");
+      }
 
       const chunks: Uint8Array[] = [];
       let received = 0;
-
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        chunks.push(value);
-        received += value.length;
-
-        if (contentLength > 0) {
-          state.value.progress = Math.round((received / contentLength) * 100);
-          options.onProgress?.(state.value.progress);
+        throwIfAborted(signal);
+        const part = await reader.read();
+        if (part.done) break;
+        if (!part.value) continue;
+        received += part.value.byteLength;
+        if (!options.sink) {
+          assertWithinLimit(received, maxBufferedSize, "缓冲下载大小");
+          chunks.push(part.value);
+        } else {
+          await options.sink.write(part.value);
+        }
+        const elapsed = Math.max((performance.now() - startedAt) / 1000, 0.001);
+        const speed = received / elapsed;
+        const percent = total && total > 0 ? Math.min(100, (received / total) * 100) : undefined;
+        state.value.loaded = received;
+        state.value.total = total;
+        state.value.speed = speed;
+        state.value.progress = percent === undefined ? 0 : Math.round(percent);
+        options.onProgress?.(state.value.progress);
+        options.onProgressDetail?.({
+          phase: "download",
+          loaded: received,
+          total,
+          percent,
+          speed,
+          eta: total && speed > 0 ? (total - received) / speed : undefined,
+        });
+      }
+      if (options.expectedSize !== undefined && received !== options.expectedSize) {
+        throw new FileUtilsError(
+          "INVALID_CONTENT",
+          `下载大小不匹配：${received} !== ${options.expectedSize}`,
+          { details: { received, expected: options.expectedSize } },
+        );
+      }
+      throwIfAborted(signal);
+      let blob: Blob | undefined;
+      if (options.sink) {
+        await options.sink.close();
+      } else {
+        blob = new Blob(chunks as BlobPart[], {
+          type: options.mimeType ?? response.headers.get("content-type") ?? "",
+        });
+        (defaults.save ?? downloadBlob)(blob, safeName);
+      }
+      state.value.progress = 100;
+      state.value.loaded = received;
+      return { bytes: received, fileName: safeName, blob };
+    } catch (cause) {
+      if (options.sink) {
+        try {
+          await options.sink.abort?.(cause);
+        } catch {
+          // Preserve the primary download failure.
         }
       }
-
-      // 合并并下载
-      const blob = new Blob(chunks as BlobPart[]);
-      downloadBlob(blob, fileName);
-
-      state.value.progress = 100;
-    } catch (err) {
-      if (!state.value.aborted) throw err;
+      const failure =
+        cause instanceof FileUtilsError
+          ? cause
+          : new FileUtilsError(
+              signal.aborted ? "ABORTED" : "NETWORK_ERROR",
+              signal.aborted ? "分片下载已取消" : "分片下载失败",
+              { cause },
+            );
+      state.value.aborted = failure.code === "ABORTED";
+      state.value.error = failure.message;
+      throw failure;
     } finally {
+      try {
+        await reader?.cancel();
+      } catch {
+        // The stream may already be closed or errored.
+      }
+      unlink();
+      if (activeController === controller) activeController = null;
       state.value.downloading = false;
-      abortController = null;
     }
   };
 
-  const abort = () => {
-    state.value.aborted = true;
-    state.value.downloading = false;
-    abortController?.abort();
+  const abort = (reason: unknown = new Error("用户取消分片下载")) => {
+    activeController?.abort(reason);
   };
 
-  return {
-    state: computed(() => state.value),
-    download,
-    abort,
-  };
+  return { state: computed(() => state.value), download, abort };
 }

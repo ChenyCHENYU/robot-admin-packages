@@ -4,10 +4,16 @@
  */
 
 // ==================== 全局安装插件 ====================
-export { setupDirectives } from "./install";
+export {
+  createDirectives,
+  directivesPlugin,
+  setupDirectives,
+} from "./install";
+export type { DirectivesPluginOptions } from "./install";
 
 // ==================== 按需导入指令 ====================
 export { default as vCopy } from "./directives/copy";
+export { createCopyDirective } from "./directives/copy";
 export { default as vDebounce } from "./directives/debounce";
 export { default as vThrottle } from "./directives/throttle";
 export { default as vDrag } from "./directives/drag";
@@ -20,19 +26,48 @@ export { default as vTooltip } from "./directives/tooltip";
 export { default as vClickOutside } from "./directives/click-outside";
 
 // ==================== 导出类型 ====================
-export type { CopyOptions, CopyBinding } from "./directives/copy";
-export type { DebounceOptions } from "./directives/debounce";
-export type { ThrottleOptions } from "./directives/throttle";
-export type { DragOptions } from "./directives/drag";
-export type { LongPressOptions } from "./directives/longpress";
-export type { PermissionOptions } from "./directives/permission";
+export type {
+  CopyBinding,
+  CopyDirectiveOptions,
+  CopyMessageAdapter,
+  CopyOptions,
+} from "./directives/copy";
+export type {
+  DebounceBinding,
+  DebounceOptions,
+} from "./directives/debounce";
+export type {
+  ThrottleBinding,
+  ThrottleOptions,
+} from "./directives/throttle";
+export type { DragBinding, DragOptions, Position } from "./directives/drag";
+export type {
+  LongPressBinding,
+  LongPressOptions,
+} from "./directives/longpress";
+export {
+  createPermissionDirective,
+  hasPermission,
+} from "./directives/permission";
+export type {
+  PermissionBinding,
+  PermissionFallback,
+  PermissionMode,
+  PermissionOptions,
+  PermissionProvider,
+  PermissionRecord,
+} from "./directives/permission";
 export type {
   WatermarkOptions,
   WatermarkBinding,
 } from "./directives/watermark";
 export type { LazyOptions, LazyBinding } from "./directives/lazy";
 export type { LoadingOptions, LoadingBinding } from "./directives/loading";
-export type { TooltipOptions, TooltipBinding } from "./directives/tooltip";
+export type {
+  TooltipBinding,
+  TooltipOptions,
+  TooltipPlacement,
+} from "./directives/tooltip";
 export type {
   ClickOutsideOptions,
   ClickOutsideBinding,

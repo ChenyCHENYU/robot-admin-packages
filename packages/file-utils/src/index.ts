@@ -1,79 +1,146 @@
-/**
- * @robot-admin/file-utils
- * 文件处理工具集 - 统一入口
- *
- * 📦 包含模块：
- * - useExcel     Excel 读写（基于 xlsx）
- * - useDownload  通用文件下载
- * - useJSZip     文件压缩导出（基于 jszip + file-saver）
- * - useCSV       CSV 解析/生成
- * - useFile      Base64/JSON/XML 处理
- * - useImage     图片压缩/裁剪/格式转换
- * - useChunkUpload/useChunkDownload  大文件分片传输
- */
+import {
+  createFileUtilsContext,
+  type FileUtilsConfig,
+} from "./config";
+import { useChunkDownload, useChunkUpload } from "./chunk";
+import { useCSV } from "./csv";
+import { useDownload, type DownloadApiFunction, type DownloadConfig } from "./download";
+import { useExcel } from "./excel";
+import { useFile } from "./file";
+import { useImage } from "./image";
+import { useJSZip } from "./zip";
 
-// ==================== 全局配置 ====================
-export { configureFileUtils } from "./config";
-export type { FileUtilsConfig } from "./config";
+export {
+  configureFileUtils,
+  createFileUtilsContext,
+  getFileUtilsContext,
+  resetFileUtilsConfig,
+  DEFAULT_FILE_UTILS_LIMITS,
+} from "./config";
+export type {
+  FileUtilsConfig,
+  FileUtilsContext,
+  FileUtilsLimits,
+  MessageType,
+  NotificationType,
+} from "./config";
 
-// ==================== 公共类型 ====================
-export type { ExportResult } from "./types";
-export { downloadBlob } from "./types";
+export {
+  assertWithinLimit,
+  downloadBlob,
+  FileUtilsError,
+  sanitizeFileName,
+  throwIfAborted,
+} from "./types";
+export type {
+  DownloadBlobOptions,
+  ExportResult,
+  FileProgress,
+  FileUtilsErrorCode,
+} from "./types";
 
-// ==================== Excel 模块 ====================
 export { useExcel } from "./excel";
 export type {
-  ExcelData,
   ExcelConfig,
+  ExcelData,
+  ExcelReadOptions,
+  ExcelRow,
   ExcelTemplate,
+  SpreadsheetFormulaPolicy,
+  UseExcelOptions,
   UseExcelReturn,
 } from "./excel";
 
-// ==================== 下载模块 ====================
 export {
-  useDownload,
-  useDownloadExcel,
-  useDownloadCSV,
-  useDownloadPDF,
-  useDownloadJSON,
-  getSupportedFileTypes,
   FileType,
+  getSupportedFileTypes,
+  useDownload,
+  useDownloadCSV,
+  useDownloadExcel,
+  useDownloadJSON,
+  useDownloadPDF,
 } from "./download";
-export type { DownloadConfig, DownloadApiFunction } from "./download";
-
-// ==================== 压缩模块 ====================
-export { useJSZip } from "./zip";
 export type {
-  ExportState,
+  DownloadApiFunction,
+  DownloadConfig,
+  DownloadPayload,
+  DownloadRequestContext,
+  DownloadResult,
+  FileExtension,
+} from "./download";
+
+export { sanitizeZipPath, useJSZip } from "./zip";
+export type {
   CodeProjectConfig,
-  ReportConfig,
+  ExportState,
   MediaConfig,
+  ReportConfig,
   TemplateConfig,
+  UseJSZipOptions,
+  ZipOperationOptions,
 } from "./zip";
 
-// ==================== CSV 模块 ====================
 export { useCSV } from "./csv";
-export type { CSVOptions } from "./csv";
+export type { CSVOptions, UseCSVOptions } from "./csv";
 
-// ==================== 文件工具模块 ====================
 export { useFile } from "./file";
-export type { XMLOptions } from "./file";
+export type { JSONFileOptions, UseFileOptions, XMLOptions } from "./file";
 
-// ==================== 图片处理模块 ====================
 export { useImage } from "./image";
 export type {
   CompressOptions,
   CropOptions,
-  ImageInfo,
   ImageFormat,
+  ImageInfo,
+  UseImageOptions,
 } from "./image";
 
-// ==================== 大文件分片模块 ====================
-export { useChunkUpload, useChunkDownload } from "./chunk";
-export type {
-  ChunkUploadOptions,
-  ChunkUploadState,
-  ChunkDownloadState,
-  ChunkUploadFn,
-  ChunkMergeFn,
+export {
+  calculateFileHash,
+  createWritableStreamSink,
+  useChunkDownload,
+  useChunkUpload,
 } from "./chunk";
+export type {
+  ChunkDownloadOptions,
+  ChunkDownloadResult,
+  ChunkDownloadSink,
+  ChunkDownloadState,
+  ChunkMergeFn,
+  ChunkUploadFn,
+  ChunkUploadOptions,
+  ChunkUploadResult,
+  ChunkUploadRunOptions,
+  ChunkUploadState,
+  UseChunkDownloadOptions,
+} from "./chunk";
+
+/**
+ * Creates an isolated toolkit instance. Prefer this in multi-tenant apps, SSR,
+ * tests and micro-frontends; `configureFileUtils` remains as a compatibility API.
+ */
+export function createFileUtils(config: FileUtilsConfig = {}) {
+  const context = createFileUtilsContext(config);
+  return Object.freeze({
+    context,
+    csv: useCSV({ context }),
+    file: useFile({ context }),
+    image: useImage({ context }),
+    excel: useExcel({ context }),
+    zip: useJSZip({ context }),
+    download(
+      api: DownloadApiFunction,
+      downloadConfig: Omit<DownloadConfig, "context">,
+    ) {
+      return useDownload(api, { ...downloadConfig, context });
+    },
+    chunkUpload(options: Omit<import("./chunk").ChunkUploadOptions, "context"> = {}) {
+      return useChunkUpload({ ...options, context });
+    },
+    chunkDownload(
+      options: Omit<import("./chunk").UseChunkDownloadOptions, "context"> = {},
+    ) {
+      return useChunkDownload({ ...options, context });
+    },
+  });
+}

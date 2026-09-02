@@ -1,334 +1,282 @@
-/*
- * @Author: ChenYu ycyplus@gmail.com
- * @Date: 2025-06-26 08:21:01
- * @LastEditors: ChenYu ycyplus@gmail.com
- * @LastEditTime: 2025-06-26 09:25:52
- * @FilePath: \Robot_Admin\src\directives\modules\drag.ts
- * @Description: 拖拽指令
- * Copyright (c) 2025 by CHENY, All Rights Reserved 😎.
- */
-
-import type { Directive } from 'vue'
-
-export interface DragOptions {
-  disabled?: boolean
-  handle?: string
-  boundary?: boolean | string
-  grid?: [number, number]
-  axis?: 'x' | 'y' | 'both'
-  onStart?: (el: HTMLElement) => void
-  onDrag?: (el: HTMLElement, position: Position) => void
-  onEnd?: (el: HTMLElement, position: Position) => void
-}
+import type { Directive } from "vue";
 
 export interface Position {
-  x: number
-  y: number
+  x: number;
+  y: number;
 }
+
+export interface DragOptions {
+  disabled?: boolean;
+  handle?: string;
+  boundary?: boolean | string | HTMLElement;
+  grid?: readonly [number, number];
+  axis?: "x" | "y" | "both";
+  onStart?: (el: HTMLElement, event: PointerEvent) => void;
+  onDrag?: (el: HTMLElement, position: Position, event: PointerEvent) => void;
+  onEnd?: (el: HTMLElement, position: Position, event: PointerEvent) => void;
+}
+
+export type DragBinding = boolean | DragOptions;
 
 interface DragState {
-  isDragging: boolean
-  startX: number
-  startY: number
-  offsetX: number
-  offsetY: number
-  boundaryCache?: {
-    minX: number
-    minY: number
-    maxX: number
-    maxY: number
+  options: Required<Pick<DragOptions, "disabled" | "grid" | "axis">> &
+    DragOptions;
+  trigger: HTMLElement;
+  original: {
+    cursor: string;
+    position: string;
+    left: string;
+    top: string;
+    touchAction: string;
+  };
+  pointerId?: number;
+  startX: number;
+  startY: number;
+  startLeft: number;
+  startTop: number;
+  startRect?: DOMRect;
+  boundaryRect?: DOMRect;
+  lastPosition: Position;
+  pendingEvent?: PointerEvent;
+  frame?: number;
+  pointerdown: (event: PointerEvent) => void;
+  pointermove: (event: PointerEvent) => void;
+  pointerup: (event: PointerEvent) => void;
+}
+
+const states = new WeakMap<HTMLElement, DragState>();
+const selectionLocks = new WeakMap<Document, { count: number; original: string }>();
+
+function lockSelection(doc: Document): void {
+  const current = selectionLocks.get(doc);
+  if (current) current.count += 1;
+  else {
+    selectionLocks.set(doc, {
+      count: 1,
+      original: doc.body.style.userSelect,
+    });
+    doc.body.style.userSelect = "none";
   }
 }
 
-interface ElType extends HTMLElement {
-  _dragOptions?: DragOptions
-  _dragState?: DragState
-  _dragHandlers?: {
-    mousedown: (e: MouseEvent) => void
-    mousemove: (e: MouseEvent) => void
-    mouseup: (e: MouseEvent) => void
+function unlockSelection(doc: Document): void {
+  const current = selectionLocks.get(doc);
+  if (!current) return;
+  current.count -= 1;
+  if (current.count <= 0) {
+    doc.body.style.userSelect = current.original;
+    selectionLocks.delete(doc);
   }
 }
 
-/**
- * * @description 解析指令参数，统一处理各种输入类型
- * ? @param value - 指令绑定值，可以是布尔值、配置对象或undefined
- * ! @return 标准化的拖拽配置对象
- */
-function parseOptions(value: boolean | DragOptions | undefined): DragOptions {
-  if (!value) return { disabled: true }
-  if (typeof value === 'boolean') return { disabled: false }
-  return {
+function parseOptions(value: DragBinding | undefined): DragState["options"] {
+  if (typeof value === "boolean") {
+    return { disabled: !value, boundary: true, grid: [1, 1], axis: "both" };
+  }
+  const options = {
     disabled: false,
     boundary: true,
-    grid: [1, 1],
-    axis: 'both',
-    ...value,
+    grid: [1, 1] as const,
+    axis: "both" as const,
+    ...(value ?? {}),
+  };
+  const [gridX, gridY] = options.grid;
+  if (gridX <= 0 || gridY <= 0 || !Number.isFinite(gridX + gridY)) {
+    throw new RangeError("grid 必须包含两个大于 0 的有限数值");
   }
+  return options;
 }
 
-/**
- * * @description 计算边界限制范围并缓存结果，优化性能
- * ? @param el - 拖拽元素
- * ? @param options - 拖拽配置选项
- * ! @return 边界限制对象，如果无边界限制则返回undefined
- */
-function calculateBoundary(el: ElType, options: DragOptions) {
-  if (!options.boundary) return undefined
-
-  let container = el.parentElement
-
-  if (typeof options.boundary === 'string') {
-    const boundaryEl = document.querySelector(options.boundary) as HTMLElement
-    if (boundaryEl) container = boundaryEl
+function resolveTrigger(el: HTMLElement, handle?: string): HTMLElement {
+  if (!handle) return el;
+  let trigger: Element | null;
+  try {
+    trigger = el.querySelector(handle);
+  } catch (error) {
+    throw new SyntaxError(
+      `无效的拖拽 handle 选择器: ${error instanceof Error ? error.message : handle}`,
+    );
   }
-
-  if (!container) return undefined
-
-  const containerRect = container.getBoundingClientRect()
-  const elRect = el.getBoundingClientRect()
-
-  return {
-    minX: 0,
-    minY: 0,
-    maxX: containerRect.width - elRect.width,
-    maxY: containerRect.height - elRect.height,
+  if (!(trigger instanceof HTMLElement)) {
+    throw new Error(`未找到拖拽 handle: ${handle}`);
   }
+  return trigger;
 }
 
-/**
- * * @description 应用位置约束条件，包括轴限制、网格对齐和边界限制
- * ? @param x - 原始X坐标
- * ? @param y - 原始Y坐标
- * ? @param el - 拖拽元素
- * ? @param options - 拖拽配置选项
- * ? @param state - 拖拽状态对象
- * ! @return 约束后的位置坐标
- */
-function applyConstraints(
-  x: number,
-  y: number,
-  el: ElType,
-  options: DragOptions,
-  state: DragState
+function resolveBoundary(
+  el: HTMLElement,
+  boundary: DragOptions["boundary"],
+): HTMLElement | undefined {
+  if (!boundary) return undefined;
+  if (boundary instanceof HTMLElement) return boundary;
+  if (typeof boundary === "string") {
+    const match = el.ownerDocument.querySelector(boundary);
+    return match instanceof HTMLElement ? match : undefined;
+  }
+  return el.parentElement ?? undefined;
+}
+
+function constrain(
+  state: DragState,
+  event: PointerEvent,
 ): Position {
-  // 轴限制
-  if (options.axis === 'x') y = el.offsetTop
-  if (options.axis === 'y') x = el.offsetLeft
+  let dx = event.clientX - state.startX;
+  let dy = event.clientY - state.startY;
+  if (state.options.axis === "x") dy = 0;
+  if (state.options.axis === "y") dx = 0;
+  const [gridX, gridY] = state.options.grid;
+  dx = Math.round(dx / gridX) * gridX;
+  dy = Math.round(dy / gridY) * gridY;
 
-  // 网格对齐
-  if (options.grid) {
-    if (options.grid[0] > 1)
-      x = Math.round(x / options.grid[0]) * options.grid[0]
-    if (options.grid[1] > 1)
-      y = Math.round(y / options.grid[1]) * options.grid[1]
+  if (state.startRect && state.boundaryRect) {
+    dx = Math.max(
+      state.boundaryRect.left - state.startRect.left,
+      Math.min(state.boundaryRect.right - state.startRect.right, dx),
+    );
+    dy = Math.max(
+      state.boundaryRect.top - state.startRect.top,
+      Math.min(state.boundaryRect.bottom - state.startRect.bottom, dy),
+    );
   }
-
-  // 边界限制
-  if (state.boundaryCache) {
-    const { minX, minY, maxX, maxY } = state.boundaryCache
-    x = Math.max(minX, Math.min(maxX, x))
-    y = Math.max(minY, Math.min(maxY, y))
-  }
-
-  return { x, y }
+  return { x: state.startLeft + dx, y: state.startTop + dy };
 }
 
-/**
- * * @description 初始化拖拽功能，设置事件监听器和样式
- * ? @param el - 目标拖拽元素
- * ? @param options - 拖拽配置选项
- * ! @return 无返回值
- */
-function initDrag(el: ElType, options: DragOptions): void {
-  if (options.disabled) return
-
-  // 清理旧的事件监听器
-  cleanup(el)
-
-  // 设置样式
-  el.style.cursor = 'move'
-  if (getComputedStyle(el).position === 'static') {
-    el.style.position = 'relative'
-  }
-
-  // 初始化状态
-  el._dragState = {
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    offsetX: 0,
-    offsetY: 0,
-  }
-
-  // 确定拖拽触发元素
-  const triggerEl = options.handle
-    ? (el.querySelector(options.handle) as HTMLElement) || el
-    : el
-
-  // 创建事件处理器
-  const handlers = {
-    mousedown: (e: MouseEvent) => {
-      e.preventDefault()
-
-      const state = el._dragState!
-      state.isDragging = true
-      state.startX = e.clientX
-      state.startY = e.clientY
-      state.offsetX = e.clientX - el.offsetLeft
-      state.offsetY = e.clientY - el.offsetTop
-
-      // 缓存边界计算
-      state.boundaryCache = calculateBoundary(el, options)
-
-      // 添加全局事件监听器
-      document.addEventListener('mousemove', handlers.mousemove, {
-        passive: false,
-      })
-      document.addEventListener('mouseup', handlers.mouseup, { once: true })
-
-      // 阻止文本选择
-      document.body.style.userSelect = 'none'
-
-      options.onStart?.(el)
-    },
-
-    mousemove: (e: MouseEvent) => {
-      const state = el._dragState!
-      if (!state.isDragging) return
-
-      e.preventDefault()
-
-      const rawX = e.clientX - state.offsetX
-      const rawY = e.clientY - state.offsetY
-
-      const { x, y } = applyConstraints(rawX, rawY, el, options, state)
-
-      // 批量更新样式
-      el.style.left = x + 'px'
-      el.style.top = y + 'px'
-
-      options.onDrag?.(el, { x, y })
-    },
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    mouseup: (e: MouseEvent) => {
-      const state = el._dragState!
-      if (!state.isDragging) return
-
-      state.isDragging = false
-
-      // 清理事件监听器
-      document.removeEventListener('mousemove', handlers.mousemove)
-
-      // 恢复文本选择
-      document.body.style.userSelect = ''
-
-      const finalX = parseInt(el.style.left) || 0
-      const finalY = parseInt(el.style.top) || 0
-
-      options.onEnd?.(el, { x: finalX, y: finalY })
-    },
-  }
-
-  // 保存处理器引用
-  el._dragHandlers = handlers
-
-  // 绑定mousedown事件
-  triggerEl.addEventListener('mousedown', handlers.mousedown, {
-    passive: false,
-  })
+function flushMove(el: HTMLElement, state: DragState): void {
+  state.frame = undefined;
+  const event = state.pendingEvent;
+  if (!event || state.pointerId !== event.pointerId) return;
+  const position = constrain(state, event);
+  el.style.left = `${position.x}px`;
+  el.style.top = `${position.y}px`;
+  state.lastPosition = position;
+  state.options.onDrag?.(el, position, event);
 }
 
-/**
- * * @description 清理所有事件监听器和状态数据，防止内存泄漏
- * ? @param el - 需要清理的拖拽元素
- * ! @return 无返回值
- */
-function cleanup(el: ElType): void {
-  if (el._dragHandlers) {
-    // 移除mousedown事件
-    const triggerEl = el._dragOptions?.handle
-      ? (el.querySelector(el._dragOptions.handle) as HTMLElement) || el
-      : el
-
-    triggerEl.removeEventListener('mousedown', el._dragHandlers.mousedown)
-
-    // 移除全局事件（如果存在）
-    document.removeEventListener('mousemove', el._dragHandlers.mousemove)
-    document.removeEventListener('mouseup', el._dragHandlers.mouseup)
-
-    delete el._dragHandlers
+function endDrag(el: HTMLElement, state: DragState, event: PointerEvent): void {
+  if (state.pointerId !== event.pointerId) return;
+  if (state.frame !== undefined) {
+    cancelAnimationFrame(state.frame);
+    flushMove(el, state);
   }
-
-  if (el._dragState) {
-    delete el._dragState
+  state.pointerId = undefined;
+  state.pendingEvent = undefined;
+  const doc = el.ownerDocument;
+  doc.removeEventListener("pointermove", state.pointermove);
+  doc.removeEventListener("pointerup", state.pointerup);
+  doc.removeEventListener("pointercancel", state.pointerup);
+  unlockSelection(doc);
+  try {
+    state.trigger.releasePointerCapture(event.pointerId);
+  } catch {
+    // Pointer capture is optional and may already be released by the browser.
   }
-
-  // 恢复样式
-  document.body.style.userSelect = ''
+  state.options.onEnd?.(el, state.lastPosition, event);
 }
 
-/**
- * * @description 检查拖拽配置选项是否发生变化，用于优化更新策略
- * ? @param oldOptions - 旧的配置选项
- * ? @param newOptions - 新的配置选项
- * ! @return 配置是否发生变化的布尔值
- */
-function optionsChanged(
-  oldOptions?: DragOptions,
-  newOptions?: DragOptions
-): boolean {
-  if (!oldOptions || !newOptions) return true
+function bind(el: HTMLElement, value: DragBinding | undefined): void {
+  unbind(el);
+  const options = parseOptions(value);
+  const trigger = resolveTrigger(el, options.handle);
+  const original = {
+    cursor: trigger.style.cursor,
+    position: el.style.position,
+    left: el.style.left,
+    top: el.style.top,
+    touchAction: trigger.style.touchAction,
+  };
 
-  const keys: (keyof DragOptions)[] = ['disabled', 'handle', 'boundary', 'axis']
-  return keys.some(key => {
-    if (key === 'grid') {
-      return JSON.stringify(oldOptions.grid) !== JSON.stringify(newOptions.grid)
+  const state = {} as DragState;
+  state.options = options;
+  state.trigger = trigger;
+  state.original = original;
+  state.startX = 0;
+  state.startY = 0;
+  state.startLeft = 0;
+  state.startTop = 0;
+  state.lastPosition = { x: el.offsetLeft, y: el.offsetTop };
+  state.pointermove = (event) => {
+    if (state.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    state.pendingEvent = event;
+    if (state.frame === undefined) {
+      state.frame = requestAnimationFrame(() => flushMove(el, state));
     }
-    return oldOptions[key] !== newOptions[key]
-  })
+  };
+  state.pointerup = (event) => endDrag(el, state, event);
+  state.pointerdown = (event) => {
+    if (state.options.disabled || state.pointerId !== undefined) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    state.pointerId = event.pointerId;
+    state.startX = event.clientX;
+    state.startY = event.clientY;
+    state.startLeft = el.offsetLeft;
+    state.startTop = el.offsetTop;
+    state.lastPosition = { x: state.startLeft, y: state.startTop };
+    state.startRect = el.getBoundingClientRect();
+    state.boundaryRect = resolveBoundary(el, state.options.boundary)?.getBoundingClientRect();
+    const doc = el.ownerDocument;
+    doc.addEventListener("pointermove", state.pointermove, { passive: false });
+    doc.addEventListener("pointerup", state.pointerup);
+    doc.addEventListener("pointercancel", state.pointerup);
+    lockSelection(doc);
+    try {
+      trigger.setPointerCapture(event.pointerId);
+    } catch {
+      // Older DOM implementations may not support pointer capture.
+    }
+    state.options.onStart?.(el, event);
+  };
+
+  states.set(el, state);
+  if (!options.disabled) {
+    if (getComputedStyle(el).position === "static") el.style.position = "relative";
+    trigger.style.cursor = "move";
+    trigger.style.touchAction = "none";
+    trigger.addEventListener("pointerdown", state.pointerdown, { passive: false });
+  }
 }
 
-// 指令定义
-const dragDirective: Directive<HTMLElement, boolean | DragOptions | undefined> =
-  {
-    /**
-     * * @description: 指令绑定
-     */
-    mounted(el: ElType, binding) {
-      const options = parseOptions(binding.value)
-      el._dragOptions = options
-      initDrag(el, options)
-    },
+function unbind(el: HTMLElement): void {
+  const state = states.get(el);
+  if (!state) return;
+  state.trigger.removeEventListener("pointerdown", state.pointerdown);
+  const doc = el.ownerDocument;
+  doc.removeEventListener("pointermove", state.pointermove);
+  doc.removeEventListener("pointerup", state.pointerup);
+  doc.removeEventListener("pointercancel", state.pointerup);
+  if (state.pointerId !== undefined) unlockSelection(doc);
+  if (state.frame !== undefined) cancelAnimationFrame(state.frame);
+  state.trigger.style.cursor = state.original.cursor;
+  state.trigger.style.touchAction = state.original.touchAction;
+  el.style.position = state.original.position;
+  el.style.left = state.original.left;
+  el.style.top = state.original.top;
+  states.delete(el);
+}
 
-    /**
-     * * @description: 指令更新
-     */
-    updated(el: ElType, binding) {
-      const newOptions = parseOptions(binding.value)
+const dragDirective: Directive<HTMLElement, DragBinding | undefined> = {
+  mounted(el, binding) {
+    bind(el, binding.value);
+  },
+  updated(el, binding) {
+    const current = states.get(el);
+    const next = parseOptions(binding.value);
+    if (
+      !current ||
+      current.options.disabled !== next.disabled ||
+      current.options.handle !== next.handle ||
+      current.options.boundary !== next.boundary ||
+      current.options.axis !== next.axis ||
+      current.options.grid[0] !== next.grid[0] ||
+      current.options.grid[1] !== next.grid[1]
+    ) {
+      bind(el, binding.value);
+      return;
+    }
+    current.options = next;
+  },
+  unmounted: unbind,
+};
 
-      // 只有关键配置变化时才重新初始化
-      if (optionsChanged(el._dragOptions, newOptions)) {
-        el._dragOptions = newOptions
-        initDrag(el, newOptions)
-      } else {
-        // 更新回调函数
-        if (el._dragOptions) {
-          el._dragOptions.onStart = newOptions.onStart
-          el._dragOptions.onDrag = newOptions.onDrag
-          el._dragOptions.onEnd = newOptions.onEnd
-        }
-      }
-    },
-
-    /**
-     * * @description: 指令卸载
-     */
-    unmounted(el: ElType) {
-      cleanup(el)
-      delete el._dragOptions
-    },
-  }
-
-export default dragDirective
+export default dragDirective;
