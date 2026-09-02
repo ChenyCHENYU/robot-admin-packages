@@ -1,5 +1,11 @@
 # @robot-admin/file-utils
 
+## 3.0.1
+
+### Patch Changes
+
+- 678118d: Validate resource limits eagerly, add opt-in full SHA-256 and raster signature checks, refine chunk retry/error behavior, and prevent expected-size overflow writes.
+
 ## 3.0.0
 
 ### Major Changes

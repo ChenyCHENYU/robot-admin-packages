@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/file-utils",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "文件处理工具集 - Excel/下载/压缩/CSV/JSON/XML/图片处理/大文件分片",
   "type": "module",
   "engines": {

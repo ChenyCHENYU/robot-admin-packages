@@ -1,5 +1,11 @@
 # @robot-admin/directives
 
+## 2.0.1
+
+### Patch Changes
+
+- 678118d: Harden DOM ownership and cleanup for permission, drag and lazy directives, and render watermark tiles sharply on high-DPI displays.
+
 ## 2.0.0
 
 ### Major Changes
