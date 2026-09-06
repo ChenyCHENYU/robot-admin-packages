@@ -6,6 +6,7 @@
  */
 
 import { resolve } from "node:path";
+import { createRequire } from "node:module";
 import chalk from "chalk";
 import { fileExists, readJsonFile } from "../utils/file";
 import { isGitRepository } from "../utils/git";
@@ -36,7 +37,7 @@ interface CheckResult {
  * 根据已安装的功能智能检测，未安装的功能只做提示不标记为失败
  */
 export async function doctor(options: DoctorOptions = {}) {
-  const cwd = options.cwd || process.cwd();
+  const cwd = resolve(options.cwd || process.cwd());
 
   // ── Banner ──
   console.log();
@@ -65,8 +66,12 @@ export async function doctor(options: DoctorOptions = {}) {
   if (hasPackageJson) {
     try {
       packageJson = await readJsonFile(packageJsonPath);
-    } catch {
-      // ignore
+    } catch (error) {
+      checks.push({
+        name: "package.json",
+        status: "fail",
+        message: `无法解析 package.json: ${error instanceof Error ? error.message : String(error)}`,
+      });
     }
   } else {
     checks.push({
@@ -88,6 +93,7 @@ export async function doctor(options: DoctorOptions = {}) {
   const hasEslint = !!allDeps["eslint"];
   const hasLintStaged = !!allDeps["lint-staged"];
   const hasPrettier = !!allDeps["prettier"];
+  const hasOxlint = !!allDeps["oxlint"];
 
   // ── 3. 核心功能检查（始终检查） ──
   console.log(`  ${chalk.bold("核心功能")}`);
@@ -95,6 +101,7 @@ export async function doctor(options: DoctorOptions = {}) {
 
   // Husky
   if (hasHusky) {
+    checks.push(dependencyCheck(cwd, "husky"));
     const huskyDir = fileExists(resolve(cwd, ".husky"));
     checks.push({
       name: "Husky 目录",
@@ -118,9 +125,11 @@ export async function doctor(options: DoctorOptions = {}) {
 
   // Commitlint
   if (hasCommitlint) {
+    checks.push(dependencyCheck(cwd, "@commitlint/cli"));
     const hasConfig =
       fileExists(resolve(cwd, "commitlint.config.cjs")) ||
       fileExists(resolve(cwd, "commitlint.config.js")) ||
+      fileExists(resolve(cwd, "commitlint.config.mjs")) ||
       fileExists(resolve(cwd, "commitlint.config.ts"));
     checks.push({
       name: "Commitlint 配置",
@@ -137,6 +146,7 @@ export async function doctor(options: DoctorOptions = {}) {
 
   // Commitizen
   if (hasCommitizen) {
+    checks.push(dependencyCheck(cwd, "commitizen"));
     const hasCzConfig =
       fileExists(resolve(cwd, ".cz-config.cjs")) ||
       fileExists(resolve(cwd, ".cz-config.js"));
@@ -146,7 +156,9 @@ export async function doctor(options: DoctorOptions = {}) {
       message: hasCzConfig ? undefined : "缺少 .cz-config.*",
     });
 
-    const hasCommitizenPath = !!packageJson.config?.commitizen;
+    const hasCommitizenPath =
+      typeof packageJson.config?.commitizen?.path === "string" &&
+      packageJson.config.commitizen.path.length > 0;
     checks.push({
       name: "commitizen path 配置",
       status: hasCommitizenPath ? "pass" : "fail",
@@ -179,24 +191,37 @@ export async function doctor(options: DoctorOptions = {}) {
   // ── 4. 附加功能检查（仅检测已安装的） ──
   const extraChecks: CheckResult[] = [];
 
-  if (hasEslint) {
+  if (hasEslint || hasOxlint || hasLintStaged) {
     console.log();
     console.log(`  ${chalk.bold("代码检查")}`);
     console.log();
 
-    const hasEslintConfig =
-      fileExists(resolve(cwd, "eslint.config.ts")) ||
-      fileExists(resolve(cwd, "eslint.config.js")) ||
-      fileExists(resolve(cwd, "eslint.config.mjs"));
-    const eslintCheck: CheckResult = {
-      name: "ESLint 配置",
-      status: hasEslintConfig ? "pass" : "fail",
-      message: hasEslintConfig ? undefined : "缺少 eslint.config.*",
-    };
-    extraChecks.push(eslintCheck);
-    printCheck(eslintCheck);
+    if (hasEslint) {
+      const eslintDependencyCheck = dependencyCheck(cwd, "eslint");
+      extraChecks.push(eslintDependencyCheck);
+      printCheck(eslintDependencyCheck);
 
-    if (hasHusky) {
+      const hasEslintConfig =
+        fileExists(resolve(cwd, "eslint.config.ts")) ||
+        fileExists(resolve(cwd, "eslint.config.js")) ||
+        fileExists(resolve(cwd, "eslint.config.mjs")) ||
+        fileExists(resolve(cwd, "eslint.config.cjs"));
+      const eslintCheck: CheckResult = {
+        name: "ESLint 配置",
+        status: hasEslintConfig ? "pass" : "fail",
+        message: hasEslintConfig ? undefined : "缺少 eslint.config.*",
+      };
+      extraChecks.push(eslintCheck);
+      printCheck(eslintCheck);
+    }
+
+    if (hasOxlint) {
+      const oxlintCheck = dependencyCheck(cwd, "oxlint");
+      extraChecks.push(oxlintCheck);
+      printCheck(oxlintCheck);
+    }
+
+    if (hasHusky && (hasEslint || hasOxlint || hasLintStaged)) {
       const preCommit = fileExists(resolve(cwd, ".husky/pre-commit"));
       const preCommitCheck: CheckResult = {
         name: "pre-commit hook",
@@ -209,6 +234,10 @@ export async function doctor(options: DoctorOptions = {}) {
   }
 
   if (hasLintStaged) {
+    const dependency = dependencyCheck(cwd, "lint-staged");
+    extraChecks.push(dependency);
+    printCheck(dependency);
+
     const lintStagedConfig = !!packageJson["lint-staged"];
     const lintStagedCheck: CheckResult = {
       name: "lint-staged 配置",
@@ -229,8 +258,15 @@ export async function doctor(options: DoctorOptions = {}) {
     const hasPrettierConfig =
       fileExists(resolve(cwd, ".prettierrc.cjs")) ||
       fileExists(resolve(cwd, ".prettierrc.js")) ||
+      fileExists(resolve(cwd, ".prettierrc.mjs")) ||
       fileExists(resolve(cwd, ".prettierrc.json")) ||
-      fileExists(resolve(cwd, ".prettierrc"));
+      fileExists(resolve(cwd, ".prettierrc")) ||
+      fileExists(resolve(cwd, "prettier.config.js")) ||
+      fileExists(resolve(cwd, "prettier.config.cjs")) ||
+      fileExists(resolve(cwd, "prettier.config.mjs"));
+    const prettierDependency = dependencyCheck(cwd, "prettier");
+    extraChecks.push(prettierDependency);
+    printCheck(prettierDependency);
     const prettierCheck: CheckResult = {
       name: "Prettier 配置",
       status: hasPrettierConfig ? "pass" : "fail",
@@ -243,7 +279,12 @@ export async function doctor(options: DoctorOptions = {}) {
   // EditorConfig（不依赖 package.json，直接检测文件）
   const hasEditorConfig = fileExists(resolve(cwd, ".editorconfig"));
   if (hasEditorConfig) {
-    // 只在存在时标记 pass，不存在不报错（属于可选功能）
+    const editorConfigCheck: CheckResult = {
+      name: "EditorConfig 配置",
+      status: "pass",
+    };
+    extraChecks.push(editorConfigCheck);
+    printCheck(editorConfigCheck);
   }
 
   // ── 5. 未安装功能提示 ──
@@ -251,6 +292,7 @@ export async function doctor(options: DoctorOptions = {}) {
   if (!hasEslint) notInstalled.push("ESLint");
   if (!hasLintStaged) notInstalled.push("lint-staged");
   if (!hasPrettier) notInstalled.push("Prettier");
+  if (!hasOxlint) notInstalled.push("Oxlint");
   if (!hasEditorConfig) notInstalled.push("EditorConfig");
 
   if (notInstalled.length > 0) {
@@ -300,4 +342,28 @@ function printCheck(check: CheckResult) {
   if (check.message && check.status === "fail") {
     console.log(`    ${chalk.gray(check.message)}`);
   }
+}
+
+/** 检查依赖是否能从目标项目解析，避免把“只声明、未安装”误判为可用。 */
+export function isDependencyAvailable(
+  cwd: string,
+  packageName: string,
+): boolean {
+  try {
+    createRequire(resolve(cwd, "package.json")).resolve(packageName);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dependencyCheck(cwd: string, packageName: string): CheckResult {
+  const available = isDependencyAvailable(cwd, packageName);
+  return {
+    name: `${packageName} 依赖`,
+    status: available ? "pass" : "fail",
+    message: available
+      ? undefined
+      : `已声明但当前项目无法解析 ${packageName}，请安装依赖`,
+  };
 }

@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/git-standards",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "零配置 Git 标准化工具包 - 集成 Commitizen + Commitlint + ESLint + Prettier + Husky",
   "type": "module",
   "keywords": [
@@ -17,9 +17,12 @@
   ],
   "author": "ChenYu <ycyplus@gmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "url": "git+https://github.com/ChenyCHENYU/robot-admin-packages.git",
     "directory": "packages/git-standards"
   },
   "main": "./dist/index.cjs",
@@ -30,16 +33,22 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
   "files": [
     "dist",
     "bin",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "publishConfig": {
@@ -50,9 +59,11 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --fix",
+    "lint": "oxlint src tests --deny-warnings",
     "test": "vitest run tests",
-    "prepublishOnly": "bun run build"
+    "check:package": "node ./node_modules/publint/src/cli.js && node ./scripts/verify-package.mjs",
+    "verify": "bun run lint && bun run type-check && bun run test && bun run build && bun run check:package",
+    "prepublishOnly": "bun run verify"
   },
   "dependencies": {
     "@commitlint/cli": "^19.6.0",
@@ -61,6 +72,7 @@
     "chalk": "^5.4.1",
     "commander": "^12.1.0",
     "commitizen": "^4.3.1",
+    "cross-spawn": "^7.0.6",
     "cz-customizable": "^7.2.1",
     "execa": "^9.5.2",
     "husky": "^9.1.7",
@@ -69,6 +81,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
+    "oxlint": "^1.52.0",
+    "publint": "0.3.24",
     "tsup": "^8.3.5",
     "typescript": "^5.8.0",
     "vitest": "^2.1.8"

@@ -1,6 +1,6 @@
 # @robot-admin/git-standards
 
-> **v1.0.4** · 零配置 · 模块化 · Git 工程化标准工具包
+> **v1.0.5** · 零配置 · 模块化 · Git 工程化标准工具包
 
 集成 Commitizen + Commitlint + Husky + ESLint + Prettier + Oxlint + lint-staged，支持按需选配。
 
@@ -11,18 +11,25 @@
 bun add --dev @robot-admin/git-standards
 
 # 初始化（交互式引导）
-node node_modules/@robot-admin/git-standards/bin/robot-standards.js init
+bunx --no-install robot-standards init
 ```
 
 运行后进入交互式引导，选择预设方案即可完成全部配置。
 
 > **注意**：所有配置文件生成后即为完整独立文件，不依赖本包的运行时导入，直接修改即可自定义。
-> 初始化可重复执行：覆盖已有配置前会创建 `.bak` 备份；更新 `package.json` 时会
-> 深合并 `scripts`、工具配置与 `lint-staged`，不会整段抹掉已有字段。
+> 初始化可重复执行：覆盖生成的配置文件前会创建 `.bak` 备份；已有 Husky Hook
+> 会原样保留；更新 `package.json` 时只补充缺失脚本，并合并工具配置与
+> `lint-staged`，不会静默覆盖项目已有约定。
 
 CLI 会按项目实际包管理器使用 `npx --no-install` 或 `pnpm exec` 等本地二进制执行
 方式，避免把含参数的整条命令误当作可执行文件。`--version` 始终从当前安装包的
 `package.json` 读取，和 npm 发布版本保持一致。
+
+运行环境要求 Node.js `>=18.18.0`。
+
+> Husky Hook 属于整个 Git 仓库，因此 `--cwd` 必须指向仓库根目录；在 monorepo
+> 子包中执行时请显式传入根目录。CLI 会拒绝在已有仓库子目录中生成另一套 Hook，
+> 防止 `core.hooksPath` 与配置目录错位。
 
 ## 提交代码
 
@@ -123,7 +130,7 @@ flowchart TD
     ESLINT -->|"返回"| C
     SKIP --> SUMMARY
 
-    SUMMARY -->|确认| EXEC["安装依赖<br/>生成配置文件<br/>初始化 Husky<br/>更新 package.json"]
+    SUMMARY -->|确认| EXEC["安装依赖<br/>生成配置文件<br/>更新 package.json<br/>初始化 Husky"]
     SUMMARY -->|否| C
 
     EXEC --> DONE["初始化完成"]
@@ -156,15 +163,19 @@ robot-standards init --ci --preset full --framework react --typescript --no-jsdo
 | `--preset <id>`    | 预设方案 `minimal \| standard \| full` | `standard`       |
 | `--framework <fw>` | 项目框架 `vue \| react \| vanilla`     | `vue`            |
 | `--typescript`     | 启用 TypeScript                        | CI 模式下 `true` |
+| `--no-typescript`  | 禁用 TypeScript                        | -                |
 | `--jsdoc`          | 强制 JSDoc 注释                        | full 时 `true`   |
+| `--no-jsdoc`       | 禁用 JSDoc                             | -                |
 | `--oxlint`         | 启用 Oxlint                            | 跟随预设         |
+| `--no-oxlint`      | 禁用 Oxlint                            | -                |
 | `--prettier`       | 启用 Prettier                          | 跟随预设         |
+| `--no-prettier`    | 禁用 Prettier                          | -                |
 
 ## 配置自定义
 
 所有生成的文件都是**完整独立的配置**，不依赖本包的任何运行时导入。直接修改文件即可：
 
-### ESLint — eslint.config.ts
+### ESLint — eslint.config.mjs
 
 ```ts
 // 生成后直接在规则对象里增删改即可
@@ -238,7 +249,7 @@ module.exports = {
 | `commitlint.config.js` |  ✔   |  ✔   |  ✔   | 提交信息校验规则        |
 | `.husky/commit-msg`    |  ✔   |  ✔   |  ✔   | 提交信息 hook           |
 | `.husky/pre-commit`    |  -   |  ✔   |  ✔   | 代码检查 hook           |
-| `eslint.config.ts`     |  -   |  ✔   |  ✔   | ESLint Flat Config      |
+| `eslint.config.mjs`    |  -   |  ✔   |  ✔   | ESLint Flat Config      |
 | `.editorconfig`        |  -   |  ✔   |  ✔   | 编辑器统一配置          |
 | `.prettierrc.js`       |  -   |  -   |  ✔   | 代码格式化配置          |
 
@@ -338,7 +349,7 @@ Git commit 时自动触发，校验提交信息格式是否合规。
 bunx --no-install commitlint --edit "$1"
 ```
 
-> 执行命令因包管理器不同而异（`bunx` / `npx` / `pnpm exec`）
+> 执行命令因包管理器不同而异（`bunx --no-install` / `npx --no-install` / `pnpm exec` / `yarn`），均只使用项目本地依赖。
 
 ---
 
@@ -351,40 +362,46 @@ Git commit 前自动触发，根据启用功能动态生成。
 **标准模式**（ESLint + lint-staged）:
 
 ```shell
-bunx lint-staged
+bunx --no-install lint-staged
 ```
 
 **完整模式**（Oxlint + lint-staged）:
 
 ```shell
-bunx oxlint --max-warnings 0
-bunx lint-staged
+bunx --no-install lint-staged
 ```
+
+完整模式中的 Oxlint、ESLint 与 Prettier 由 lint-staged 对暂存文件统一调度，避免在
+pre-commit 阶段重复执行全量检查。
 
 > 文件会自动设置可执行权限（`chmod 755`），确保在 Git Bash / WSL 环境下正常运行。
 
 ---
 
-#### `eslint.config.ts` — ESLint Flat Config
+#### `eslint.config.mjs` — ESLint Flat Config
 
 根据框架（Vue/React/Vanilla）、TypeScript、JSDoc 选项动态生成。
 
 **Vue 3 + TypeScript 示例**:
 
 ```ts
+import js from "@eslint/js";
 import pluginVue from "eslint-plugin-vue";
-import vueTsConfigs from "@vue/eslint-config-typescript";
+import {
+  defineConfigWithVueTs,
+  vueTsConfigs,
+} from "@vue/eslint-config-typescript";
 import skipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import oxlint from "eslint-plugin-oxlint"; // 完整模式
 import jsdocPlugin from "eslint-plugin-jsdoc"; // 启用 JSDoc 时
-import { defineConfigWithVueTs } from "@vue/eslint-config-typescript";
 
 export default defineConfigWithVueTs(
   { name: "app/files-to-lint", files: ["**/*.{ts,mts,tsx,vue}"] },
   { name: "app/files-to-ignore", ignores: ["**/dist/**", "**/coverage/**"] },
 
+  js.configs.recommended,
   ...oxlint.configs["flat/recommended"], // Oxlint 基础规则
-  pluginVue.configs["flat/essential"], // Vue 规则
+  ...pluginVue.configs["flat/essential"], // Vue 规则
   vueTsConfigs.recommended, // TS 规则
 
   {
@@ -443,9 +460,9 @@ module.exports = {
   singleQuote: true,
   semi: false,
   printWidth: 80,
-  trailingComma: "all",
+  trailingComma: "es5",
   arrowParens: "avoid",
-  endOfLine: "auto",
+  endOfLine: "lf",
 };
 ```
 
@@ -458,11 +475,13 @@ init 同时更新 `package.json` 中的以下字段：
 | 字段                | 极简 | 标准 | 完整 | 内容                           |
 | ------------------- | :--: | :--: | :--: | ------------------------------ |
 | `scripts.cz`        |  ✔   |  ✔   |  ✔   | `"git-cz"`                     |
-| `scripts.prepare`   |  ✔   |  ✔   |  ✔   | `"husky"`                      |
+| `scripts.prepare`¹  |  ✔   |  ✔   |  ✔   | `"husky"` 或追加 `&& husky`    |
 | `scripts.lint`      |  -   |  ✔   |  ✔   | `"eslint . --fix"` 或含 oxlint |
 | `scripts.format`    |  -   |  -   |  ✔   | `"prettier --write src/"`      |
 | `config.commitizen` |  ✔   |  ✔   |  ✔   | cz-customizable 路径           |
 | `lint-staged`       |  -   |  ✔   |  ✔   | 暂存区检查规则                 |
+
+¹ Yarn 项目使用 `postinstall`。已有同名脚本和配置会保留；仅在安全兼容时追加或合并。
 
 **lint-staged 配置示例**（完整模式）:
 
@@ -472,10 +491,10 @@ init 同时更新 `package.json` 中的以下字段：
     "src/**/*.{js,jsx,ts,tsx,vue}": [
       "oxlint --max-warnings 0 --deny-warnings",
       "eslint --fix --no-cache",
-      "prettier --write"
+      "prettier --write",
     ],
-    "*.{json,md,yml,yaml}": ["prettier --write"]
-  }
+    "*.{json,md,yml,yaml}": ["prettier --write"],
+  },
 }
 ```
 
@@ -491,8 +510,7 @@ bun run cz / git cz
 git commit（由 commitizen 触发）
     │
     ├─ .husky/pre-commit 触发:
-    │   1. oxlint --max-warnings 0     ← 快速全量 lint
-    │   2. lint-staged                 ← 增量检查暂存文件
+    │   lint-staged                    ← 增量检查暂存文件
     │       ├─ oxlint --deny-warnings
     │       ├─ eslint --fix --no-cache
     │       └─ prettier --write
@@ -509,15 +527,16 @@ git commit（由 commitizen 触发）
 检查当前项目的 Git 标准化配置状态：
 
 ```bash
-node node_modules/@robot-admin/git-standards/bin/robot-standards.js doctor
+bunx --no-install robot-standards doctor
 ```
 
-智能检测已安装的功能模块，未安装的功能标记为 `○ 未启用` 而非失败：
+智能检测配置文件、Hook 和依赖的真实可解析状态；未启用的可选功能不会判为失败：
 
 ```
   核心功能
 
   ✔ Git 仓库
+  ✔ husky 依赖
   ✔ Husky 目录
   ✔ commit-msg hook
   ✔ Commitlint 配置
@@ -589,7 +608,7 @@ rm -rf node_modules
 npm install
 
 # 或使用 doctor 检查缺失的依赖
-node node_modules/@robot-admin/git-standards/bin/robot-standards.js doctor
+bunx --no-install robot-standards doctor
 ```
 
 ### ESLint Flat Config 不生效
@@ -599,7 +618,7 @@ node node_modules/@robot-admin/git-standards/bin/robot-standards.js doctor
 **解决方案**:
 
 ```bash
-# 删除旧配置文件（保留 eslint.config.ts）
+# 删除旧配置文件（保留 eslint.config.mjs）
 rm .eslintrc.js .eslintrc.json .eslintrc.yml
 ```
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.5
+
+### Patch Changes
+
+- Ensure both ESM and CommonJS public entries load correctly, with matching declaration files and package checks before publishing.
+- Preserve existing package scripts, Commitizen settings, lint-staged rules, and Husky hooks during repeated initialization.
+- Generate loadable ESLint flat configs for Vue, React, and Vanilla projects using `eslint.config.mjs`.
+- Detect Git repositories and package managers from workspace subdirectories, and execute Bun tools with `--no-install`.
+- Reject repository subdirectories as initialization targets so Husky hooks cannot be attached to the wrong Git root.
+- Validate CLI choices, support negative JSDoc flags, improve dependency-aware diagnostics, and expand regression coverage.
+- Declare the supported Node.js runtime and include the package license in published artifacts.
+
 ## 1.0.4
 
 ### Patch Changes

@@ -54,6 +54,21 @@ export async function writeExecutableFile(
 }
 
 /**
+ * 安全写入可执行文件：内容变化时先创建 `.bak`，再恢复执行权限。
+ */
+export async function writeExecutableFileWithBackup(
+  filePath: string,
+  content: string,
+): Promise<void> {
+  await writeFileWithBackup(filePath, content);
+  try {
+    chmodSync(filePath, 0o755);
+  } catch {
+    // Windows 环境下 chmod 可能不生效，忽略错误
+  }
+}
+
+/**
  * 写入文件内容（写入前若目标已存在则备份为 `.bak`，避免重复初始化覆盖用户自定义内容）
  */
 export async function writeFileWithBackup(

@@ -5,8 +5,8 @@
  * Copyright (c) 2026 by CHENY, All Rights Reserved.
  */
 
-import { resolve } from "node:path";
-import { unlinkSync, existsSync, readFileSync } from "node:fs";
+import { relative, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import chalk from "chalk";
 import ora from "ora";
 import { execa } from "execa";
@@ -18,12 +18,12 @@ import {
   splitExecCommand,
   type PackageManager,
 } from "../utils/package-manager";
-import { isGitRepository, initGitRepository } from "../utils/git";
+import { findGitRoot, initGitRepository } from "../utils/git";
 import {
-  writeFileContent,
   writeFileWithBackup,
-  writeExecutableFile,
+  writeExecutableFileWithBackup,
   updatePackageJson,
+  readFileContent,
   readJsonFile,
 } from "../utils/file";
 import { generateLintStagedConfig } from "../configs/lint-staged";
@@ -138,7 +138,36 @@ const PRESETS: Record<
 
 // ─── 主函数 ──────────────────────────────────────────────────────
 export async function init(options: InitOptions = {}) {
-  const cwd = options.cwd || process.cwd();
+  const cwd = resolve(options.cwd || process.cwd());
+
+  if (!existsSync(cwd)) {
+    throw new Error(`目标目录不存在: ${cwd}`);
+  }
+  try {
+    await readJsonFile(resolve(cwd, "package.json"));
+  } catch (error) {
+    throw new Error(`目标目录缺少有效的 package.json: ${cwd}`, {
+      cause: error,
+    });
+  }
+
+  // Git hooks 属于整个仓库。禁止在已有仓库的子目录中生成另一套配置，
+  // 避免 package-local .husky 与仓库级 core.hooksPath 指向不一致。
+  const gitRoot = findGitRoot(cwd);
+  if (gitRoot && relative(gitRoot, cwd) !== "") {
+    throw new Error(
+      `目标目录不是 Git 仓库根目录: ${cwd}。请改用 --cwd ${gitRoot}`,
+    );
+  }
+
+  const presetId = options.preset || "standard";
+  if (presetId !== "custom" && !(presetId in PRESETS)) {
+    throw new Error(`不支持的预设: ${String(presetId)}`);
+  }
+  const framework = options.framework || "vue";
+  if (!["vue", "react", "vanilla"].includes(framework)) {
+    throw new Error(`不支持的框架: ${String(framework)}`);
+  }
 
   // ── Banner ──
   printBanner();
@@ -147,16 +176,11 @@ export async function init(options: InitOptions = {}) {
   console.log(`  ${S.STEP} ${chalk.bold("环境检测")}`);
   console.log();
 
-  if (!isGitRepository(cwd)) {
-    const spinner = ora({
-      text: chalk.gray("初始化 Git 仓库..."),
-      prefixText: "  ",
-      spinner: "dots",
-    }).start();
-    await initGitRepository(cwd);
-    spinner.succeed(chalk.white("Git 仓库初始化完成"));
-  } else {
+  const hasGitRepository = gitRoot !== null;
+  if (hasGitRepository) {
     console.log(`  ${S.OK} Git 仓库已就绪`);
+  } else {
+    console.log(`  ${S.WARN} ${chalk.yellow("将初始化 Git 仓库")}`);
   }
 
   const pm = await detectPackageManager(cwd);
@@ -174,7 +198,6 @@ export async function init(options: InitOptions = {}) {
 
   if (options.ci) {
     // ── CI 模式 ──
-    const presetId: PresetId = options.preset || "standard";
     if (presetId === "custom") {
       features = {
         eslint: true,
@@ -191,7 +214,7 @@ export async function init(options: InitOptions = {}) {
     if (options.oxlint !== undefined) features.oxlint = options.oxlint;
     const jsdocDefault = presetId === "full" ? true : false;
     eslintOpts = {
-      framework: options.framework || "vue",
+      framework,
       typescript: options.typescript ?? true,
       jsdoc: options.jsdoc ?? jsdocDefault,
     };
@@ -202,43 +225,48 @@ export async function init(options: InitOptions = {}) {
     );
     console.log();
   } else {
-    // ── 交互式模式 ──
-    const result = await interactiveSetup(options);
-    features = result.features;
-    eslintOpts = result.eslintOpts;
-  }
-
-  // 3. 配置摘要 & 确认
-  printSummary(features, eslintOpts, pmName);
-
-  if (!options.ci) {
+    // ── 交互式模式：每次重新选择后都必须再次确认 ──
     const { confirm } = await import("@inquirer/prompts");
-    const proceed = await confirm({
-      message: chalk.white("确认以上配置并开始安装?"),
-      default: true,
-      theme: { prefix: `  ${S.ARROW}` },
-    });
-    if (!proceed) {
-      console.log();
-      console.log(`  ${S.INFO} ${chalk.gray("重新选择配置...")}`);
-      console.log();
+    while (true) {
       const result = await interactiveSetup(options);
       features = result.features;
       eslintOpts = result.eslintOpts;
       printSummary(features, eslintOpts, pmName);
-      // 递归确认后直接继续
+      const proceed = await confirm({
+        message: chalk.white("确认以上配置并开始安装?"),
+        default: true,
+        theme: { prefix: `  ${S.ARROW}` },
+      });
+      if (proceed) break;
+      console.log();
+      console.log(`  ${S.INFO} ${chalk.gray("重新选择配置...")}`);
+      console.log();
     }
   }
 
+  // 3. CI 摘要；交互模式已在确认循环中输出。
+  if (options.ci) printSummary(features, eslintOpts, pmName);
+
   console.log();
 
-  // 4. 执行安装流程
+  // 4. 所有确认完成后才允许修改目标目录。
+  if (!hasGitRepository) {
+    const spinner = ora({
+      text: chalk.gray("初始化 Git 仓库..."),
+      prefixText: "  ",
+      spinner: "dots",
+    }).start();
+    await initGitRepository(cwd);
+    spinner.succeed(chalk.white("Git 仓库初始化完成"));
+  }
+
+  // 5. 执行安装流程
   await installDependencies(cwd, pm, features, eslintOpts);
   await generateConfigFiles(cwd, features, eslintOpts);
-  await setupHusky(cwd, pm, features);
   await addPackageScripts(cwd, pm, features);
+  await setupHusky(cwd, pm, features);
 
-  // 5. 完成
+  // 6. 完成
   printCompletion(pm, features);
 }
 
@@ -255,8 +283,6 @@ function printBanner() {
 }
 
 // ─── 交互式选择 ─────────────────────────────────────────────────
-const BACK_SIGNAL = Symbol("back");
-
 async function interactiveSetup(
   options: InitOptions,
 ): Promise<{ features: FeatureSet; eslintOpts: ESLintOptions }> {
@@ -456,8 +482,8 @@ function printSummary(
       eslintOpts.framework === "vue"
         ? "Vue 3"
         : eslintOpts.framework === "react"
-        ? "React"
-        : "Vanilla";
+          ? "React"
+          : "Vanilla";
     const ts = eslintOpts.typescript ? " + TS" : "";
     const jsdoc = eslintOpts.jsdoc ? " + JSDoc" : "";
     console.log(
@@ -483,6 +509,33 @@ function printSummary(
 }
 
 // ─── 安装依赖 ────────────────────────────────────────────────────
+const TOOL_VERSIONS: Record<string, string> = {
+  "@commitlint/cli": "^19.6.0",
+  "@commitlint/config-conventional": "^19.6.0",
+  commitizen: "^4.3.1",
+  "cz-customizable": "^7.2.1",
+  husky: "^9.1.7",
+  eslint: "^9.39.0",
+  "@eslint/js": "^9.39.0",
+  "eslint-plugin-vue": "^10.0.0",
+  "@vue/eslint-config-typescript": "^14.0.0",
+  "typescript-eslint": "^8.0.0",
+  "eslint-plugin-react": "^7.37.0",
+  "eslint-plugin-react-hooks": "^7.0.0",
+  "eslint-plugin-jsdoc": "^50.0.0",
+  "lint-staged": "^15.2.0",
+  oxlint: "^1.52.0",
+  "eslint-plugin-oxlint": "^1.52.0",
+  prettier: "^3.0.0",
+  "@vue/eslint-config-prettier": "^10.0.0",
+};
+
+const withTestedVersion = (name: string): string => {
+  const version = TOOL_VERSIONS[name];
+  if (!version) throw new Error(`缺少工具版本约束: ${name}`);
+  return `${name}@${version}`;
+};
+
 async function installDependencies(
   cwd: string,
   pm: PackageManager,
@@ -506,15 +559,18 @@ async function installDependencies(
 
   // ── ESLint ──
   if (features.eslint) {
-    deps.push("eslint");
+    deps.push("eslint", "@eslint/js");
     if (eslintOpts.framework === "vue") {
-      deps.push("eslint-plugin-vue", "@vue/eslint-config-typescript");
+      deps.push("eslint-plugin-vue");
+      if (eslintOpts.typescript) {
+        deps.push("@vue/eslint-config-typescript");
+      }
     }
-    if (eslintOpts.typescript) {
-      deps.push(
-        "@typescript-eslint/eslint-plugin",
-        "@typescript-eslint/parser",
-      );
+    if (eslintOpts.typescript && eslintOpts.framework !== "vue") {
+      deps.push("typescript-eslint");
+    }
+    if (eslintOpts.framework === "react") {
+      deps.push("eslint-plugin-react", "eslint-plugin-react-hooks");
     }
     if (eslintOpts.jsdoc) {
       deps.push("eslint-plugin-jsdoc");
@@ -545,7 +601,7 @@ async function installDependencies(
     const installCmd = getInstallCommand(pm);
     await execa(
       installCmd.split(" ")[0],
-      [...installCmd.split(" ").slice(1), ...deps],
+      [...installCmd.split(" ").slice(1), ...deps.map(withTestedVersion)],
       { cwd, stdio: "pipe" },
     );
     spinner.succeed(
@@ -558,7 +614,7 @@ async function installDependencies(
 }
 
 // ─── 生成配置文件 ────────────────────────────────────────────────
-async function generateConfigFiles(
+export async function generateConfigFiles(
   cwd: string,
   features: FeatureSet,
   eslintOpts: ESLintOptions,
@@ -648,8 +704,13 @@ module.exports = {
         'perf', 'test', 'chore', 'revert', 'build', 'deps',
       ],
     ],
+    'type-case': [2, 'always', 'lower-case'],
+    'type-empty': [2, 'never'],
     'scope-empty': [2, 'never'],
+    'subject-empty': [2, 'never'],
     'subject-case': [0],
+    'subject-full-stop': [0, 'never'],
+    'header-max-length': [2, 'always', 88],
   },
 }
 `;
@@ -668,7 +729,6 @@ module.exports = {
  * 直接修改此文件即可自定义格式化规则
  */
 module.exports = {
-  $schema: 'https://json.schemastore.org/prettierrc',
   semi: false,
   singleQuote: true,
   printWidth: 80,
@@ -678,17 +738,20 @@ module.exports = {
   bracketSpacing: true,
   jsxSingleQuote: true,
   arrowParens: 'avoid',
-  endOfLine: 'auto',
+  endOfLine: 'lf',
   htmlWhitespaceSensitivity: 'strict',
   vueIndentScriptAndStyle: true,
   singleAttributePerLine: true,
 }
 `;
-      await writeFileWithBackup(resolve(cwd, `.prettierrc${jsExt}`), prettierConfig);
+      await writeFileWithBackup(
+        resolve(cwd, `.prettierrc${jsExt}`),
+        prettierConfig,
+      );
       generated.push(`.prettierrc${jsExt}`);
     }
 
-    // ── eslint.config.ts（仅当 eslint 启用）──
+    // ── eslint.config.mjs（仅当 eslint 启用）──
     if (features.eslint) {
       // 根据选项动态构建完整的 eslint 配置模板
       const hasOxlint = features.oxlint;
@@ -698,11 +761,21 @@ module.exports = {
       const isTs = eslintOpts.typescript;
 
       // ── imports ──
-      const importLines: string[] = [];
+      const isReact = eslintOpts.framework === "react";
+      const importLines: string[] = ["import js from '@eslint/js'"];
       if (isVue) importLines.push("import pluginVue from 'eslint-plugin-vue'");
       if (isVue && isTs) {
         importLines.push(
           "import {\n  defineConfigWithVueTs,\n  vueTsConfigs,\n} from '@vue/eslint-config-typescript'",
+        );
+      }
+      if (!isVue && isTs) {
+        importLines.push("import tseslint from 'typescript-eslint'");
+      }
+      if (isReact) {
+        importLines.push(
+          "import reactPlugin from 'eslint-plugin-react'",
+          "import reactHooks from 'eslint-plugin-react-hooks'",
         );
       }
       if (hasOxlint)
@@ -716,7 +789,17 @@ module.exports = {
         importLines.push("import jsdocPlugin from 'eslint-plugin-jsdoc'");
 
       // ── 文件扩展名 ──
-      const fileExts = isTs ? "js,ts,mts,tsx,vue" : "js,jsx,vue";
+      const fileExts = isVue
+        ? isTs
+          ? "js,ts,mts,tsx,vue"
+          : "js,vue"
+        : isReact
+          ? isTs
+            ? "js,jsx,ts,tsx"
+            : "js,jsx"
+          : isTs
+            ? "js,ts,mts"
+            : "js";
 
       // ── Vue 2 废弃规则 ──
       const vue2DeprecationRules = isVue
@@ -745,9 +828,6 @@ module.exports = {
             'transition',
             'draggable',
             '/^icon-/i',
-            '/^C_/',
-            '/^c_/',
-            'v-md-editor',
           ],
         },
       ],
@@ -815,28 +895,10 @@ ${vue2DeprecationRules}`
     },
   },
   {
-    files: ['**/*.{ts,mts,tsx,vue}'],
+    files: ['**/*.{${isVue ? "ts,mts,tsx,vue" : isReact ? "ts,tsx" : "ts,mts"}}'],
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'error',
-    },
-  },
-`
-        : "";
-
-      // ── JSDoc 白名单 ──
-      const jsdocWhitelist = hasJsdoc
-        ? `
-  //MARK: JSDoc 白名单覆盖规则
-  {
-    files: [
-      'src/router/**/*.ts',
-      'src/stores/**/*.ts',
-      'src/views/**/components/*.vue',
-    ],
-    rules: {
-      'jsdoc/require-jsdoc': 'off',
-      '@typescript-eslint/require-jsdoc': 'off',
     },
   },
 `
@@ -851,8 +913,6 @@ ${vue2DeprecationRules}`
       'src/assets/images/**/*',
       '**/*.d.ts',
       '**/auto-imports.d.ts',
-      'src/views/**/components/*.vue',
-      'scripts/**/*',
     ],
   },
 `;
@@ -864,7 +924,7 @@ ${vue2DeprecationRules}`
       'no-undef': 'off',
 
       //! 引号规范
-      '@typescript-eslint/quotes': ['error', 'single'],${
+      quotes: ['error', 'single', { allowTemplateLiterals: true }],${
         isVue ? "\n      'vue/html-quotes': ['error', 'double']," : ""
       }
 
@@ -901,10 +961,30 @@ ${vue2DeprecationRules}`
         ? "\n  ...oxlint.configs['flat/recommended'], // 高性能基础校验\n"
         : "";
       const vueLine = isVue
-        ? `\n  //! 忽略转义字符\n  {\n    rules: {\n      'no-useless-escape': 'off',\n    },\n  },\n\n  pluginVue.configs['flat/essential'], // Vue 专用规则`
+        ? `\n  //! 忽略转义字符\n  {\n    rules: {\n      'no-useless-escape': 'off',\n    },\n  },\n\n  ...pluginVue.configs['flat/essential'], // Vue 专用规则`
         : "";
       const tsLine =
-        isVue && isTs ? "\n  vueTsConfigs.recommended, // TS 专用规则" : "";
+        isVue && isTs
+          ? "\n  vueTsConfigs.recommended, // TS 专用规则"
+          : !isVue && isTs
+            ? "\n  ...tseslint.configs.recommended, // TS 专用规则"
+            : "";
+      const reactLine = isReact
+        ? `
+  {
+    ...reactPlugin.configs.flat.recommended,
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    settings: { react: { version: 'detect' } },
+  },
+  {
+    ...reactPlugin.configs.flat['jsx-runtime'],
+    files: ['**/*.{js,jsx,ts,tsx}'],
+  },
+  {
+    ...reactHooks.configs.flat.recommended,
+    files: ['**/*.{js,jsx,ts,tsx}'],
+  },`
+        : "";
       const skipLine = hasPrettier && isVue ? "\n  skipFormatting" : "";
 
       const eslintConfig = `/*
@@ -932,7 +1012,8 @@ ${wrapperStart}
   },
 
   //MARK: 核心规则组（按优先级排序）
-${oxlintLine}${vueLine}${tsLine}
+  js.configs.recommended,
+${oxlintLine}${vueLine}${tsLine}${reactLine}
 ${fileTypeOverrides}
 ${jsdocBlock}${tsRules}
       //! 代码复杂度
@@ -959,11 +1040,14 @@ ${vueComponentRules}
       'no-duplicate-imports': 'error',
     },
   },
-${ignoreAssets}${jsdocWhitelist}${skipLine}
+${ignoreAssets}${skipLine}
 ${wrapperEnd}
 `;
-      await writeFileWithBackup(resolve(cwd, "eslint.config.ts"), eslintConfig);
-      generated.push("eslint.config.ts");
+      await writeFileWithBackup(
+        resolve(cwd, "eslint.config.mjs"),
+        eslintConfig,
+      );
+      generated.push("eslint.config.mjs");
     }
 
     // ── .editorconfig（仅当 editorconfig 启用）──
@@ -1006,7 +1090,11 @@ indent_style = tab
 }
 
 // ─── Husky 设置 ──────────────────────────────────────────────────
-async function setupHusky(cwd: string, pm: PackageManager, features: FeatureSet) {
+async function setupHusky(
+  cwd: string,
+  pm: PackageManager,
+  features: FeatureSet,
+) {
   const spinner = ora({
     text: chalk.gray("初始化 Husky..."),
     prefixText: "  ",
@@ -1018,10 +1106,7 @@ async function setupHusky(cwd: string, pm: PackageManager, features: FeatureSet)
     // 既是 hook 脚本里的命令前缀，也需拆分后传给 execa（首个参数须为单个可执行名）。
     const execCmd = getExecCommand(pm);
     const [execBin, ...execArgs] = splitExecCommand(pm);
-    // husky init 会执行两件事：
-    // 1. 调用 index.js default export → 创建 .husky/_/ 运行时基础设施 + 设置 core.hooksPath = .husky/_
-    // 2. 创建 .husky/ 目录和默认 pre-commit 脚本
-    //
+    // 仅安装 Husky 运行时，不使用会覆盖 prepare / pre-commit 的 `husky init`。
     // .husky/_/ 是 Husky v9 的**核心运行时目录**（被 .gitignore 自动排除）：
     //   - _/h: 调度脚本，负责查找并执行 .husky/<hook-name> 用户脚本
     //   - _/pre-commit, _/commit-msg 等: 包装脚本，Git 通过 core.hooksPath 实际调用这些
@@ -1029,17 +1114,35 @@ async function setupHusky(cwd: string, pm: PackageManager, features: FeatureSet)
     //
     // ⚠️ 切勿删除 .husky/_/ 目录！它不是旧版遗留物，而是 hook 执行的必要基础设施。
     //    该目录由 prepare 脚本（husky）在每次 install 后自动重建。
-    await execa(execBin, [...execArgs, "husky", "init"], {
+    await execa(execBin, [...execArgs, "husky"], {
       cwd,
       stdio: "pipe",
     });
 
-    // ── commit-msg hook（始终创建）──
-    // --no-install 已包含在 npm 的 execCmd 中；pnpm exec / yarn / bunx 无需该参数
-    const commitMsg = `${execCmd} commitlint --edit "$1"\n`;
-    await writeExecutableFile(resolve(cwd, ".husky/commit-msg"), commitMsg);
+    const writeHook = async (
+      name: string,
+      content: string,
+    ): Promise<boolean> => {
+      const filePath = resolve(cwd, ".husky", name);
+      if (existsSync(filePath)) {
+        const existing = await readFileContent(filePath);
+        if (existing.trim() && existing !== content) {
+          console.log(
+            `\n  ${S.WARN} ${chalk.yellow(`${name} 已存在，已保留原内容`)}`,
+          );
+          return false;
+        }
+      }
+      await writeExecutableFileWithBackup(filePath, content);
+      return true;
+    };
 
-    const hooks: string[] = ["commit-msg"];
+    // ── commit-msg hook（始终创建）──
+    // --no-install 已包含在 npm / bun 的 execCmd 中。
+    const commitMsg = `${execCmd} commitlint --edit "$1"\n`;
+    const commitMsgWritten = await writeHook("commit-msg", commitMsg);
+
+    const hooks: string[] = commitMsgWritten ? ["commit-msg"] : [];
 
     // ── pre-commit hook（根据功能动态生成）──
     const needsPreCommit =
@@ -1047,29 +1150,21 @@ async function setupHusky(cwd: string, pm: PackageManager, features: FeatureSet)
 
     if (needsPreCommit) {
       const cmds: string[] = [];
-      if (features.oxlint) {
-        cmds.push(`${execCmd} oxlint --max-warnings 0`);
-      }
       if (features.lintStaged) {
         cmds.push(`${execCmd} lint-staged`);
+      } else if (features.oxlint) {
+        cmds.push(`${execCmd} oxlint --max-warnings 0 --deny-warnings`);
       } else if (features.eslint) {
         cmds.push(`${execCmd} eslint . --fix`);
       }
-      await writeExecutableFile(
-        resolve(cwd, ".husky/pre-commit"),
-        cmds.join("\n") + "\n",
-      );
-      hooks.push("pre-commit");
-    } else {
-      // 极简模式：移除 husky init 创建的默认 pre-commit
-      const defaultPreCommit = resolve(cwd, ".husky/pre-commit");
-      if (existsSync(defaultPreCommit)) {
-        unlinkSync(defaultPreCommit);
+      if (await writeHook("pre-commit", cmds.join("\n") + "\n")) {
+        hooks.push("pre-commit");
       }
     }
 
     spinner.succeed(
-      chalk.white("Husky 初始化完成 ") + chalk.gray(`(${hooks.join(", ")})`),
+      chalk.white("Husky 初始化完成 ") +
+        chalk.gray(hooks.length ? `(${hooks.join(", ")})` : "(保留已有 hooks)"),
     );
   } catch (error) {
     spinner.fail(chalk.red("Husky 初始化失败"));
@@ -1078,7 +1173,7 @@ async function setupHusky(cwd: string, pm: PackageManager, features: FeatureSet)
 }
 
 // ─── 更新 package.json ──────────────────────────────────────────
-async function addPackageScripts(
+export async function addPackageScripts(
   cwd: string,
   pm: PackageManager,
   features: FeatureSet,
@@ -1093,33 +1188,81 @@ async function addPackageScripts(
     const packageJsonPath = resolve(cwd, "package.json");
     const packageJson = await readJsonFile(packageJsonPath);
 
-    const scripts = packageJson.scripts || {};
+    if (
+      packageJson.scripts !== undefined &&
+      (typeof packageJson.scripts !== "object" ||
+        packageJson.scripts === null ||
+        Array.isArray(packageJson.scripts))
+    ) {
+      throw new Error("package.json#scripts 必须是对象");
+    }
+    const scripts: Record<string, string> = packageJson.scripts
+      ? { ...packageJson.scripts }
+      : {};
+    const preserved: string[] = [];
 
-    // cz 脚本（始终添加）
-    scripts.cz = "git-cz";
+    const addScriptIfMissing = (name: string, command: string) => {
+      if (!scripts[name]) {
+        scripts[name] = command;
+      } else if (scripts[name] !== command) {
+        preserved.push(`scripts.${name}`);
+      }
+    };
 
-    // prepare 脚本（husky 需要）
-    scripts.prepare = "husky";
-
-    // lint 脚本（仅当 eslint 启用）
+    // 通用命令只补缺失项，不改写项目已有约定。
+    addScriptIfMissing("cz", "git-cz");
     if (features.eslint) {
-      scripts.lint = features.oxlint
-        ? "oxlint . --fix -D correctness --ignore-path .gitignore && eslint . --fix"
-        : "eslint . --fix";
+      addScriptIfMissing(
+        "lint",
+        features.oxlint
+          ? "oxlint . --fix -D correctness --ignore-path .gitignore && eslint . --fix"
+          : "eslint . --fix",
+      );
+    }
+    if (features.prettier) {
+      addScriptIfMissing("format", "prettier --write src/");
     }
 
-    // format 脚本（仅当 prettier 启用）
-    if (features.prettier) {
-      scripts.format = "prettier --write src/";
+    // Husky 需要在依赖安装后初始化；已有生命周期脚本采用追加方式保留。
+    const lifecycle = pm === "yarn" ? "postinstall" : "prepare";
+    const lifecycleScript = scripts[lifecycle];
+    if (!lifecycleScript) {
+      scripts[lifecycle] = "husky";
+    } else if (!/(^|\s|&&|;)husky(?:\s|$)/.test(lifecycleScript)) {
+      scripts[lifecycle] = `${lifecycleScript} && husky`;
     }
 
     // commitizen config（始终添加）
     // ESM 项目需要指定 .cjs 配置路径，因为 cz-customizable 默认只查找 .cz-config.js
     const isESM = packageJson.type === "module";
-    const czConfig: Record<string, any> = {
-      commitizen: { path: "node_modules/cz-customizable" },
-    };
-    if (isESM) {
+    if (
+      packageJson.config !== undefined &&
+      (typeof packageJson.config !== "object" ||
+        packageJson.config === null ||
+        Array.isArray(packageJson.config))
+    ) {
+      throw new Error("package.json#config 必须是对象");
+    }
+    const existingConfig = packageJson.config || {};
+    const czConfig: Record<string, any> = { ...existingConfig };
+    if (!existingConfig.commitizen) {
+      czConfig.commitizen = { path: "node_modules/cz-customizable" };
+    } else if (
+      typeof existingConfig.commitizen === "object" &&
+      existingConfig.commitizen !== null &&
+      !Array.isArray(existingConfig.commitizen) &&
+      !existingConfig.commitizen.path
+    ) {
+      czConfig.commitizen = {
+        ...existingConfig.commitizen,
+        path: "node_modules/cz-customizable",
+      };
+    } else if (
+      existingConfig.commitizen.path !== "node_modules/cz-customizable"
+    ) {
+      preserved.push("config.commitizen");
+    }
+    if (isESM && !existingConfig["cz-customizable"]) {
       czConfig["cz-customizable"] = { config: ".cz-config.cjs" };
     }
 
@@ -1127,11 +1270,33 @@ async function addPackageScripts(
 
     // lint-staged config（仅当 lintStaged 启用）
     if (features.lintStaged) {
-      updates["lint-staged"] = generateLintStagedConfig({
+      const generated = generateLintStagedConfig({
         eslint: features.eslint,
         oxlint: features.oxlint,
         prettier: features.prettier,
       });
+      const existing = packageJson["lint-staged"];
+      if (existing === undefined) {
+        updates["lint-staged"] = generated;
+      } else if (
+        existing &&
+        typeof existing === "object" &&
+        !Array.isArray(existing)
+      ) {
+        const merged = { ...existing } as Record<string, string | string[]>;
+        for (const [pattern, commands] of Object.entries(generated)) {
+          const current = merged[pattern];
+          if (!current) {
+            merged[pattern] = commands;
+            continue;
+          }
+          const currentCommands = Array.isArray(current) ? current : [current];
+          merged[pattern] = [...new Set([...currentCommands, ...commands])];
+        }
+        updates["lint-staged"] = merged;
+      } else {
+        preserved.push("lint-staged");
+      }
     }
 
     await updatePackageJson(updates, cwd);
@@ -1142,6 +1307,11 @@ async function addPackageScripts(
       chalk.white("package.json 更新完成 ") +
         chalk.gray(`(${parts.join(" + ")})`),
     );
+    if (preserved.length > 0) {
+      console.log(
+        `  ${S.WARN} ${chalk.yellow(`已保留现有配置: ${preserved.join(", ")}`)}`,
+      );
+    }
   } catch (error) {
     spinner.fail(chalk.red("package.json 更新失败"));
     throw error;

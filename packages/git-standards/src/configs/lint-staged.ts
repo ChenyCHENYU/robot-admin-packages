@@ -11,11 +11,11 @@ export interface LintStagedOptions {
    */
   eslint?: boolean;
   /**
-   * 是否启用 Oxlint
+   * 是否启用 Oxlint（默认 false）
    */
   oxlint?: boolean;
   /**
-   * 是否启用 Prettier
+   * 是否启用 Prettier（默认 false）
    */
   prettier?: boolean;
   /**
@@ -36,19 +36,22 @@ export function createLintStagedConfig(options: LintStagedOptions = {}) {
   const markupPattern = options.filePatterns?.markup || "*.{json,md,yml,yaml}";
 
   const codeCommands: string[] = [];
+  const enableEslint = options.eslint ?? true;
+  const enableOxlint = options.oxlint ?? false;
+  const enablePrettier = options.prettier ?? false;
 
   // Oxlint 优先（性能最优）
-  if (options.oxlint !== false) {
+  if (enableOxlint) {
     codeCommands.push("oxlint --max-warnings 0 --deny-warnings");
   }
 
   // ESLint（默认启用，可通过 eslint: false 关闭）
-  if (options.eslint !== false) {
+  if (enableEslint) {
     codeCommands.push("eslint --fix --no-cache");
   }
 
   // Prettier
-  if (options.prettier !== false) {
+  if (enablePrettier) {
     codeCommands.push("prettier --write");
   }
 
@@ -60,7 +63,7 @@ export function createLintStagedConfig(options: LintStagedOptions = {}) {
   }
 
   // 为标记文件添加 Prettier
-  if (options.prettier !== false) {
+  if (enablePrettier) {
     config[markupPattern] = ["prettier --write"];
   }
 

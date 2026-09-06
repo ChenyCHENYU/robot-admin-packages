@@ -6,14 +6,28 @@
  */
 
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { execa } from "execa";
 
 /**
  * 检查是否在 Git 仓库中
  */
 export function isGitRepository(cwd: string = process.cwd()): boolean {
-  return existsSync(resolve(cwd, ".git"));
+  return findGitRoot(cwd) !== null;
+}
+
+/** 查找当前目录所属的 Git 根目录（兼容普通仓库、worktree 和 submodule）。 */
+export function findGitRoot(cwd: string = process.cwd()): string | null {
+  let current = resolve(cwd);
+
+  // `.git` 在普通仓库中是目录，在 worktree / submodule 中可能是文件。
+  // 向上查找可避免在 monorepo 子包中误建嵌套仓库。
+  while (true) {
+    if (existsSync(resolve(current, ".git"))) return current;
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
 }
 
 /**
