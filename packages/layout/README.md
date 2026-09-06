@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/layout.svg)](https://www.npmjs.com/package/@robot-admin/layout)
 [![license](https://img.shields.io/npm/l/@robot-admin/layout.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
 
-当前版本：`3.0.0`。
+当前版本：`3.1.0`。
 
 ---
 
@@ -17,6 +17,7 @@
 - 🧩 **开箱即用** - 提供 SettingsDrawer 设置抽屉，覆盖外观 / 布局 / 功能配置
 - 🧭 **菜单展开方式** - 内置传统展开 / 右侧面板两种菜单展开模式配置
 - 🔌 **插槽系统** - 灵活的 slot 机制，主项目仅关注业务组件
+- 🪄 **精简适配** - `provideLayout()` 从最小宿主输入自动创建完整响应式上下文
 - 🎨 **CSS 变量同步** - 配置变更自动同步到 CSS 变量，样式实时响应
 - ♿ **键盘与焦点可访问性** - 抽屉/菜单支持 Escape、方向键、焦点恢复与语义属性
 - 🛡️ **安全设置导入** - 对枚举、布尔值、数值范围与主题色进行运行时校验
@@ -35,7 +36,7 @@
                │ LayoutContext (provide/inject)
                ▼
 ┌──────────────────────────────────────┐
-│  @robot-admin/layout                  │
+│  @robot-admin/layout（Vue + Naive UI）│
 │  ├─ C_LayoutContainer (智能容器)      │
 │  │   └─ 根据 layoutMode 自动调度      │
 │  ├─ layouts/ (6 种布局骨架)           │
@@ -47,6 +48,12 @@
 │  │   └─ CardLayout                    │
 │  └─ SettingsDrawer (设置 UI)          │
 └──────────────────────────────────────┘
+
+┌──────────────────────────────────────┐
+│  @robot-admin/layout/core             │
+│  设置协议、运行时校验、常量和纯函数    │
+│  不依赖 Vue / Pinia / UI 框架          │
+└──────────────────────────────────────┘
 ```
 
 ---
@@ -57,6 +64,10 @@
 src/
 ├── index.ts                           # 主入口（统一导出）
 ├── setup.ts                           # 一键初始化 setupLayout()
+├── core/                              # 无框架设置协议、校验与纯函数
+│   ├── index.ts
+│   ├── settings.ts
+│   └── types.ts
 ├── components/
 │   ├── C_LayoutContainer/             # 智能布局容器（主入口组件）
 │   │   └── index.vue
@@ -91,6 +102,7 @@ src/
 │   └── MenuTrigger/                   # 菜单触发区域
 ├── composables/
 │   ├── useLayoutContext.ts            # LayoutContext provide/inject
+│   ├── createLayoutContext.ts         # 最小宿主输入适配助手
 │   ├── useLayoutCache.ts              # 页面缓存管理
 │   └── useMenuSplit.ts                # 菜单拆分（一级/二级分离）
 ├── stores/
@@ -147,10 +159,9 @@ setupLayout(app, {
 app.mount("#app");
 ```
 
-### 2. 使用布局容器
+### 2. 提供宿主数据并使用布局容器
 
 ```vue
-<!-- src/components/C_Layout/index.vue -->
 <template>
   <C_LayoutContainer>
     <template #logo><AppLogo /></template>
@@ -164,15 +175,36 @@ app.mount("#app");
 </template>
 
 <script setup lang="ts">
-import { C_LayoutContainer } from "@robot-admin/layout";
+import {
+  C_LayoutContainer,
+  provideLayout,
+  useSettingsStore,
+  type MenuOptions,
+} from "@robot-admin/layout";
+
+const props = defineProps<{
+  menus: MenuOptions[];
+  isDark: boolean;
+}>();
+
+provideLayout({
+  settings: useSettingsStore(),
+  menus: () => props.menus,
+  isDark: () => props.isDark,
+  brand: { name: "My Admin", homePath: "/home" },
+});
 </script>
 ```
+
+`provideLayout()` 会自动桥接布局模式、折叠状态、尺寸、动画和显示开关。只有需要完全
+自定义响应式来源时，才直接构造 `LayoutContext` 并调用 `provideLayoutContext()`。
 
 ### 3. 添加设置抽屉
 
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
+import { NDialogProvider, NMessageProvider } from "naive-ui";
 import { SettingsDrawer } from "@robot-admin/layout";
 
 const visible = ref(false);
@@ -183,13 +215,20 @@ const settingsActions = {
 
 <template>
   <button @click="visible = true">⚙️ 设置</button>
-  <SettingsDrawer v-model:show="visible" :actions="settingsActions">
-    <template #appearance-prepend>
-      <AppThemeExtension />
-    </template>
-  </SettingsDrawer>
+  <NDialogProvider>
+    <NMessageProvider>
+      <SettingsDrawer v-model:show="visible" :actions="settingsActions">
+        <template #appearance-prepend>
+          <AppThemeExtension />
+        </template>
+      </SettingsDrawer>
+    </NMessageProvider>
+  </NDialogProvider>
 </template>
 ```
+
+`SettingsDrawer` 使用 Naive UI 的 Message/Dialog API，因此必须位于
+`NMessageProvider` 和 `NDialogProvider` 下；应用根部已有 Provider 时无需重复包裹。
 
 `SettingsDrawer` 不再自行清空 `localStorage` / `sessionStorage`。缓存清理由宿主通过
 `actions.clearCache` 明确实现，避免误删登录态、语言和业务数据。可用扩展插槽：
@@ -249,21 +288,31 @@ settings.resetSettings();
 
 ### 设置属性一览
 
-| 属性                    | 类型               | 默认值      | 说明            |
-| ----------------------- | ------------------ | ----------- | --------------- |
-| `themeMode`             | `ThemeMode`        | `'light'`   | 主题模式        |
-| `primaryColor`          | `string`           | `'#409eff'` | 主题色          |
-| `layoutMode`            | `LayoutMode`       | `'side'`    | 布局模式        |
-| `menuExpandMode`        | `MenuExpandMode`   | `'inline'`  | 菜单展开方式    |
-| `borderRadius`          | `BorderRadiusSize` | `'medium'`  | 圆角大小        |
-| `transitionType`        | `TransitionType`   | `'slide'`   | 页面动画        |
-| `fixedHeader`           | `boolean`          | `true`      | 固定头部        |
-| `showBreadcrumb`        | `boolean`          | `true`      | 显示面包屑      |
-| `showTagsView`          | `boolean`          | `true`      | 显示标签页      |
-| `showFooter`            | `boolean`          | `true`      | 显示页脚        |
-| `sidebarWidth`          | `number`           | `220`       | 侧边栏宽度 (px) |
-| `sidebarCollapsedWidth` | `number`           | `64`        | 折叠宽度 (px)   |
-| `headerHeight`          | `number`           | `56`        | 头部高度 (px)   |
+| 属性                    | 默认值      | 作用方      | 说明                         |
+| ----------------------- | ----------- | ----------- | ---------------------------- |
+| `themeMode`             | `'light'`   | 宿主回调    | 标准主题模式                 |
+| `primaryColor`          | `'#409eff'` | 包内        | 主题色与派生 CSS 变量        |
+| `borderRadius`          | `'medium'`  | 包内        | 圆角 CSS 变量                |
+| `transitionType`        | `'slide'`   | 包内        | 页面动画类型                 |
+| `enableTransition`      | `true`      | 包内        | 是否启用页面动画             |
+| `layoutMode`            | `'side'`    | 包内        | 当前布局模式                 |
+| `menuExpandMode`        | `'inline'`  | 宿主菜单    | 菜单展开方式                 |
+| `collapsed`             | `false`     | 包内/宿主   | 共享侧栏折叠状态             |
+| `fixedHeader`           | `true`      | 宿主头部    | 固定头部策略                 |
+| `showBreadcrumb`        | `true`      | 宿主头部    | 显示面包屑                   |
+| `showBreadcrumbIcon`    | `true`      | 宿主头部    | 显示面包屑图标               |
+| `showTagsView`          | `true`      | 包内        | 显示标签页                   |
+| `tagsViewHeight`        | `44`        | 包内        | 标签页高度 (px)              |
+| `tagsViewStyle`         | `'default'` | 宿主标签页  | 标签页风格                   |
+| `showFooter`            | `true`      | 包内        | 显示页脚                     |
+| `sidebarWidth`          | `220`       | 包内        | 侧边栏宽度 (px)              |
+| `sidebarCollapsedWidth` | `64`        | 包内        | 折叠宽度 (px)                |
+| `headerHeight`          | `56`        | 包内/宿主   | 头部高度 (px)                |
+| `enableHotkeys`         | `true`      | 宿主扩展    | 是否启用宿主快捷键           |
+| `version`               | `'3.1.0'`   | 配置元数据  | 当前默认配置来源版本         |
+
+“宿主”字段由 Store 和导入导出协议统一维护，但布局包不会越权修改宿主业务组件；这种边界
+避免重复实现面包屑、快捷键和标签页等业务能力。
 
 ### CSS 变量
 
@@ -369,6 +418,14 @@ settings.$patch(safePatch);
 `useLayoutCache()` 默认不会输出开发日志，也不会向 `window` 暴露调试函数；仅在
 受控的本地开发场景显式设置 `enableDevLog` / `exposeToWindow`。
 
+### 3.1 升级说明
+
+- 新增 `createLayoutContext()` 与 `provideLayout()`，用于精简普通项目的上下文桥接代码。
+- 原有 `LayoutContext`、`provideLayoutContext()` 和所有组件/插槽继续兼容。
+- `C_SideLayout` 等旧别名已正式标记为废弃，3.x 仍保留，计划在 4.0 移除；请改用
+  `SideLayout`、`TopLayout`、`MixLayout`、`MixTopLayout`、
+  `ReverseHorizontalMixLayout`、`CardLayout`。
+
 ### 3.0 升级说明
 
 - 现有根入口、6 种布局、组件名、slot 名和 CSS 入口保持兼容。
@@ -377,6 +434,9 @@ settings.$patch(safePatch);
 - `enableTransition: false` 现在会真正关闭路由过渡，但保留已选择的动画类型。
 - 缓存清理改为宿主白名单动作；从 2.x 升级时请传入 `actions.clearCache`。
 - `@robot-admin/theme` 不再是 peer dependency；需要主题联动时使用 `onThemeModeChange`。
+
+多 Store 实例可以拥有独立状态，但默认 CSS 变量和设置抽屉的灰度、色弱、水印属于页面级
+视觉效果；同一页面应由一个布局宿主统一管理，避免多个应用同时争用 `document` 根节点。
 
 ### 单独使用布局骨架
 

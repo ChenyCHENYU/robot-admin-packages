@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/layout",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Composable Vue layout and settings system for Robot Admin",
   "type": "module",
   "keywords": [
@@ -83,8 +83,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
+    "@vue/test-utils": "^2.4.6",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/server-renderer": "^3.5.13",
+    "happy-dom": "^20.12.2",
     "naive-ui": "^2.41.0",
     "pinia": "^3.0.1",
     "publint": "0.3.24",

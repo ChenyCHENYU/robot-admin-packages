@@ -3,7 +3,7 @@
  */
 
 import { THEME_PRESETS, COLOR_SWATCHES } from "../../constants";
-import type { ThemePreset } from "../../types";
+import type { LayoutMode, ThemePreset } from "../../types";
 
 // 重新导出（内部使用）
 export { COLOR_SWATCHES, THEME_PRESETS };
@@ -73,4 +73,9 @@ export const LAYOUT_MODE_OPTIONS = [
       <rect x="32" y="24" width="24" height="20" rx="2" fill="currentColor" fill-opacity="0.4"/>
     `,
   },
-];
+] satisfies Array<{
+  label: string;
+  value: LayoutMode;
+  disabled: boolean;
+  svg: string;
+}>;

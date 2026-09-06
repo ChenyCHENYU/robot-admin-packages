@@ -9,6 +9,12 @@ import { onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import type { RouteLocationNormalizedLoaded } from "vue-router";
 
+interface LayoutCacheDebugWindow extends Window {
+  __clearCache__?: () => void;
+  __removeCache__?: (name: string) => void;
+  __getCachedViews__?: () => string[];
+}
+
 /** KeepAlive 缓存选项 */
 export interface LayoutCacheOptions {
   /** 最大缓存数量，默认 20 */
@@ -102,19 +108,20 @@ export function useLayoutCache(options: LayoutCacheOptions = {}) {
   // 暴露调试方法到 window
   const getCachedViews = () => cachedViews.value;
   if (expose && typeof window !== "undefined") {
-    (window as any).__clearCache__ = clearAllCache;
-    (window as any).__removeCache__ = removeCache;
-    (window as any).__getCachedViews__ = getCachedViews;
+    const debugWindow = window as LayoutCacheDebugWindow;
+    debugWindow.__clearCache__ = clearAllCache;
+    debugWindow.__removeCache__ = removeCache;
+    debugWindow.__getCachedViews__ = getCachedViews;
 
     onUnmounted(() => {
-      if ((window as any).__clearCache__ === clearAllCache) {
-        delete (window as any).__clearCache__;
+      if (debugWindow.__clearCache__ === clearAllCache) {
+        delete debugWindow.__clearCache__;
       }
-      if ((window as any).__removeCache__ === removeCache) {
-        delete (window as any).__removeCache__;
+      if (debugWindow.__removeCache__ === removeCache) {
+        delete debugWindow.__removeCache__;
       }
-      if ((window as any).__getCachedViews__ === getCachedViews) {
-        delete (window as any).__getCachedViews__;
+      if (debugWindow.__getCachedViews__ === getCachedViews) {
+        delete debugWindow.__getCachedViews__;
       }
     });
   }

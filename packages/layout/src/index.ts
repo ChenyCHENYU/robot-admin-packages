@@ -1,7 +1,7 @@
 /**
  * @robot-admin/layout
  *
- * 布局和设置管理系统 v2.1
+ * 布局和设置管理系统
  * 提供智能布局容器、6 种布局骨架、设置配置、主题预设等功能
  *
  * 架构：智能容器模式
@@ -68,6 +68,11 @@ export type {
   DrawerHandlers,
   MenuCollapseHandlers,
 } from "./composables/useLayoutContext";
+export {
+  createLayoutContext,
+  provideLayout,
+} from "./composables/createLayoutContext";
+export type { CreateLayoutContextOptions } from "./composables/createLayoutContext";
 export { useMenuSplit } from "./composables/useMenuSplit";
 export type {
   UseMenuSplitOptions,
@@ -105,10 +110,23 @@ export {
   COLOR_SWATCHES,
 } from "./constants";
 
-// ============ 向后兼容别名（deprecated，下个大版本移除） ============
-export { default as C_SideLayout } from "./components/layouts/SideLayout/index.vue";
-export { default as C_TopLayout } from "./components/layouts/TopLayout/index.vue";
-export { default as C_MixLayout } from "./components/layouts/MixLayout/index.vue";
-export { default as C_MixTopLayout } from "./components/layouts/MixTopLayout/index.vue";
-export { default as C_ReverseHorizontalMixLayout } from "./components/layouts/ReverseHorizontalMixLayout/index.vue";
-export { default as C_CardLayout } from "./components/layouts/CardLayout/index.vue";
+// ============ 3.x 向后兼容别名（计划在 4.0 移除） ============
+import SideLayoutCompat from "./components/layouts/SideLayout/index.vue";
+import TopLayoutCompat from "./components/layouts/TopLayout/index.vue";
+import MixLayoutCompat from "./components/layouts/MixLayout/index.vue";
+import MixTopLayoutCompat from "./components/layouts/MixTopLayout/index.vue";
+import ReverseHorizontalMixLayoutCompat from "./components/layouts/ReverseHorizontalMixLayout/index.vue";
+import CardLayoutCompat from "./components/layouts/CardLayout/index.vue";
+
+/** @deprecated 请使用 SideLayout；该别名计划在 4.0 移除。 */
+export const C_SideLayout = SideLayoutCompat;
+/** @deprecated 请使用 TopLayout；该别名计划在 4.0 移除。 */
+export const C_TopLayout = TopLayoutCompat;
+/** @deprecated 请使用 MixLayout；该别名计划在 4.0 移除。 */
+export const C_MixLayout = MixLayoutCompat;
+/** @deprecated 请使用 MixTopLayout；该别名计划在 4.0 移除。 */
+export const C_MixTopLayout = MixTopLayoutCompat;
+/** @deprecated 请使用 ReverseHorizontalMixLayout；该别名计划在 4.0 移除。 */
+export const C_ReverseHorizontalMixLayout = ReverseHorizontalMixLayoutCompat;
+/** @deprecated 请使用 CardLayout；该别名计划在 4.0 移除。 */
+export const C_CardLayout = CardLayoutCompat;

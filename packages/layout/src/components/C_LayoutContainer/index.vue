@@ -154,6 +154,6 @@ const collapseHandlers = {
   },
 };
 provide(MENU_COLLAPSE_KEY, collapseHandlers);
-// 3.x 兼容层：旧消费方仍可使用字符串 key，下个大版本移除。
+// 3.x 兼容层：旧消费方仍可使用字符串 key，计划在 4.0 移除。
 provide("menuCollapse", collapseHandlers);
 </script>

@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.1.0
+
+### Minor Changes
+
+- Add `createLayoutContext()` and `provideLayout()` to derive the complete reactive layout contract from a settings Store, menus, dark state, brand data, and an optional icon component.
+- Keep the advanced `LayoutContext` API intact while formally deprecating the legacy `C_*Layout` aliases for removal in 4.0.
+- Add browser interaction coverage for SettingsDrawer providers, atomic imports, reset rollback, host-owned cache clearing, and global visual-effect cleanup.
+- Correct integration prerequisites, host-owned setting semantics, migration guidance, architecture diagrams, and stale version references without changing existing layout visuals or interactions.
+
 ## 3.0.0
 
 ### Major Changes

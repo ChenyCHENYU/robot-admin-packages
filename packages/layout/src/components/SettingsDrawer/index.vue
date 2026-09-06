@@ -412,6 +412,7 @@ import { LAYOUT_SETTINGS_KEY } from "../../composables/useLayoutContext";
 import { COLOR_SWATCHES, LAYOUT_MODE_OPTIONS, THEME_PRESETS } from "./data";
 import type {
   SettingsDrawerActions,
+  LayoutMode,
   ThemeMode,
   ThemePreset,
 } from "../../types";
@@ -420,7 +421,7 @@ import type {
 
 const props = withDefaults(
   defineProps<{
-    /** 抽屉宽度，保持 2.x 默认值 */
+    /** 抽屉宽度，默认 380px */
     width?: number;
     /** 显式设置 Store；优先级高于 setupLayout 注入和默认 Store */
     store?: SettingsStoreInstance;
@@ -592,9 +593,9 @@ onUnmounted(() => {
 });
 
 // 处理布局切换 - 阻止抽屉关闭
-const handleLayoutChange = (value: string, disabled?: boolean) => {
+const handleLayoutChange = (value: LayoutMode, disabled?: boolean) => {
   if (disabled) return;
-  settingsStore.layoutMode = value as any;
+  settingsStore.layoutMode = value;
 };
 
 // ============ 方法 ============

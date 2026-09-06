@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ref } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import {
   sanitizeLayoutSettingsConfig,
@@ -11,6 +12,7 @@ import {
   createSettingsStore,
   sanitizeSettingsPatch,
 } from "../src/stores/settings";
+import { createLayoutContext } from "../src/composables/createLayoutContext";
 
 describe("layout helpers", () => {
   it("matches route segments without prefix false positives", () => {
@@ -136,5 +138,34 @@ describe("layout helpers", () => {
 
     await expect(store.updateThemeMode("dark")).rejects.toThrow("sync failed");
     expect(store.themeMode).toBe("light");
+  });
+
+  it("creates a reactive layout context from the minimal host contract", () => {
+    setActivePinia(createPinia());
+    const settings = createSettingsStore({ id: "layout-context-test" })();
+    const menus = ref([{ label: "Home", key: "/home" }]);
+    const isDark = ref(false);
+    const context = createLayoutContext({
+      settings,
+      menus,
+      isDark,
+      brand: { name: "Workspace" },
+    });
+
+    expect(context.menus.value).toEqual(menus.value);
+    expect(context.isDark.value).toBe(false);
+    expect(context.layoutMode.value).toBe("side");
+    expect(context.brand).toMatchObject({
+      name: "Workspace",
+      homePath: "/home",
+    });
+
+    settings.layoutMode = "mix";
+    isDark.value = true;
+    context.collapsed!.value = true;
+
+    expect(context.layoutMode.value).toBe("mix");
+    expect(context.isDark.value).toBe(true);
+    expect(settings.collapsed).toBe(true);
   });
 });

@@ -8,7 +8,13 @@ const entrypoints = [
     name: "root",
     esm: "../dist/index.js",
     cjs: "../dist/index.cjs",
-    exports: ["C_LayoutContainer", "SettingsDrawer", "setupLayout"],
+    exports: [
+      "C_LayoutContainer",
+      "SettingsDrawer",
+      "createLayoutContext",
+      "provideLayout",
+      "setupLayout",
+    ],
   },
   {
     name: "core",
@@ -47,6 +53,28 @@ for (const file of ["index.js", "index.cjs", "index.d.ts", "index.d.cts"]) {
   const source = await readFile(new URL(`../dist/core/${file}`, import.meta.url), "utf8");
   if (/\b(?:vue|vue-router|pinia|naive-ui)\b/.test(source)) {
     throw new TypeError(`core/${file} contains a framework dependency`);
+  }
+}
+
+const rootDeclaration = await readFile(
+  new URL("../dist/index.d.ts", import.meta.url),
+  "utf8",
+);
+for (const alias of [
+  "C_SideLayout",
+  "C_TopLayout",
+  "C_MixLayout",
+  "C_MixTopLayout",
+  "C_ReverseHorizontalMixLayout",
+  "C_CardLayout",
+]) {
+  const declarationIndex = rootDeclaration.indexOf(`const ${alias}`);
+  const leadingComment = rootDeclaration.slice(
+    Math.max(0, declarationIndex - 120),
+    declarationIndex,
+  );
+  if (declarationIndex < 0 || !leadingComment.includes("@deprecated")) {
+    throw new TypeError(`${alias} is missing its public @deprecated marker`);
   }
 }
 
