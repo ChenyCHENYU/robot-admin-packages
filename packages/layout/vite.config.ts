@@ -20,13 +20,7 @@ export default defineConfig({
     },
     // Vite 8: rollupOptions → rolldownOptions
     rolldownOptions: {
-      external: [
-        "vue",
-        "vue-router",
-        "pinia",
-        "naive-ui",
-        "@robot-admin/theme",
-      ],
+      external: ["vue", "vue-router", "pinia", "naive-ui"],
       output: {
         assetFileNames: (assetInfo) => {
           // CSS 文件统一命名为 index.css

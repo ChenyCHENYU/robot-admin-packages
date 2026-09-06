@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/layout.svg)](https://www.npmjs.com/package/@robot-admin/layout)
 [![license](https://img.shields.io/npm/l/@robot-admin/layout.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
 
-当前版本：`2.3.2`。
+当前版本：`3.0.0`。
 
 ---
 
@@ -110,10 +110,13 @@ src/
 ## 📦 安装
 
 ```bash
-bun add @robot-admin/layout @robot-admin/theme naive-ui
+bun add @robot-admin/layout naive-ui
 ```
 
-**Peer Dependencies**: `vue ^3.4` · `vue-router ^4.0` · `pinia ^2.0 || ^3.0` · `naive-ui ^2.38` · `@robot-admin/theme ^0.3 || ^0.4`
+**Peer Dependencies**: `vue ^3.4` · `vue-router ^4.0` · `pinia ^2.0 || ^3.0` · `naive-ui ^2.38`
+
+> 3.0 仍完整保留现有 Naive UI 组件、交互和样式。状态校验等无 UI 能力可从
+> `@robot-admin/layout/core` 独立导入，为后续适配其他 UI 框架预留稳定边界；当前版本不包含 Element Plus 视图适配器。
 
 ---
 
@@ -126,18 +129,15 @@ bun add @robot-admin/layout @robot-admin/theme naive-ui
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { setupLayout } from "@robot-admin/layout";
-import { useThemeStore } from "@robot-admin/theme";
-import "@robot-admin/layout/style";  // 导入样式
+import "@robot-admin/layout/style"; // 导入样式
 import App from "./App.vue";
 
 const app = createApp(App);
 app.use(createPinia());
 
-const themeStore = useThemeStore();
-themeStore.init();
-
 setupLayout(app, {
-  onThemeModeChange: (mode) => themeStore.setMode(mode),
+  // 可选：同步到宿主自己的主题系统
+  onThemeModeChange: (mode) => syncAppTheme(mode),
   defaults: {
     layoutMode: "side",
     primaryColor: "#409eff",
@@ -154,7 +154,9 @@ app.mount("#app");
 <template>
   <C_LayoutContainer>
     <template #logo><AppLogo /></template>
-    <template #menu="{ collapsed }"><AppMenu :collapsed="collapsed" /></template>
+    <template #menu="{ collapsed }"
+      ><AppMenu :collapsed="collapsed"
+    /></template>
     <template #header><AppHeader /></template>
     <template #tags-view><AppTags /></template>
     <template #footer><AppFooter /></template>
@@ -174,39 +176,51 @@ import { ref } from "vue";
 import { SettingsDrawer } from "@robot-admin/layout";
 
 const visible = ref(false);
+const settingsActions = {
+  clearCache: () => localStorage.removeItem("my-app-disposable-cache"),
+};
 </script>
 
 <template>
   <button @click="visible = true">⚙️ 设置</button>
-  <SettingsDrawer v-model:show="visible" />
+  <SettingsDrawer v-model:show="visible" :actions="settingsActions">
+    <template #appearance-prepend>
+      <AppThemeExtension />
+    </template>
+  </SettingsDrawer>
 </template>
 ```
+
+`SettingsDrawer` 不再自行清空 `localStorage` / `sessionStorage`。缓存清理由宿主通过
+`actions.clearCache` 明确实现，避免误删登录态、语言和业务数据。可用扩展插槽：
+`appearance-prepend/append`、`layout-prepend/after-mode/append`、
+`features-prepend/append`；插槽均暴露当前 `settings`。
 
 ---
 
 ## 📐 布局模式
 
-| 模式 | 常量值 | 一级菜单 | 二级菜单 | 适用场景 |
-|------|--------|----------|----------|----------|
-| **左侧菜单** | `side` | 左侧栏 | 左侧栏（折叠） | 经典后台管理（ERP、CRM） |
-| **顶部菜单** | `top` | 顶部横向 | 顶部下拉 | 菜单少，需更宽内容区 |
-| **混合布局** | `mix` | 左侧图标栏 | 悬浮弹出 | 一级菜单少，二级多 |
-| **顶部混合** | `mix-top` | 左侧图标栏 | 顶部横向 | 全局导航 + 侧边详情 |
-| **反转混合** | `reverse-horizontal-mix` | 顶部横向 | 右侧栏 | 特殊需求，右手操作 |
-| **卡片布局** | `card-layout` | hover 抽屉 | 网格铺开 | 应用首页 / 工作台 |
+| 模式         | 常量值                   | 一级菜单   | 二级菜单       | 适用场景                 |
+| ------------ | ------------------------ | ---------- | -------------- | ------------------------ |
+| **左侧菜单** | `side`                   | 左侧栏     | 左侧栏（折叠） | 经典后台管理（ERP、CRM） |
+| **顶部菜单** | `top`                    | 顶部横向   | 顶部下拉       | 菜单少，需更宽内容区     |
+| **混合布局** | `mix`                    | 左侧图标栏 | 悬浮弹出       | 一级菜单少，二级多       |
+| **顶部混合** | `mix-top`                | 左侧图标栏 | 顶部横向       | 全局导航 + 侧边详情      |
+| **反转混合** | `reverse-horizontal-mix` | 顶部横向   | 右侧栏         | 特殊需求，右手操作       |
+| **卡片布局** | `card-layout`            | hover 抽屉 | 网格铺开       | 应用首页 / 工作台        |
 
 ---
 
 ## 🎨 主题预设
 
-| 预设 | 主题色 | 图标 |
-|------|--------|------|
-| 科技蓝 | `#409eff` | 💙 |
-| 清新绿 | `#52c41a` | 💚 |
-| 商务灰 | `#595959` | 🖤 |
-| 活力橙 | `#fa8c16` | 🧡 |
-| 优雅紫 | `#722ed1` | 💜 |
-| 经典红 | `#f5222d` | ❤️ |
+| 预设   | 主题色    | 图标 |
+| ------ | --------- | ---- |
+| 科技蓝 | `#409eff` | 💙   |
+| 清新绿 | `#52c41a` | 💚   |
+| 商务灰 | `#595959` | 🖤   |
+| 活力橙 | `#fa8c16` | 🧡   |
+| 优雅紫 | `#722ed1` | 💜   |
+| 经典红 | `#f5222d` | ❤️   |
 
 ---
 
@@ -220,10 +234,10 @@ import { useSettingsStore } from "@robot-admin/layout";
 const settings = useSettingsStore();
 
 // 读取
-settings.layoutMode;       // 'side' | 'top' | 'mix' | ...
-settings.menuExpandMode;   // 'inline' | 'panel'
-settings.primaryColor;     // '#409eff'
-settings.themeMode;        // 'light' | 'dark' | 'system'
+settings.layoutMode; // 'side' | 'top' | 'mix' | ...
+settings.menuExpandMode; // 'inline' | 'panel'
+settings.primaryColor; // '#409eff'
+settings.themeMode; // 'light' | 'dark' | 'system'
 
 // 修改
 settings.layoutMode = "mix";
@@ -235,21 +249,21 @@ settings.resetSettings();
 
 ### 设置属性一览
 
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `themeMode` | `ThemeMode` | `'light'` | 主题模式 |
-| `primaryColor` | `string` | `'#409eff'` | 主题色 |
-| `layoutMode` | `LayoutMode` | `'side'` | 布局模式 |
-| `menuExpandMode` | `MenuExpandMode` | `'inline'` | 菜单展开方式 |
-| `borderRadius` | `BorderRadiusSize` | `'medium'` | 圆角大小 |
-| `transitionType` | `TransitionType` | `'slide'` | 页面动画 |
-| `fixedHeader` | `boolean` | `true` | 固定头部 |
-| `showBreadcrumb` | `boolean` | `true` | 显示面包屑 |
-| `showTagsView` | `boolean` | `true` | 显示标签页 |
-| `showFooter` | `boolean` | `true` | 显示页脚 |
-| `sidebarWidth` | `number` | `220` | 侧边栏宽度 (px) |
-| `sidebarCollapsedWidth` | `number` | `64` | 折叠宽度 (px) |
-| `headerHeight` | `number` | `56` | 头部高度 (px) |
+| 属性                    | 类型               | 默认值      | 说明            |
+| ----------------------- | ------------------ | ----------- | --------------- |
+| `themeMode`             | `ThemeMode`        | `'light'`   | 主题模式        |
+| `primaryColor`          | `string`           | `'#409eff'` | 主题色          |
+| `layoutMode`            | `LayoutMode`       | `'side'`    | 布局模式        |
+| `menuExpandMode`        | `MenuExpandMode`   | `'inline'`  | 菜单展开方式    |
+| `borderRadius`          | `BorderRadiusSize` | `'medium'`  | 圆角大小        |
+| `transitionType`        | `TransitionType`   | `'slide'`   | 页面动画        |
+| `fixedHeader`           | `boolean`          | `true`      | 固定头部        |
+| `showBreadcrumb`        | `boolean`          | `true`      | 显示面包屑      |
+| `showTagsView`          | `boolean`          | `true`      | 显示标签页      |
+| `showFooter`            | `boolean`          | `true`      | 显示页脚        |
+| `sidebarWidth`          | `number`           | `220`       | 侧边栏宽度 (px) |
+| `sidebarCollapsedWidth` | `number`           | `64`        | 折叠宽度 (px)   |
+| `headerHeight`          | `number`           | `56`        | 头部高度 (px)   |
 
 ### CSS 变量
 
@@ -270,32 +284,37 @@ settings.resetSettings();
 
 ## 🧩 C_LayoutContainer Slots
 
-| Slot 名称 | 说明 | 适用布局 |
-|-----------|------|----------|
-| `#logo` | 品牌 Logo | 全部 |
-| `#menu` | 垂直菜单 | Side |
-| `#header` | 完整头部 | Side / Mix |
+| Slot 名称       | 说明           | 适用布局                      |
+| --------------- | -------------- | ----------------------------- |
+| `#logo`         | 品牌 Logo      | 全部                          |
+| `#menu`         | 垂直菜单       | Side                          |
+| `#header`       | 完整头部       | Side / Mix                    |
 | `#header-extra` | 头部右侧操作区 | Top / MixTop / Reverse / Card |
-| `#top-menu` | 水平菜单 | Top / MixTop / Reverse |
-| `#tags-view` | 标签页 | 全部 |
-| `#footer` | 页脚 | 全部 |
-| `#brand` | 顶部品牌区 | MixTop |
-| `#menu-trigger` | 菜单触发区 | Card |
-| `#drawer-menu` | 抽屉菜单 | Card |
+| `#top-menu`     | 水平菜单       | Top / MixTop / Reverse        |
+| `#tags-view`    | 标签页         | 全部                          |
+| `#footer`       | 页脚           | 全部                          |
+| `#brand`        | 顶部品牌区     | MixTop                        |
+| `#menu-trigger` | 菜单触发区     | Card                          |
+| `#drawer-menu`  | 抽屉菜单       | Card                          |
 
 ---
 
 ## 📖 类型定义
 
 ```typescript
-type LayoutMode = "side" | "top" | "mix" | "mix-top" | "reverse-horizontal-mix" | "card-layout";
+type LayoutMode =
+  "side" | "top" | "mix" | "mix-top" | "reverse-horizontal-mix" | "card-layout";
 type MenuExpandMode = "inline" | "panel";
 type TransitionType = "fade" | "slide" | "zoom" | "none";
 type BorderRadiusSize = "small" | "medium" | "large";
 type TagsViewStyle = "default" | "card" | "smart";
 type ThemeMode = "light" | "dark" | "system";
 
-interface ThemePreset { name: string; icon: string; primaryColor: string; }
+interface ThemePreset {
+  name: string;
+  icon: string;
+  primaryColor: string;
+}
 interface SettingsStoreOptions {
   id?: string;
   defaults?: Partial<SettingsState>;
@@ -328,10 +347,13 @@ export const useSettingsStore = createSettingsStore({
 从文件、URL 或远端接口加载的设置属于不可信输入，写入 Store 前应先校验：
 
 ```typescript
-import { sanitizeSettingsPatch, useSettingsStore } from "@robot-admin/layout";
+import { sanitizeLayoutSettingsConfig } from "@robot-admin/layout/core";
+import { useSettingsStore } from "@robot-admin/layout";
 
 const imported = JSON.parse(await file.text());
-const safePatch = sanitizeSettingsPatch(imported.settings);
+// 一次校验完整文件，失败时不会产生部分状态写入。
+const config = sanitizeLayoutSettingsConfig(imported);
+const safePatch = config.settings ?? {};
 const settings = useSettingsStore();
 
 if (safePatch.themeMode !== undefined) {
@@ -346,6 +368,15 @@ settings.$patch(safePatch);
 
 `useLayoutCache()` 默认不会输出开发日志，也不会向 `window` 暴露调试函数；仅在
 受控的本地开发场景显式设置 `enableDevLog` / `exposeToWindow`。
+
+### 3.0 升级说明
+
+- 现有根入口、6 种布局、组件名、slot 名和 CSS 入口保持兼容。
+- `LayoutContext.collapsed` 为可选的双向状态；提供后，侧栏与宿主头部共享同一折叠状态。
+- 自定义 Store 可通过 `setupLayout()` 注入，也可用 `SettingsDrawer :store="store"` 显式传入。
+- `enableTransition: false` 现在会真正关闭路由过渡，但保留已选择的动画类型。
+- 缓存清理改为宿主白名单动作；从 2.x 升级时请传入 `actions.clearCache`。
+- `@robot-admin/theme` 不再是 peer dependency；需要主题联动时使用 `onThemeModeChange`。
 
 ### 单独使用布局骨架
 

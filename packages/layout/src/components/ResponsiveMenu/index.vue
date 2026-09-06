@@ -7,7 +7,7 @@
  -->
 <template>
   <div ref="containerRef" class="responsive-menu">
-    <div ref="visibleRef" class="responsive-menu__visible">
+    <div class="responsive-menu__visible">
       <NMenu
         v-if="visibleOptions.length > 0"
         mode="horizontal"
@@ -241,10 +241,8 @@ const calculateVisibleItems = () => {
   if (!containerRef.value || !menuData.value.length) return;
 
   const containerWidth = containerRef.value.offsetWidth;
-  if (containerWidth === 0) {
-    nextTick(() => calculateVisibleItems());
-    return;
-  }
+  // 隐藏容器交由 ResizeObserver 在重新可见时触发，避免无限 nextTick 循环。
+  if (containerWidth <= 0) return;
 
   const count = calculateVisibleCount(containerWidth);
   visibleItems.value = menuData.value.slice(0, count);
@@ -253,24 +251,29 @@ const calculateVisibleItems = () => {
 
 // ============ 防抖 & ResizeObserver ============
 
-let resizeTimer: number | null = null;
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 const debouncedCalculate = () => {
   if (resizeTimer) clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(() => calculateVisibleItems(), 100);
+  resizeTimer = setTimeout(() => calculateVisibleItems(), 100);
 };
 
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
   nextTick(() => calculateVisibleItems());
-  if (containerRef.value) {
+  if (containerRef.value && typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(() => debouncedCalculate());
     resizeObserver.observe(containerRef.value);
+  } else if (typeof window !== "undefined") {
+    window.addEventListener("resize", debouncedCalculate, { passive: true });
   }
 });
 
 onUnmounted(() => {
   resizeObserver?.disconnect();
+  if (typeof window !== "undefined") {
+    window.removeEventListener("resize", debouncedCalculate);
+  }
   if (resizeTimer) clearTimeout(resizeTimer);
 });
 

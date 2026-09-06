@@ -41,20 +41,32 @@ export { createSettingsStore, useSettingsStore } from "./stores/settings";
 
 // ============ Utils ============
 export { adjustColor, sanitizeSettingsPatch } from "./stores/settings";
+export {
+  sanitizeLayoutSettingsConfig,
+  SETTINGS_CONFIG_SCHEMA_VERSION,
+} from "./core/settings";
+export type {
+  LayoutSettingsConfig,
+  LayoutVisualEffects,
+} from "./core/settings";
 
 // ============ Composables ============
-export { useLayoutCache } from "./composables/useLayoutCache";
+export { shouldCacheRoute, useLayoutCache } from "./composables/useLayoutCache";
 export type { LayoutCacheOptions } from "./composables/useLayoutCache";
 export {
   useLayoutContext,
   LAYOUT_CONTEXT_KEY,
   DEFAULT_BRAND_CONFIG,
   DRAWER_HANDLER_KEY,
+  LAYOUT_SETTINGS_KEY,
+  MENU_COLLAPSE_KEY,
+  provideLayoutContext,
 } from "./composables/useLayoutContext";
 export type {
   LayoutContext,
   LayoutBrandConfig,
   DrawerHandlers,
+  MenuCollapseHandlers,
 } from "./composables/useLayoutContext";
 export { useMenuSplit } from "./composables/useMenuSplit";
 export type {
@@ -72,12 +84,15 @@ export type {
   SettingsState,
   ThemePreset,
   SettingsStoreOptions,
+  SettingsDrawerActions,
   LayoutInfo,
   PresetColor,
   MenuOptions,
   MenuTag,
   MenuItemType,
+  ThemeMode,
 } from "./types";
+export type { SettingsStoreInstance } from "./stores/settings";
 
 // ============ Constants ============
 export {

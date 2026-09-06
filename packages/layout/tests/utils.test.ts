@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
+import {
+  sanitizeLayoutSettingsConfig,
+  SETTINGS_CONFIG_SCHEMA_VERSION,
+} from "../src/core";
+import { shouldCacheRoute } from "../src/composables/useLayoutCache";
 import { isPathSegmentPrefix } from "../src/composables/useMenuSplit";
 import {
   adjustColor,
@@ -53,6 +58,71 @@ describe("layout helpers", () => {
     expect(() =>
       createSettingsStore({ defaults: { themeMode: "auto" as never } }),
     ).toThrow(RangeError);
+  });
+
+  it("validates the complete configuration before it can be applied", () => {
+    const source = {
+      schemaVersion: SETTINGS_CONFIG_SCHEMA_VERSION,
+      settings: { themeMode: "dark", sidebarWidth: 240 },
+      gray: true,
+      watermark: { enabled: true, text: "Robot Admin" },
+      ignoredFutureField: true,
+    };
+
+    expect(sanitizeLayoutSettingsConfig(source)).toEqual({
+      schemaVersion: SETTINGS_CONFIG_SCHEMA_VERSION,
+      settings: { themeMode: "dark", sidebarWidth: 240 },
+      gray: true,
+      watermark: { enabled: true, text: "Robot Admin" },
+    });
+    expect(source).toEqual({
+      schemaVersion: SETTINGS_CONFIG_SCHEMA_VERSION,
+      settings: { themeMode: "dark", sidebarWidth: 240 },
+      gray: true,
+      watermark: { enabled: true, text: "Robot Admin" },
+      ignoredFutureField: true,
+    });
+    expect(() =>
+      sanitizeLayoutSettingsConfig({
+        settings: { layoutMode: "side" },
+        watermark: { enabled: true, text: 123 },
+      }),
+    ).toThrow(TypeError);
+    expect(() => sanitizeLayoutSettingsConfig({ schemaVersion: 2 })).toThrow(
+      RangeError,
+    );
+  });
+
+  it("only auto-caches explicitly named keep-alive routes", () => {
+    expect(
+      shouldCacheRoute({
+        name: "UserList",
+        meta: { keepAlive: true },
+      } as never),
+    ).toBe(true);
+    expect(
+      shouldCacheRoute({
+        name: "UserList",
+        meta: { keepAlive: false },
+      } as never),
+    ).toBe(false);
+    expect(
+      shouldCacheRoute({
+        name: Symbol("UserList"),
+        meta: { keepAlive: true },
+      } as never),
+    ).toBe(false);
+  });
+
+  it("disables the transition name without discarding the selected preset", () => {
+    setActivePinia(createPinia());
+    const store = createSettingsStore({ id: "settings-transition-test" })();
+
+    store.transitionType = "slide";
+    store.enableTransition = false;
+    expect(store.shouldEnableTransition).toBe(false);
+    expect(store.transitionName).toBe("");
+    expect(store.transitionType).toBe("slide");
   });
 
   it("rolls back theme state when the synchronization callback fails", async () => {

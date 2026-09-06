@@ -7,7 +7,7 @@
 <template>
   <NDrawer
     v-model:show="visible"
-    :width="380"
+    :width="width"
     placement="right"
     :trap-focus="true"
     :block-scroll="true"
@@ -16,6 +16,7 @@
       <NTabs v-model:value="activeTab" animated class="settings-tabs">
         <!-- 外观 Tab -->
         <NTabPane name="appearance" tab="🎨 外观">
+          <slot name="appearance-prepend" :settings="settingsStore" />
           <!-- 预设方案网格 -->
           <div class="settings-section">
             <div class="preset-grid">
@@ -121,10 +122,12 @@
               恢复外观默认设置
             </NButton>
           </div>
+          <slot name="appearance-append" :settings="settingsStore" />
         </NTabPane>
 
         <!-- 布局 Tab -->
         <NTabPane name="layout" tab="📐 布局">
+          <slot name="layout-prepend" :settings="settingsStore" />
           <!-- 布局模式 -->
           <div class="settings-section">
             <div class="section-title">布局模式</div>
@@ -142,7 +145,9 @@
                 :aria-disabled="mode.disabled"
                 :aria-pressed="settingsStore.layoutMode === mode.value"
                 @click.stop="handleLayoutChange(mode.value, mode.disabled)"
-                @keydown.enter.stop="handleLayoutChange(mode.value, mode.disabled)"
+                @keydown.enter.stop="
+                  handleLayoutChange(mode.value, mode.disabled)
+                "
                 @keydown.space.stop.prevent="
                   handleLayoutChange(mode.value, mode.disabled)
                 "
@@ -164,6 +169,8 @@
               </div>
             </div>
           </div>
+
+          <slot name="layout-after-mode" :settings="settingsStore" />
 
           <div
             class="settings-section menu-expand-section"
@@ -247,10 +254,12 @@
               恢复布局默认设置
             </NButton>
           </div>
+          <slot name="layout-append" :settings="settingsStore" />
         </NTabPane>
 
         <!-- 功能 Tab -->
         <NTabPane name="features" tab="🔧 功能">
+          <slot name="features-prepend" :settings="settingsStore" />
           <!-- 缓存管理 -->
           <div class="settings-section">
             <div class="section-title">缓存管理</div>
@@ -366,6 +375,7 @@
               </div>
             </div>
           </div>
+          <slot name="features-append" :settings="settingsStore" />
         </NTabPane>
       </NTabs>
     </NDrawerContent>
@@ -373,7 +383,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from "vue";
+import { ref, computed, watch, onUnmounted, inject } from "vue";
 import {
   NDrawer,
   NDrawerContent,
@@ -390,25 +400,58 @@ import {
   useDialog,
 } from "naive-ui";
 import {
-  sanitizeSettingsPatch,
   useSettingsStore,
+  type SettingsStoreInstance,
 } from "../../stores/settings";
 import { DEFAULT_SETTINGS } from "../../constants";
+import {
+  sanitizeLayoutSettingsConfig,
+  SETTINGS_CONFIG_SCHEMA_VERSION,
+} from "../../core/settings";
+import { LAYOUT_SETTINGS_KEY } from "../../composables/useLayoutContext";
 import { COLOR_SWATCHES, LAYOUT_MODE_OPTIONS, THEME_PRESETS } from "./data";
-import type { ThemePreset } from "../../types";
-import type { ThemeMode } from "@robot-admin/theme";
+import type {
+  SettingsDrawerActions,
+  ThemeMode,
+  ThemePreset,
+} from "../../types";
 
 // ============ 数据定义 ============
 
+const props = withDefaults(
+  defineProps<{
+    /** 抽屉宽度，保持 2.x 默认值 */
+    width?: number;
+    /** 显式设置 Store；优先级高于 setupLayout 注入和默认 Store */
+    store?: SettingsStoreInstance;
+    /** 由宿主实现的缓存清理、页面刷新等高副作用操作 */
+    actions?: SettingsDrawerActions;
+    /** 导入文件最大字节数，默认 1 MiB */
+    maxImportBytes?: number;
+  }>(),
+  {
+    width: 380,
+    maxImportBytes: 1024 * 1024,
+  },
+);
+
 const message = useMessage();
 const dialog = useDialog();
-const settingsStore = useSettingsStore();
+const injectedSettingsStore = inject(LAYOUT_SETTINGS_KEY, null);
+const settingsStore =
+  props.store ?? injectedSettingsStore ?? useSettingsStore();
 const visible = defineModel<boolean>("show", { default: false });
 const activeTab = ref("appearance");
 
-// 功能开关
-const grayMode = ref(false);
-const colorWeakMode = ref(false);
+// 功能开关：记录宿主原始状态，卸载时精确恢复，避免污染全局 class。
+const initialGrayMode =
+  typeof document !== "undefined" &&
+  document.documentElement.classList.contains("gray-mode");
+const initialColorWeakMode =
+  typeof document !== "undefined" &&
+  document.documentElement.classList.contains("color-weak-mode");
+const grayMode = ref(initialGrayMode);
+const colorWeakMode = ref(initialColorWeakMode);
 const watermarkEnabled = ref(false);
 const watermarkText = ref("Robot Admin");
 
@@ -417,9 +460,10 @@ let watermarkEl: HTMLElement | null = null;
 
 // 创建水印函数
 const createWatermark = (text: string) => {
+  if (typeof document === "undefined") return;
   // 移除旧水印
   if (watermarkEl) {
-    document.body.removeChild(watermarkEl);
+    watermarkEl.remove();
     watermarkEl = null;
   }
 
@@ -440,6 +484,7 @@ const createWatermark = (text: string) => {
 
   // 创建水印容器
   watermarkEl = document.createElement("div");
+  watermarkEl.dataset.robotAdminLayoutWatermark = "true";
   watermarkEl.style.cssText = `
     position: fixed;
     top: 0;
@@ -459,19 +504,23 @@ const createWatermark = (text: string) => {
 // 移除水印函数
 const removeWatermark = () => {
   if (watermarkEl) {
-    document.body.removeChild(watermarkEl);
+    watermarkEl.remove();
     watermarkEl = null;
   }
 };
 
 // 监听灰色模式
 watch(grayMode, (val) => {
-  document.documentElement.classList.toggle("gray-mode", val);
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("gray-mode", val);
+  }
 });
 
 // 监听色弱模式
 watch(colorWeakMode, (val) => {
-  document.documentElement.classList.toggle("color-weak-mode", val);
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("color-weak-mode", val);
+  }
 });
 
 // 监听水印开关
@@ -508,17 +557,17 @@ const systemInfo = computed(() => {
   let os = "Unknown";
 
   // 检测浏览器
-  if (ua.includes("Chrome")) browser = "Chrome";
+  if (ua.includes("Edg/")) browser = "Edge";
   else if (ua.includes("Firefox")) browser = "Firefox";
+  else if (ua.includes("Chrome")) browser = "Chrome";
   else if (ua.includes("Safari")) browser = "Safari";
-  else if (ua.includes("Edge")) browser = "Edge";
 
   // 检测操作系统
   if (ua.includes("Windows")) os = "Windows";
   else if (ua.includes("Mac")) os = "macOS";
-  else if (ua.includes("Linux")) os = "Linux";
   else if (ua.includes("Android")) os = "Android";
   else if (ua.includes("iOS")) os = "iOS";
+  else if (ua.includes("Linux")) os = "Linux";
 
   return {
     browser,
@@ -533,6 +582,13 @@ const systemInfo = computed(() => {
 // 组件卸载时清理水印
 onUnmounted(() => {
   removeWatermark();
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("gray-mode", initialGrayMode);
+    document.documentElement.classList.toggle(
+      "color-weak-mode",
+      initialColorWeakMode,
+    );
+  }
 });
 
 // 处理布局切换 - 阻止抽屉关闭
@@ -569,13 +625,17 @@ const handleThemeModeChange = async (mode: ThemeMode) => {
 /**
  * 恢复外观默认设置
  */
-const handleResetAppearance = () => {
-  settingsStore.themeMode = DEFAULT_SETTINGS.themeMode;
-  settingsStore.primaryColor = DEFAULT_SETTINGS.primaryColor;
-  settingsStore.borderRadius = DEFAULT_SETTINGS.borderRadius;
-  settingsStore.transitionType = DEFAULT_SETTINGS.transitionType;
-  settingsStore.enableTransition = DEFAULT_SETTINGS.enableTransition;
-  message.success("已恢复外观默认设置");
+const handleResetAppearance = async () => {
+  try {
+    await settingsStore.updateThemeMode(DEFAULT_SETTINGS.themeMode);
+    settingsStore.primaryColor = DEFAULT_SETTINGS.primaryColor;
+    settingsStore.borderRadius = DEFAULT_SETTINGS.borderRadius;
+    settingsStore.transitionType = DEFAULT_SETTINGS.transitionType;
+    settingsStore.enableTransition = DEFAULT_SETTINGS.enableTransition;
+    message.success("已恢复外观默认设置");
+  } catch {
+    message.error("恢复外观默认设置失败");
+  }
 };
 
 /**
@@ -606,9 +666,16 @@ const handleReset = () => {
     content: "确定要恢复默认配置吗？此操作不可撤销。",
     positiveText: "确认",
     negativeText: "取消",
-    onPositiveClick: () => {
-      settingsStore.resetSettings();
-      message.success("已恢复默认配置");
+    onPositiveClick: async () => {
+      const previousSettings = { ...settingsStore.settingsState };
+      try {
+        settingsStore.resetSettings();
+        await settingsStore.updateThemeMode(settingsStore.themeMode);
+        message.success("已恢复默认配置");
+      } catch {
+        settingsStore.$patch(previousSettings);
+        message.error("恢复默认配置失败");
+      }
     },
   });
 };
@@ -622,18 +689,17 @@ const handleClearCache = () => {
     content: "确定要清除浏览器缓存吗？",
     positiveText: "确认",
     negativeText: "取消",
-    onPositiveClick: () => {
-      // 清除 localStorage
-      const keysToKeep = ["theme-mode", "robot-admin-settings"];
-      const allKeys = Object.keys(localStorage);
-      allKeys.forEach((key) => {
-        if (!keysToKeep.includes(key)) {
-          localStorage.removeItem(key);
-        }
-      });
-      // 清除 sessionStorage
-      sessionStorage.clear();
-      message.success("缓存已清除");
+    onPositiveClick: async () => {
+      if (!props.actions?.clearCache) {
+        message.warning("宿主应用未配置可安全清理的缓存");
+        return;
+      }
+      try {
+        await props.actions.clearCache();
+        message.success("缓存已清除");
+      } catch {
+        message.error("缓存清除失败");
+      }
     },
   });
 };
@@ -642,7 +708,11 @@ const handleClearCache = () => {
  * 重新加载页面
  */
 const handleReload = () => {
-  location.reload();
+  if (props.actions?.reloadPage) {
+    props.actions.reloadPage();
+  } else if (typeof window !== "undefined") {
+    window.location.reload();
+  }
 };
 
 /**
@@ -650,6 +720,7 @@ const handleReload = () => {
  */
 const handleExportConfig = () => {
   const config = {
+    schemaVersion: SETTINGS_CONFIG_SCHEMA_VERSION,
     settings: settingsStore.settingsState,
     gray: grayMode.value,
     colorWeak: colorWeakMode.value,
@@ -675,6 +746,7 @@ const handleExportConfig = () => {
  * 导入配置
  */
 const handleImportConfig = () => {
+  if (typeof document === "undefined") return;
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "application/json";
@@ -683,49 +755,30 @@ const handleImportConfig = () => {
     if (!file) return;
 
     try {
-      const text = await file.text();
-      const config: unknown = JSON.parse(text);
-      if (!config || typeof config !== "object" || Array.isArray(config)) {
-        throw new TypeError("配置文件根节点必须是对象");
+      if (file.size > props.maxImportBytes) {
+        throw new RangeError("配置文件过大");
       }
-      const imported = config as Record<string, unknown>;
+      const text = await file.text();
+      // 先完成全量校验，成功后再修改任何状态，避免部分配置污染。
+      const imported = sanitizeLayoutSettingsConfig(JSON.parse(text));
 
       // 应用配置
       if (imported.settings !== undefined) {
-        const settingsPatch = sanitizeSettingsPatch(imported.settings);
-        if (settingsPatch.themeMode !== undefined) {
-          await settingsStore.updateThemeMode(settingsPatch.themeMode);
-          delete settingsPatch.themeMode;
+        const { themeMode, ...settingsPatch } = imported.settings;
+        if (themeMode !== undefined) {
+          await settingsStore.updateThemeMode(themeMode);
         }
         settingsStore.$patch(settingsPatch);
       }
       if (imported.gray !== undefined) {
-        if (typeof imported.gray !== "boolean") throw new TypeError("gray");
         grayMode.value = imported.gray;
       }
       if (imported.colorWeak !== undefined) {
-        if (typeof imported.colorWeak !== "boolean")
-          throw new TypeError("colorWeak");
         colorWeakMode.value = imported.colorWeak;
       }
       if (imported.watermark !== undefined) {
-        if (
-          !imported.watermark ||
-          typeof imported.watermark !== "object" ||
-          Array.isArray(imported.watermark)
-        ) {
-          throw new TypeError("watermark");
-        }
-        const watermark = imported.watermark as Record<string, unknown>;
-        if (
-          typeof watermark.enabled !== "boolean" ||
-          typeof watermark.text !== "string" ||
-          watermark.text.length > 200
-        ) {
-          throw new TypeError("watermark");
-        }
-        watermarkEnabled.value = watermark.enabled;
-        watermarkText.value = watermark.text;
+        watermarkEnabled.value = imported.watermark.enabled;
+        watermarkText.value = imported.watermark.text;
       }
 
       message.success("配置已导入");

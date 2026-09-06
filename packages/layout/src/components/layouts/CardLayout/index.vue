@@ -42,7 +42,7 @@
           <div class="logo-container">
             <div class="logo-glow"></div>
             <video
-              v-if="brand.logoType === 'video'"
+              v-if="brand.logoType === 'video' && brand.logoSrc"
               :src="brand.logoSrc"
               :width="brand.logoSize || 36"
               :height="brand.logoSize || 36"
@@ -55,11 +55,12 @@
               您的浏览器不支持 video 标签。
             </video>
             <img
-              v-else
+              v-else-if="brand.logoSrc"
               :src="brand.logoSrc"
               :width="brand.logoSize || 36"
               :height="brand.logoSize || 36"
               class="logo-video"
+              :alt="brand.name || 'Logo'"
             />
           </div>
           <div class="brand-name">
@@ -117,7 +118,15 @@
               class="menu-category"
             >
               <!-- 分类标题 -->
-              <div class="category-header" @click="navigateToPage(category)">
+              <div
+                class="category-header"
+                role="link"
+                :tabindex="category.disabled ? -1 : 0"
+                :aria-disabled="category.disabled || undefined"
+                @click="navigateToPage(category)"
+                @keydown.enter="navigateToPage(category)"
+                @keydown.space.prevent="navigateToPage(category)"
+              >
                 <component
                   :is="LayoutIcon"
                   v-if="category.meta?.icon"
@@ -136,7 +145,12 @@
                   v-for="item in category.children"
                   :key="item.path"
                   class="menu-item"
+                  role="link"
+                  :tabindex="item.disabled ? -1 : 0"
+                  :aria-disabled="item.disabled || undefined"
                   @click="navigateToPage(item)"
+                  @keydown.enter="navigateToPage(item)"
+                  @keydown.space.prevent="navigateToPage(item)"
                 >
                   <component
                     :is="LayoutIcon"
@@ -161,7 +175,12 @@
                       v-for="subItem in item.children"
                       :key="subItem.path"
                       class="menu-item submenu-item"
+                      role="link"
+                      :tabindex="subItem.disabled ? -1 : 0"
+                      :aria-disabled="subItem.disabled || undefined"
                       @click="navigateToPage(subItem)"
+                      @keydown.enter="navigateToPage(subItem)"
+                      @keydown.space.prevent="navigateToPage(subItem)"
                     >
                       <component
                         :is="LayoutIcon"
@@ -249,7 +268,7 @@ const cancelHideTimer = () => {
 };
 
 const navigateToPage = (item: MenuOptions) => {
-  if (item.path) {
+  if (!item.disabled && item.path) {
     router.push(item.path);
     showDrawerMenu.value = false;
   }

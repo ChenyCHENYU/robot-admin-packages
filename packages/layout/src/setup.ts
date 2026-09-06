@@ -7,6 +7,7 @@
 import type { App } from "vue";
 import type { SettingsStoreOptions } from "./types";
 import { createSettingsStore } from "./stores/settings";
+import { LAYOUT_SETTINGS_KEY } from "./composables/useLayoutContext";
 
 /**
  * 初始化布局系统
@@ -22,12 +23,12 @@ import { createSettingsStore } from "./stores/settings";
  * })
  * ```
  */
-export function setupLayout(_app: App, options: SettingsStoreOptions = {}) {
-  // 注册 settings store
+export function setupLayout(app: App, options: SettingsStoreOptions = {}) {
   const settingsStore = createSettingsStore(options);
+  const settings = settingsStore();
 
-  // 初始化 CSS Variables
-  settingsStore().syncCSSVariables();
+  // 让所有内置组件读取同一个实例；Store 内的 immediate watcher 负责同步 CSS 变量。
+  app.provide(LAYOUT_SETTINGS_KEY, settings);
 
   return settingsStore;
 }

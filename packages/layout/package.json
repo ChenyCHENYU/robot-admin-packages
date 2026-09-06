@@ -1,7 +1,7 @@
 {
   "name": "@robot-admin/layout",
-  "version": "2.3.2",
-  "description": "Layout and settings management system for Robot Admin - v2.0 with decoupled architecture",
+  "version": "3.0.0",
+  "description": "Composable Vue layout and settings system for Robot Admin",
   "type": "module",
   "keywords": [
     "vue",
@@ -12,9 +12,12 @@
   ],
   "author": "ChenYu <ycyplus@gmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "url": "git+https://github.com/ChenyCHENYU/robot-admin-packages.git",
     "directory": "packages/layout"
   },
   "main": "./dist/index.cjs",
@@ -22,14 +25,29 @@
   "types": "./dist/index.d.ts",
   "style": "./dist/index.css",
   "sideEffects": [
-    "*.css",
-    "*.scss"
+    "**/*.css",
+    "**/*.scss"
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core/index.d.ts",
+        "default": "./dist/core/index.js"
+      },
+      "require": {
+        "types": "./dist/core/index.d.cts",
+        "default": "./dist/core/index.cjs"
+      }
     },
     "./style": "./dist/index.css",
     "./css": "./dist/index.css",
@@ -39,7 +57,9 @@
   "files": [
     "dist",
     "src/styles",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public",
@@ -47,27 +67,30 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit && vite build && tsup --config tsup.core.config.ts && node scripts/finalize-build.mjs",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
     "type-check": "vue-tsc --noEmit",
-    "prepublishOnly": "bun run build"
+    "check:package": "node ./node_modules/publint/src/cli.js && node ./scripts/verify-package.mjs",
+    "verify": "bun run type-check && bun run test && bun run build && bun run check:package",
+    "prepublishOnly": "bun run verify"
   },
   "peerDependencies": {
     "vue": "^3.4.0",
     "vue-router": "^4.0.0",
     "pinia": "^2.0.0 || ^3.0.0",
-    "naive-ui": "^2.38.0",
-    "@robot-admin/theme": "^0.3.0 || ^0.4.0"
+    "naive-ui": "^2.38.0"
   },
   "devDependencies": {
-    "@robot-admin/theme": "workspace:*",
     "@types/node": "^22.13.9",
     "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/server-renderer": "^3.5.13",
     "naive-ui": "^2.41.0",
     "pinia": "^3.0.1",
+    "publint": "0.3.24",
     "sass": "^1.83.4",
     "typescript": "~5.8.0",
+    "tsup": "^8.3.5",
     "vite": "^8.0.1",
     "vite-plugin-dts": "^4.5.4",
     "vue": "^3.5.13",

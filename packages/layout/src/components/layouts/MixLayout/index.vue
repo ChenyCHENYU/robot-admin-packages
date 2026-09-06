@@ -21,7 +21,7 @@
         <slot name="logo">
           <div class="logo-glow"></div>
           <video
-            v-if="brand.logoType === 'video'"
+            v-if="brand.logoType === 'video' && brand.logoSrc"
             :src="brand.logoSrc"
             :width="brand.logoSize || 40"
             :height="brand.logoSize || 40"
@@ -34,11 +34,12 @@
             您的浏览器不支持 video 标签。
           </video>
           <img
-            v-else
+            v-else-if="brand.logoSrc"
             :src="brand.logoSrc"
             :width="brand.logoSize || 40"
             :height="brand.logoSize || 40"
             class="logo-video"
+            :alt="brand.name || 'Logo'"
           />
         </slot>
       </div>
@@ -52,7 +53,12 @@
           :class="{
             active: menuSplit.activeFirstMenu.value === item.path,
           }"
+          role="button"
+          :tabindex="item.disabled ? -1 : 0"
+          :aria-disabled="item.disabled || undefined"
           @click="menuSplit.handleFirstMenuClick(item)"
+          @keydown.enter="menuSplit.handleFirstMenuClick(item)"
+          @keydown.space.prevent="menuSplit.handleFirstMenuClick(item)"
         >
           <div class="menu-item-content">
             <component
@@ -94,7 +100,12 @@
             :key="child.path"
             class="second-menu-item"
             :class="{ active: menuSplit.isMenuItemActive(child.path) }"
+            role="link"
+            :tabindex="child.disabled ? -1 : 0"
+            :aria-disabled="child.disabled || undefined"
             @click="menuSplit.handleSecondMenuClick(child)"
+            @keydown.enter="menuSplit.handleSecondMenuClick(child)"
+            @keydown.space.prevent="menuSplit.handleSecondMenuClick(child)"
           >
             <component
               :is="LayoutIcon"

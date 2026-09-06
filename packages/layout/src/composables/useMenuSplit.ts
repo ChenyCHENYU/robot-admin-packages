@@ -120,6 +120,7 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
   // ============ 交互处理 ============
 
   const handleFirstMenuClick = (item: MenuOptions) => {
+    if (item.disabled) return;
     if (toValue(floatingSecondMenu)) {
       // MixLayout: 纯点击模式
       if (item.children && item.children.length > 0) {
@@ -146,7 +147,7 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
   };
 
   const handleSecondMenuClick = (item: MenuOptions) => {
-    if (item.path) router.push(item.path);
+    if (!item.disabled && item.path) router.push(item.path);
   };
 
   // ============ 路由自动匹配 ============

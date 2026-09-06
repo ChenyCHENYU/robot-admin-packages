@@ -6,10 +6,16 @@
  * 实现布局骨架与业务数据的完全解耦
  */
 
-import type { InjectionKey, ComputedRef, Component } from "vue";
-import { inject } from "vue";
+import type {
+  InjectionKey,
+  ComputedRef,
+  Component,
+  WritableComputedRef,
+} from "vue";
+import { inject, provide } from "vue";
 import type { MenuOptions } from "../types/menu";
 import type { LayoutMode, MenuExpandMode } from "../types";
+import type { SettingsStoreInstance } from "../stores/settings";
 
 /**
  * 品牌配置
@@ -47,6 +53,8 @@ export interface LayoutContext {
   // ============ 布局配置（来自 settings store） ============
   /** 当前布局模式 */
   layoutMode: ComputedRef<LayoutMode>;
+  /** 侧边栏折叠状态；提供后由容器和宿主头部共享同一数据源 */
+  collapsed?: WritableComputedRef<boolean>;
   /** 菜单展开方式 */
   menuExpandMode?: ComputedRef<MenuExpandMode>;
   /** 侧边栏宽度 (px) */
@@ -89,6 +97,19 @@ export interface LayoutContext {
  */
 export const LAYOUT_CONTEXT_KEY: InjectionKey<LayoutContext> =
   Symbol("layout-context");
+
+/** 当前布局使用的设置 Store，支持自定义 Store id 与多实例。 */
+export const LAYOUT_SETTINGS_KEY: InjectionKey<SettingsStoreInstance> =
+  Symbol("layout-settings");
+
+/** 侧边栏折叠控制器。 */
+export interface MenuCollapseHandlers {
+  isCollapsed: ComputedRef<boolean>;
+  handleCollapsedChange: (collapsed: boolean) => void;
+}
+
+export const MENU_COLLAPSE_KEY: InjectionKey<MenuCollapseHandlers> =
+  Symbol("menu-collapse");
 
 /**
  * 抽屉菜单统一控制器
@@ -134,6 +155,12 @@ export function useLayoutContext(): LayoutContext {
     );
   }
   return ctx;
+}
+
+/** 在组件 setup 中提供布局上下文，避免消费方直接操作 InjectionKey。 */
+export function provideLayoutContext(context: LayoutContext): LayoutContext {
+  provide(LAYOUT_CONTEXT_KEY, context);
+  return context;
 }
 
 /**

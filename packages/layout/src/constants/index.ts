@@ -7,7 +7,7 @@ import type {
   SettingsState,
   LayoutInfo,
   PresetColor,
-} from "../types";
+} from "../core/types";
 
 // ============ 主题色预设 ============
 export const PRESET_COLORS: PresetColor[] = [
@@ -136,7 +136,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
 
   // 高级
   enableHotkeys: true,
-  version: "2.3.2",
+  version: "3.0.0",
 };
 
 // ============ 其他常量 ============

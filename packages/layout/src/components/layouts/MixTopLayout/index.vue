@@ -24,7 +24,7 @@
         <slot name="logo">
           <div class="logo-glow"></div>
           <video
-            v-if="brand.logoType === 'video'"
+            v-if="brand.logoType === 'video' && brand.logoSrc"
             :src="brand.logoSrc"
             :width="brand.logoSize || 40"
             :height="brand.logoSize || 40"
@@ -37,11 +37,12 @@
             您的浏览器不支持 video 标签。
           </video>
           <img
-            v-else
+            v-else-if="brand.logoSrc"
             :src="brand.logoSrc"
             :width="brand.logoSize || 40"
             :height="brand.logoSize || 40"
             class="logo-video"
+            :alt="brand.name || 'Logo'"
           />
         </slot>
       </div>
@@ -55,7 +56,15 @@
           :class="{
             active: menuSplit.activeFirstMenu.value === item.path,
           }"
+          role="button"
+          :tabindex="item.disabled ? -1 : 0"
+          :aria-disabled="item.disabled || undefined"
+          :aria-current="
+            menuSplit.activeFirstMenu.value === item.path ? 'page' : undefined
+          "
           @click="menuSplit.handleFirstMenuClick(item)"
+          @keydown.enter="menuSplit.handleFirstMenuClick(item)"
+          @keydown.space.prevent="menuSplit.handleFirstMenuClick(item)"
         >
           <div class="menu-item-content">
             <component

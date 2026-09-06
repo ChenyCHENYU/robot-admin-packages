@@ -24,7 +24,7 @@
           <div class="logo-container">
             <div class="logo-glow"></div>
             <video
-              v-if="brand.logoType === 'video'"
+              v-if="brand.logoType === 'video' && brand.logoSrc"
               :src="brand.logoSrc"
               :width="brand.logoSize || 36"
               :height="brand.logoSize || 36"
@@ -37,11 +37,12 @@
               您的浏览器不支持 video 标签。
             </video>
             <img
-              v-else
+              v-else-if="brand.logoSrc"
               :src="brand.logoSrc"
               :width="brand.logoSize || 36"
               :height="brand.logoSize || 36"
               class="logo-video"
+              :alt="brand.name || 'Logo'"
             />
           </div>
           <div class="brand-name">
@@ -102,6 +103,11 @@
           { active: !isCollapsed },
         ]"
         @click="toggleCollapse"
+        role="button"
+        tabindex="0"
+        :aria-expanded="!isCollapsed"
+        @keydown.enter="toggleCollapse"
+        @keydown.space.prevent="toggleCollapse"
       >
         <span
           :class="[
@@ -170,7 +176,19 @@
                   :class="{
                     active: menuSplit.isMenuItemActive(subChild.path),
                   }"
+                  role="button"
+                  :tabindex="subChild.disabled ? -1 : 0"
+                  :aria-disabled="subChild.disabled || undefined"
+                  :aria-current="
+                    menuSplit.isMenuItemActive(subChild.path)
+                      ? 'page'
+                      : undefined
+                  "
                   @click="menuSplit.handleSecondMenuClick(subChild)"
+                  @keydown.enter="menuSplit.handleSecondMenuClick(subChild)"
+                  @keydown.space.prevent="
+                    menuSplit.handleSecondMenuClick(subChild)
+                  "
                 >
                   <component
                     :is="LayoutIcon"
@@ -188,7 +206,15 @@
                 :class="{
                   active: menuSplit.isMenuItemActive(child.path),
                 }"
+                role="button"
+                :tabindex="child.disabled ? -1 : 0"
+                :aria-disabled="child.disabled || undefined"
+                :aria-current="
+                  menuSplit.isMenuItemActive(child.path) ? 'page' : undefined
+                "
                 @click="menuSplit.handleSecondMenuClick(child)"
+                @keydown.enter="menuSplit.handleSecondMenuClick(child)"
+                @keydown.space.prevent="menuSplit.handleSecondMenuClick(child)"
               >
                 <component
                   :is="LayoutIcon"

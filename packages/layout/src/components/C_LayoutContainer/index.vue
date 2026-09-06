@@ -113,8 +113,10 @@
 
 <script setup lang="ts">
 import { computed, ref, provide } from "vue";
-import { useSettingsStore } from "../../stores/settings";
-import { useLayoutContext } from "../../composables/useLayoutContext";
+import {
+  MENU_COLLAPSE_KEY,
+  useLayoutContext,
+} from "../../composables/useLayoutContext";
 
 // 骨架布局全局样式
 import "../../styles/layouts.scss";
@@ -129,20 +131,29 @@ import CardLayout from "../layouts/CardLayout/index.vue";
 
 defineOptions({ name: "C_LayoutContainer" });
 
-const settingsStore = useSettingsStore();
 const ctx = useLayoutContext();
 
-const layoutMode = computed(() => settingsStore.layoutMode);
+const layoutMode = ctx.layoutMode;
 const isDark = ctx.isDark;
 
-// Side 布局折叠状态
-const sideCollapsed = ref(false);
+// 上下文提供 collapsed 时与宿主共享；否则保留内部状态以兼容旧接入。
+const internalCollapsed = ref(false);
+const sideCollapsed = computed({
+  get: () => ctx.collapsed?.value ?? internalCollapsed.value,
+  set: (value: boolean) => {
+    if (ctx.collapsed) ctx.collapsed.value = value;
+    else internalCollapsed.value = value;
+  },
+});
 
 // 提供折叠状态给子组件（如 C_Header 的汉堡按钮）
-provide("menuCollapse", {
+const collapseHandlers = {
   isCollapsed: sideCollapsed,
   handleCollapsedChange: (collapsed: boolean) => {
     sideCollapsed.value = collapsed;
   },
-});
+};
+provide(MENU_COLLAPSE_KEY, collapseHandlers);
+// 3.x 兼容层：旧消费方仍可使用字符串 key，下个大版本移除。
+provide("menuCollapse", collapseHandlers);
 </script>

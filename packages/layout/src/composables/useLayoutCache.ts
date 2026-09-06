@@ -7,6 +7,7 @@
 
 import { onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import type { RouteLocationNormalizedLoaded } from "vue-router";
 
 /** KeepAlive 缓存选项 */
 export interface LayoutCacheOptions {
@@ -16,6 +17,15 @@ export interface LayoutCacheOptions {
   enableDevLog?: boolean;
   /** 是否暴露调试方法到 window，默认 false */
   exposeToWindow?: boolean;
+}
+
+/** KeepAlive 仅接受具名组件，并由路由 meta.keepAlive 明确开启。 */
+export function shouldCacheRoute(
+  route: Pick<RouteLocationNormalizedLoaded, "name" | "meta">,
+): route is Pick<RouteLocationNormalizedLoaded, "name" | "meta"> & {
+  name: string;
+} {
+  return typeof route.name === "string" && route.meta.keepAlive === true;
 }
 
 /**
@@ -47,21 +57,14 @@ export function useLayoutCache(options: LayoutCacheOptions = {}) {
   } = options;
 
   const route = useRoute();
+  const normalizedMaxCount =
+    Number.isFinite(maxCount) && maxCount > 0 ? Math.floor(maxCount) : 20;
   const cachedViews = ref<string[]>([]);
-  const maxCacheCount = ref(maxCount);
-
-  /**
-   * 判断页面是否应该被缓存
-   * 极简策略：只有明确配置 meta.keepAlive = true 才缓存
-   */
-  const shouldCache = (routeName: string | symbol | undefined | null) => {
-    if (!routeName || typeof routeName !== "string") return false;
-    return route.meta?.keepAlive === true;
-  };
+  const maxCacheCount = ref(normalizedMaxCount);
 
   /** 添加缓存 */
   const addCache = (name: string) => {
-    if (!cachedViews.value.includes(name) && shouldCache(name)) {
+    if (name && !cachedViews.value.includes(name)) {
       cachedViews.value.push(name);
 
       // 控制缓存数量
@@ -118,11 +121,9 @@ export function useLayoutCache(options: LayoutCacheOptions = {}) {
 
   // 监听路由变化，动态管理缓存
   watch(
-    () => route.name,
-    (newName) => {
-      if (newName && typeof newName === "string") {
-        addCache(newName);
-      }
+    () => [route.name, route.meta.keepAlive] as const,
+    () => {
+      if (shouldCacheRoute(route)) addCache(route.name);
     },
     { immediate: true },
   );

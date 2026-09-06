@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.0
+
+### Major Changes
+
+- Release the 3.0 architecture upgrade while preserving the existing Naive UI layouts, interactions, slots, and visual styling.
+
+  - Add a UI-independent `@robot-admin/layout/core` entrypoint for validated settings and shared contracts.
+  - Make layout/store injection and collapsed state work reliably with custom stores and multi-instance hosts.
+  - Replace destructive built-in storage clearing with explicit host actions and add stable SettingsDrawer extension slots.
+  - Validate complete imported configuration files before applying state and restore host-owned global classes on teardown.
+  - Respect the transition enable switch, harden route caching and responsive measurement, and improve built-in menu keyboard semantics.
+  - Verify all six layout modes in SSR and validate both ESM and CommonJS package entrypoints before publishing.
+
 ## 2.3.2
 
 ### Patch Changes

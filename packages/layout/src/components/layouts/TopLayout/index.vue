@@ -24,7 +24,7 @@
           <div class="logo-container">
             <div class="logo-glow"></div>
             <video
-              v-if="brand.logoType === 'video'"
+              v-if="brand.logoType === 'video' && brand.logoSrc"
               :src="brand.logoSrc"
               :width="brand.logoSize || 36"
               :height="brand.logoSize || 36"
@@ -37,11 +37,12 @@
               您的浏览器不支持 video 标签。
             </video>
             <img
-              v-else
+              v-else-if="brand.logoSrc"
               :src="brand.logoSrc"
               :width="brand.logoSize || 36"
               :height="brand.logoSize || 36"
               class="logo-video"
+              :alt="brand.name || 'Logo'"
             />
           </div>
           <div class="brand-name">
