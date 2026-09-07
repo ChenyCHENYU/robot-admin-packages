@@ -12,7 +12,7 @@
 
 | 包名                                                   | 本仓库版本 | npm 最新版                                                                                                                  | 描述                                                     |
 | ------------------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| [@robot-admin/layout](./packages/layout)               | `3.2.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/layout)](https://www.npmjs.com/package/@robot-admin/layout)               | 6 种布局、Vue Headless/Naive 分层入口与作用域副作用      |
+| [@robot-admin/layout](./packages/layout)               | `3.2.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/layout)](https://www.npmjs.com/package/@robot-admin/layout)               | 6 种布局、Vue Headless/Naive 分层入口与作用域副作用      |
 | [@robot-admin/theme](./packages/theme)                 | `0.4.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/theme)](https://www.npmjs.com/package/@robot-admin/theme)                 | 亮色/暗色/跟随系统、设计风格与安全持久化                 |
 | [@robot-admin/directives](./packages/directives)       | `2.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/directives)](https://www.npmjs.com/package/@robot-admin/directives)       | 11 个 Vue 3 指令、应用级适配器、无障碍与严格生命周期清理 |
 | [@robot-admin/file-utils](./packages/file-utils)       | `3.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/file-utils)](https://www.npmjs.com/package/@robot-admin/file-utils)       | 安全 Excel/ZIP/CSV、隔离配置及可取消的真流式大文件传输   |

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { nextTick, reactive, ref } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import {
@@ -20,8 +20,19 @@ import {
   estimateMenuItemWidth,
 } from "../src/composables/useResponsiveMenu";
 import { normalizeLayoutMenus } from "../src/utils/menu";
+import type { LayoutMenuItem } from "../src/utils/menu";
+import type { MenuOptions } from "../src/types/menu";
 
 describe("layout helpers", () => {
+  it("keeps the 3.x menu discriminator contract", () => {
+    expectTypeOf<MenuOptions["type"]>().toEqualTypeOf<
+      "group" | "divider" | undefined
+    >();
+    expectTypeOf<LayoutMenuItem["type"]>().toEqualTypeOf<
+      "group" | "divider" | undefined
+    >();
+  });
+
   it("matches route segments without prefix false positives", () => {
     expect(isPathSegmentPrefix("/users", "/users/42")).toBe(true);
     expect(isPathSegmentPrefix("users", "/users/42")).toBe(true);

@@ -38,7 +38,7 @@ export interface MenuMeta extends Record<string, unknown> {
  */
 export interface MenuOptions<TMeta extends MenuMeta = MenuMeta> {
   /** 菜单项类型（分组/分割线） */
-  type?: MenuItemType;
+  type?: "group" | "divider";
   /** 唯一标识 */
   key?: string;
   /** 菜单跳转路径 */

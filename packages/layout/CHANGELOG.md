@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.2.1
+
+### Patch Changes
+
+- Restore the 3.x `MenuOptions.type` contract to `group | divider`, preventing the
+  normalized menu result from becoming wider than existing consumer menu components.
+
 ## 3.2.0
 
 ### Minor Changes

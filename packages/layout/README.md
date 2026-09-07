@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/layout.svg)](https://www.npmjs.com/package/@robot-admin/layout)
 [![license](https://img.shields.io/npm/l/@robot-admin/layout.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
 
-当前版本：`3.2.0`。
+当前版本：`3.2.1`。
 
 ---
 
@@ -314,7 +314,7 @@ settings.resetSettings();
 | `sidebarCollapsedWidth` | `64`        | 包内       | 折叠宽度 (px)                        |
 | `headerHeight`          | `56`        | 包内/宿主  | 头部高度 (px)                        |
 | `enableHotkeys`         | `true`      | 宿主扩展   | 是否启用宿主快捷键                   |
-| `version`               | `'3.2.0'`   | 兼容字段   | 已废弃；配置迁移请使用 schemaVersion |
+| `version`               | `'3.2.1'`   | 兼容字段   | 已废弃；配置迁移请使用 schemaVersion |
 
 “宿主”字段由 Store 和导入导出协议统一维护，但布局包不会越权修改宿主业务组件；这种边界
 避免重复实现面包屑、快捷键和标签页等业务能力。
