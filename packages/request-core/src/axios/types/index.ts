@@ -1,133 +1,205 @@
-/*
- * @Author: ChenYu ycyplus@gmail.com
- * @Date: 2026-02-07 10:00:00
- * @LastEditors: ChenYu ycyplus@gmail.com
- * @LastEditTime: 2026-02-07 10:00:00
- * @FilePath: \robot-admin-request-core\src\axios\types\index.ts
- * @Description: Axios 插件 - 增强类型定义
- * Copyright (c) 2026 by CHENY, All Rights Reserved 😎.
- */
+import type {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+} from "axios";
 
-import type { AxiosRequestConfig } from "axios";
+export type RequestScope = string | symbol;
+export type ConcurrencyPolicy = "allow" | "join" | "takeLatest" | "takeFirst";
 
-/**
- * 请求去重配置
- */
 export interface DedupeConfig {
-  /** 是否启用去重（默认 true） */
+  /** @default true for GET/HEAD/OPTIONS, false for mutation methods */
   enabled?: boolean;
-  /** 自定义请求 key 生成函数 */
   keyGenerator?: (config: AxiosRequestConfig) => string;
 }
 
-/**
- * 请求缓存配置
- */
 export interface CacheConfig {
-  /** 是否启用缓存（默认 false，只对 GET 请求有效） */
+  /** @default false */
   enabled?: boolean;
-  /** 缓存时间（毫秒，默认 5 分钟） */
+  /** Cache lifetime in milliseconds. @default 300000 */
   ttl?: number;
-  /** 是否强制刷新缓存 */
+  /** Skip reads while still replacing the stored value. */
   forceUpdate?: boolean;
+  /** Optional invalidation tags associated with this entry. */
+  tags?: readonly string[];
+  /** Additional response-varying request headers included in the cache key. */
+  varyHeaders?: readonly string[];
+  /** Override the generated cache key for this request. */
+  key?: string;
 }
 
-/**
- * 请求重试配置
- */
+export interface RetryContext {
+  attempt: number;
+  delay: number;
+  elapsed: number;
+  error: AxiosError;
+  config: EnhancedAxiosRequestConfig;
+}
+
 export interface RetryConfig {
-  /** 是否启用重试（默认 false） */
+  /** @default false */
   enabled?: boolean;
-  /** 重试次数（默认 3） */
+  /** Number of retry attempts after the initial request. @default 3 */
   count?: number;
-  /** 重试延迟（毫秒，默认 1000） */
+  /** Base retry delay in milliseconds. @default 1000 */
   delay?: number;
-  /** 是否使用指数退避（默认 true） */
+  /** @default true */
   exponentialBackoff?: boolean;
-  /** 是否启用随机抖动（默认 true），避免重试风暴 */
+  /** @default true */
   jitter?: boolean;
-  /** 可重试的 HTTP 状态码 */
   retryableStatusCodes?: number[];
-  /** 允许重试的 HTTP 方法（默认仅幂等方法，避免对非幂等 POST/PUT/DELETE 重复执行副作用） */
+  /** @default GET, HEAD, OPTIONS, PUT and DELETE */
   retryableMethods?: string[];
+  /** Maximum delay for one retry. @default 30000 */
+  maxDelay?: number;
+  /** Maximum elapsed retry time. Zero disables the limit. @default 0 */
+  maxElapsedMs?: number;
+  /** Honor Retry-After for 429/503 responses. @default true */
+  respectRetryAfter?: boolean;
+  /** Allow replaying stream-like request bodies. @default false */
+  retryUnsafeBody?: boolean;
+  shouldRetry?: (error: AxiosError, attempt: number) => boolean | Promise<boolean>;
+  onRetry?: (context: RetryContext) => void | Promise<void>;
 }
 
-/**
- * 路由取消配置
- */
 export interface CancelConfig {
-  /** 是否启用路由切换时自动取消（默认 true） */
+  /** Track the request so it can be canceled by scope or as a group. @default true */
   enabled?: boolean;
-  /** 白名单：不需要取消的请求 URL 模式 */
   whitelist?: RegExp[];
+  scope?: RequestScope;
 }
 
-/**
- * 扩展的 Axios 请求配置
- */
-export interface EnhancedAxiosRequestConfig extends AxiosRequestConfig {
-  /** 请求去重配置 */
-  dedupe?: boolean | DedupeConfig;
-  /** 请求缓存配置 */
+export interface RequestPolicyDefaults {
   cache?: boolean | CacheConfig;
-  /** 请求重试配置 */
   retry?: boolean | RetryConfig;
-  /** 路由取消配置 */
+  dedupe?: boolean | DedupeConfig;
   cancel?: boolean | CancelConfig;
-  /** 内部标记：当前重试次数 */
+  concurrency?: ConcurrencyPolicy;
+}
+
+export interface EnhancedAxiosRequestConfig<D = unknown>
+  extends AxiosRequestConfig<D> {
+  dedupe?: boolean | DedupeConfig;
+  cache?: boolean | CacheConfig;
+  retry?: boolean | RetryConfig;
+  cancel?: boolean | CancelConfig;
+  concurrency?: ConcurrencyPolicy;
+  scope?: RequestScope;
+  /** Skip token injection and unauthorized recovery for this request. */
+  skipAuth?: boolean;
+  /** Skip the client-level error callback for this request. */
+  silent?: boolean;
+
+  /** @internal */
   __retryCount?: number;
-  /** 内部标记：取消请求 ID */
+  /** @internal */
+  __retryStartedAt?: number;
+  /** @internal */
   __cancelId?: string;
-  /** 内部标记：去重请求键 */
+  /** @internal */
   __requestKey?: string;
-  /** 内部标记：是否来自缓存 */
+  /** @internal */
   __fromCache?: boolean;
-  /** 内部标记：共享的 AbortController（dedupe 与 cancel 复用，避免 signal 互相覆盖） */
+  /** @internal */
+  __cachedResponse?: AxiosResponse;
+  /** @internal */
   __abortController?: EnhancedAbortController;
-  /** 内部标记：调用方原始 AbortSignal，用于在最终响应阶段恢复配置 */
+  /** @internal */
   __externalSignal?: AxiosRequestConfig["signal"];
-  /** 内部标记：移除外部 AbortSignal 桥接监听器 */
+  /** @internal */
   __abortCleanup?: () => void;
-  /** 内部标记：是否被 cancel 插件管理（保留兼容） */
+  /** @internal */
   __managedByCancel?: boolean;
-  /** 内部标记：是否正在处理 401 错误 */
+  /** @internal */
   __handling401?: boolean;
+  /** @internal */
+  __authRetryCount?: number;
 }
 
-/**
- * 缓存项
- */
-export interface CacheItem<T = any> {
-  /** 缓存数据 */
+export type EnhancedAxiosInstance = AxiosInstance & {
+  request<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    config: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+  get<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    url: string,
+    config?: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+  delete<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    url: string,
+    config?: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+  head<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    url: string,
+    config?: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+  options<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    url: string,
+    config?: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+  post<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    url: string,
+    data?: D,
+    config?: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+  put<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    url: string,
+    data?: D,
+    config?: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+  patch<T = unknown, R = AxiosResponse<T>, D = unknown>(
+    url: string,
+    data?: D,
+    config?: EnhancedAxiosRequestConfig<D>,
+  ): Promise<R>;
+};
+
+export interface CacheItem<T = unknown> {
   data: T;
-  /** 过期时间戳 */
   expireAt: number;
+  tags?: readonly string[];
 }
 
-/**
- * 请求 key 生成器参数
- */
+export interface CacheStore {
+  get<T = unknown>(key: string): T | null;
+  set<T = unknown>(
+    key: string,
+    data: T,
+    ttl: number,
+    options?: { tags?: readonly string[] },
+  ): void;
+  delete(key: string): boolean;
+  clear(): void;
+  cleanup?(): void;
+  deleteByPrefix?(prefix: string): number;
+  deleteByTag?(tag: string): number;
+  readonly size: number;
+}
+
+export interface MemoryCacheOptions {
+  maxSize?: number;
+  clone?: boolean | (<T>(value: T) => T);
+}
+
 export interface RequestKeyParams {
   method?: string;
   url?: string;
-  params?: any;
-  data?: any;
+  baseURL?: string;
+  params?: unknown;
+  data?: unknown;
 }
 
-/**
- * 扩展的 AbortController 接口
- */
+export interface RequestKeyOptions {
+  varyHeaders?: readonly string[];
+}
+
 export interface EnhancedAbortController extends AbortController {
-  /** 请求开始时间 */
   _startTime?: number;
 }
 
-/**
- * 缓存响应数据接口
- */
 export interface CachedResponseData {
-  data: any;
+  data: unknown;
   status: number;
   statusText: string;
-  headers: Record<string, any>;
+  headers: Record<string, unknown>;
 }

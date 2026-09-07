@@ -1,19 +1,22 @@
 import type { AxiosInstance } from "axios";
 import type { EnhancedAxiosRequestConfig } from "./types";
-
-let globalService: AxiosInstance | null = null;
+import {
+  getDefaultAxiosInstance,
+  setDefaultAxiosInstance,
+} from "./runtime";
 
 export function setGlobalAxiosInstance(instance: AxiosInstance): void {
-  globalService = instance;
+  setDefaultAxiosInstance(instance);
 }
 
 export function getGlobalAxiosInstance(): AxiosInstance {
-  if (!globalService) {
+  const instance = getDefaultAxiosInstance();
+  if (!instance) {
     throw new Error(
       "Axios instance not initialized. Please call createRequestCore() or setGlobalAxiosInstance() first.",
     );
   }
-  return globalService;
+  return instance;
 }
 
 const service = new Proxy({} as AxiosInstance, {
@@ -24,7 +27,7 @@ const service = new Proxy({} as AxiosInstance, {
 
 export default service;
 
-export async function getData<T = any>(
+export async function getData<T = unknown>(
   url: string,
   config?: EnhancedAxiosRequestConfig,
 ): Promise<T> {
@@ -32,25 +35,34 @@ export async function getData<T = any>(
   return response.data;
 }
 
-export async function postData<T = any>(
+export async function postData<T = unknown, D = unknown>(
   url: string,
-  data?: any,
-  config?: EnhancedAxiosRequestConfig,
+  data?: D,
+  config?: EnhancedAxiosRequestConfig<D>,
 ): Promise<T> {
   const response = await getGlobalAxiosInstance().post(url, data, config);
   return response.data;
 }
 
-export async function putData<T = any>(
+export async function putData<T = unknown, D = unknown>(
   url: string,
-  data?: any,
-  config?: EnhancedAxiosRequestConfig,
+  data?: D,
+  config?: EnhancedAxiosRequestConfig<D>,
 ): Promise<T> {
   const response = await getGlobalAxiosInstance().put(url, data, config);
   return response.data;
 }
 
-export async function deleteData<T = any>(
+export async function patchData<T = unknown, D = unknown>(
+  url: string,
+  data?: D,
+  config?: EnhancedAxiosRequestConfig<D>,
+): Promise<T> {
+  const response = await getGlobalAxiosInstance().patch(url, data, config);
+  return response.data;
+}
+
+export async function deleteData<T = unknown>(
   url: string,
   config?: EnhancedAxiosRequestConfig,
 ): Promise<T> {

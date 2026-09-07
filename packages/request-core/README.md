@@ -1,455 +1,346 @@
 # @robot-admin/request-core
 
-> 为 Vue 3 打造的企业级请求解决方案：Axios 增强 + 6 个请求插件 + CRUD Composable
-
 [![npm version](https://img.shields.io/npm/v/@robot-admin/request-core.svg)](https://www.npmjs.com/package/@robot-admin/request-core)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![license](https://img.shields.io/npm/l/@robot-admin/request-core.svg)](./LICENSE)
 
-当前版本：`0.2.0`。
+面向生产环境的实例化请求编排与 Vue 3 Headless CRUD 工具。当前版本：
+`0.4.0`。
 
----
+它保留 Axios 的完整能力，只收拢应用中最容易重复出错的部分：并发请求、缓存、
+取消、重试、Token 刷新、错误标准化以及列表 CRUD 生命周期。
 
-## ✨ 核心特性
+## 特性
 
-- 🚀 **开箱即用**：3 步接入，5 分钟实现完整 CRUD
-- 🔌 **请求插件**：缓存、重试、去重、取消与可共享的 reLogin 协调
-- 📊 **useTableCrud**：配置式表格 CRUD，自动处理分页/搜索/增删改查
-- 🎯 **智能适配**：自动兼容不同后端响应格式（字段名、成功码）
-- 💪 **类型安全**：完整 TypeScript 支持
-- 🎨 **Naive UI 集成**：深度集成 Naive UI 组件
+- 每个 Client 独立持有缓存、待处理请求、取消作用域和认证状态，无跨应用污染。
+- 简单调用保持一行，复杂调用通过平铺的请求配置按需启用。
+- 相同请求支持 `join`、`takeLatest`、`takeFirst`、`allow` 四种并发语义。
+- 内存 LRU 缓存支持 TTL、标签/前缀失效、自定义同步 CacheStore 和引用保护。
+- 重试支持幂等方法白名单、指数退避、抖动、`Retry-After` 和总时间预算。
+- Token 主动刷新、并发 401 恢复和重新登录均使用 single-flight。
+- `RequestError` 统一业务、HTTP、网络、超时、取消和配置错误。
+- Vue 层不依赖具体 UI；Naive UI 仅作为可选兼容适配层。
+- ESM、CJS 和 TypeScript 类型入口均经过发布前验证。
 
----
-
-## 📦 安装
+## 安装与入口
 
 ```bash
-npm install @robot-admin/request-core
-# 或
-bun add @robot-admin/request-core
+bun add @robot-admin/request-core axios
 ```
 
-**Peer Dependencies**: `axios@^1.7.0`；使用根入口或 `./crud` 时还需
-`vue@^3.4.0` 与 `naive-ui@^2.38.0`。
+| 入口 | 依赖边界 | 用途 |
+| --- | --- | --- |
+| `@robot-admin/request-core/axios` | Axios | 推荐的请求 Client、策略及兼容 API |
+| `@robot-admin/request-core/vue` | Axios + Vue | `useRequest`、Headless `useTableCrud`、Client 注入 |
+| `@robot-admin/request-core/naive` | Axios + Vue + Naive UI | `useNaiveTableCrud` 兼容适配 |
+| `@robot-admin/request-core` | 完整兼容入口 | 旧项目平滑迁移，当前仍会引用 Naive UI |
+| `@robot-admin/request-core/crud` | 兼容入口 | 已废弃，迁移到 `/vue` 或 `/naive` |
 
-纯请求场景可从 `@robot-admin/request-core/axios` 导入 `createAxiosInstance`
-等 API；CRUD 可使用 `@robot-admin/request-core/crud`。根入口继续保留
-`createRequestCore` 和全部 API，兼容已有项目。
+纯请求项目应使用 `/axios`，这样不会引入 Vue 或任何 UI 框架。
 
----
+## 推荐接入
 
-## 🚀 30 秒快速上手
-
-### 1️⃣ 初始化（main.ts）
+### 创建唯一的应用 Client
 
 ```ts
-import { createApp } from 'vue'
-import { createRequestCore } from '@robot-admin/request-core'
-
-const app = createApp(App)
-
-app.use(createRequestCore({
-  request: { baseURL: '/api', timeout: 10000 },
-  interceptors: {
-    request: (config) => {
-      config.headers.Authorization = `Bearer ${localStorage.getItem('token')}`
-      return config
-    }
-  }
-}))
-```
-
-### 2️⃣ 使用 CRUD（任意组件）
-
-```vue
-<script setup lang="ts">
-import { useTableCrud } from '@robot-admin/request-core'
-
-const table = useTableCrud({
-  api: { list: '/users', get: '/users/:id', create: '/users', update: '/users/:id', remove: '/users/:id' },
-  columns: [
-    { key: 'id', title: 'ID' },
-    { key: 'name', title: '姓名' },
-    { key: 'email', title: '邮箱' }
-  ]
-})
-</script>
-
-<template>
-  <n-data-table :data="table.data.value" :columns="table.columns.value" :loading="table.loading.value" />
-</template>
-```
-
-✅ **完成！** 一个完整的带分页、搜索、编辑、删除的数据表格！
-
----
-
-## 📚 核心 API
-
-### 请求方法
-
-| 方法 | 说明 | 示例 |
-|------|------|------|
-| `getData(url, config?)` | GET 请求 | `getData('/users')` |
-| `postData(url, data, config?)` | POST 请求 | `postData('/users', { name: '张三' })` |
-| `putData(url, data, config?)` | PUT 请求 | `putData('/users/1', { name: '李四' })` |
-| `deleteData(url, config?)` | DELETE 请求 | `deleteData('/users/1')` |
-
-### useTableCrud 配置
-
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `api.list` | `string` | ✅ | 列表接口 |
-| `api.get` | `string` | - | 详情接口（支持 `:id`） |
-| `api.create` | `string` | - | 创建接口 |
-| `api.update` | `string` | - | 更新接口（支持 `:id`） |
-| `api.remove` | `string` | - | 删除接口（支持 `:id`） |
-| `columns` | `TableColumn[]` | ✅ | 表格列配置 |
-| `customActions` | `CustomAction[]` | - | 自定义操作按钮 |
-| `idKey` | `string` | - | ID 字段名（默认 `'id'`） |
-| `defaultPageSize` | `number` | - | 每页条数（默认 `10`） |
-| `autoLoad` | `boolean` | - | 自动加载（默认 `true`） |
-
-### useTableCrud 返回值
-
-| 属性/方法 | 类型 | 说明 |
-|-----------|------|------|
-| `data` | `Ref<T[]>` | 表格数据 |
-| `loading` | `Ref<boolean>` | 加载状态 |
-| `total` | `Ref<number>` | 总条数 |
-| `pagination` | `object` | 分页配置（Naive UI 格式） |
-| `columns` | `Ref<DataTableColumn[]>` | 表格列（含操作列） |
-| `search()` | `() => Promise<void>` | 搜索 |
-| `resetSearch()` | `() => void` | 重置搜索 |
-| `refresh()` | `() => Promise<void>` | 刷新数据 |
-| `viewDetail(row)` | `(row: T) => void` | 查看详情 |
-| `handleEdit(row)` | `(row: T) => void` | 编辑 |
-| `handleDelete(row)` | `(row: T) => void` | 删除 |
-
----
-
-## 🔌 插件系统
-
-所有请求方法都支持插件配置：
-
-### 缓存插件（仅 GET）
-
-```ts
-getData('/users', {
-  cache: { 
-    enabled: true,      // 启用缓存
-    ttl: 300000,       // 5 分钟过期
-    forceUpdate: false // 不强制更新
-  }
-})
-```
-
-### 重试插件
-
-```ts
-getData('/report', {
-  retry: {
-    enabled: true,           // 启用重试
-    count: 3,                // 最多重试 3 次
-    delay: 1000,             // 基础延迟 1 秒
-    exponentialBackoff: true,// 指数退避
-    jitter: true,            // ±25% 随机抖动，降低并发惊群
-  }
-})
-```
-
-默认只重试 `GET/HEAD/OPTIONS/PUT/DELETE`。只有服务端实现幂等键等保护、确认重复
-执行安全时，才应通过 `retryableMethods: ['POST']` 显式允许 POST。
-
-### 去重插件
-
-```ts
-getData('/users', {
-  dedupe: { 
-    enabled: true,  // 启用去重（默认启用）
-    keyGenerator: (config) => `${config.method}-${config.url}` // 自定义去重 key
-  }
-})
-```
-
-默认 key 会包含 `Authorization`、`X-Tenant-Id` 和 `X-User-Id`，防止多租户或
-多用户场景下缓存/去重串用；如自定义 `keyGenerator`，也应保留等价的身份维度。
-
-### 取消插件
-
-```ts
-getData('/users', {
-  cancel: { 
-    enabled: true,  // 启用自动取消（路由切换时）
-    whitelist: []   // 白名单接口（不取消）
-  }
-})
-```
-
-### reLogin 插件
-
-为多个 401 请求提供同一个等待 Promise。业务拦截器仍负责展示登录界面、
-刷新 token 和重发请求，库不会擅自决定业务流程：
-
-```ts
+// src/services/request.ts
 import {
-  waitForReLogin,
-  onReLoginSuccess,
-  onReLoginCancel,
+  createRequestClient,
+  type ResponseAdapter,
 } from '@robot-admin/request-core/axios'
 
-// 每个收到 401 的请求都等待同一个 Promise
-await waitForReLogin()
+const responseAdapter: ResponseAdapter = {
+  isSuccess: data => [0, 200].includes((data as { code: number }).code),
+  getData: data => (data as { data: unknown }).data,
+  getError: data => ({
+    code: (data as { code?: number }).code,
+    message: (data as { message?: string }).message ?? '请求失败',
+    data,
+  }),
+}
 
-// 登录弹窗在成功或取消时调用其一
-onReLoginSuccess()
-onReLoginCancel()
+export const request = createRequestClient({
+  request: {
+    baseURL: import.meta.env.VITE_API_BASE,
+    timeout: 10_000,
+  },
+  response: responseAdapter,
+  defaults: {
+    concurrency: 'join',
+    retry: { enabled: false },
+    cache: { enabled: false },
+  },
+  hooks: {
+    onError: error => {
+      if (error.kind !== 'canceled') window.$message?.error(error.message)
+    },
+  },
+})
 ```
 
----
+所有能力均可省略。默认缓存和重试关闭；新 Client 的相同安全读取请求默认共享结果，
+副作用方法默认允许并发。
 
-## 🎯 完整示例
+### 类型化调用
 
-### 场景 1：完整的数据表格（分页 + 搜索 + CRUD）
-
-```vue
-<script setup lang="ts">
-import { useTableCrud } from '@robot-admin/request-core'
-
+```ts
 interface User {
   id: number
   name: string
-  email: string
-  role: string
 }
 
-const table = useTableCrud<User>({
-  api: {
-    list: '/api/users/list',
-    get: '/api/users/:id',
-    create: '/api/users',
-    update: '/api/users/:id',
-    remove: '/api/users/:id'
-  },
-  columns: [
-    { key: 'id', title: 'ID', width: 80 },
-    { key: 'name', title: '姓名', width: 120 },
-    { key: 'email', title: '邮箱', width: 200 },
-    { key: 'role', title: '角色', width: 100 }
-  ],
-  customActions: [
-    {
-      key: 'resetPassword',
-      label: '重置密码',
-      icon: 'mdi:lock-reset',
-      handler: async (row, ctx) => {
-        await postData(`/api/users/${row.id}/reset-password`, {})
-        ctx.message.success('密码已重置')
-      }
-    }
-  ]
+interface CreateUser {
+  name: string
+}
+
+const users = await request.get<User[]>('/users', {
+  params: { keyword: 'robot' },
 })
-</script>
 
-<template>
-  <n-space vertical>
-    <!-- 搜索栏 -->
-    <n-space>
-      <n-input v-model:value="table.searchKeyword.value" placeholder="搜索用户..." />
-      <n-button type="primary" @click="table.search()">搜索</n-button>
-      <n-button @click="table.resetSearch()">重置</n-button>
-      <n-button type="success" @click="table.handleCreate()">新增用户</n-button>
-    </n-space>
+const user = await request.post<User, CreateUser>('/users', {
+  name: 'Robot',
+})
 
-    <!-- 表格 -->
-    <n-data-table
-      :data="table.data.value"
-      :columns="table.columns.value"
-      :loading="table.loading.value"
-      :pagination="table.pagination"
-    />
-  </n-space>
-</template>
+const response = await request.raw<User>({
+  method: 'GET',
+  url: '/users/1',
+})
 ```
 
-### 场景 2：自定义请求（带插件）
+支持 `request/get/post/put/patch/delete/head/options/raw`。`raw()` 返回完整
+`AxiosResponse`，其他方法返回响应适配器处理后的数据。
+
+## 全局配置与按需能力
+
+策略可以在 Client 层配置默认值，也可以被单次请求覆盖：
 
 ```ts
-import { getData, postData } from '@robot-admin/request-core'
-
-// 带缓存的 GET 请求
-const users = await getData('/api/users', {
-  cache: { enabled: true, ttl: 300000 }  // 缓存 5 分钟
+await request.get('/dashboard', {
+  cache: { enabled: true, ttl: 60_000, tags: ['dashboard'] },
+  retry: { enabled: true, count: 2, maxElapsedMs: 8_000 },
+  concurrency: 'takeLatest',
+  scope: 'dashboard-page',
 })
 
-// 默认仅重试幂等方法；POST 必须由业务明确确认可安全重复后才能加入白名单
-const result = await postData('/api/idempotent-submit', { data: 'test' }, {
+request.cache.invalidateTag('dashboard')
+request.requests.cancelScope('dashboard-page')
+```
+
+并发策略：
+
+- `join`：相同请求共享一次网络调用，适合字典和初始化数据。
+- `takeLatest`：取消旧请求，只保留最新请求，适合搜索和分页。
+- `takeFirst`：已有相同请求时拒绝新请求，适合提交按钮。
+- `allow`：允许全部并发，适合调用方自行管理的任务。
+
+旧 `dedupe` 配置继续可用。隐式去重只作用于 GET、HEAD、OPTIONS；POST 等
+副作用请求不会被默认取消。
+
+### 缓存
+
+```ts
+const client = createRequestClient({
+  cache: { maxSize: 500, clone: true },
+})
+
+await client.get('/users', {
+  cache: {
+    enabled: true,
+    ttl: 5 * 60_000,
+    tags: ['users'],
+    varyHeaders: ['accept-language'],
+  },
+})
+
+client.cache.clear()
+client.cache.invalidateTag('users')
+client.cache.invalidatePrefix('GET|')
+```
+
+缓存按 Client 隔离，键包含 `baseURL`、URL、方法、参数、请求体、响应类型和身份
+相关请求头摘要。切换用户或租户时仍建议显式 `client.cache.clear()`。
+
+### 重试
+
+```ts
+await request.get('/reports', {
   retry: {
     enabled: true,
     count: 3,
-    retryableMethods: ['POST'],
-    jitter: true,
-  }
+    delay: 500,
+    maxDelay: 10_000,
+    maxElapsedMs: 20_000,
+    respectRetryAfter: true,
+    onRetry: ({ attempt, delay }) => reportRetry(attempt, delay),
+  },
 })
 ```
 
-调用方传入的 `AbortSignal` 会与 dedupe、路由批量取消共享同一取消链；自动重试
-的退避等待也可立即取消。默认重试方法为 `GET/HEAD/OPTIONS/PUT/DELETE`，不会
-自动重试普通 POST 请求。
+默认只允许 GET、HEAD、OPTIONS、PUT、DELETE 重试。POST 不会自动重试；流式或
+不可重放的 body 也会被保护性跳过。
 
----
-
-## ⚙️ 高级配置
-
-### 适配不同后端响应格式
-
-#### 1. 自定义成功状态码
-
-如果后端返回的成功码不是 `0` 或 `200`：
+## 认证恢复
 
 ```ts
-createRequestCore({
+const request = createRequestClient({
   request: { baseURL: '/api' },
-  successCodes: [1, '1', 'success'],  // 自定义成功码
-  interceptors: {
-    response: (response) => {
-      const { code } = response.data
-      if (![1, '1', 'success'].includes(code)) {
-        throw new Error(response.data.message)
-      }
-      return response
-    }
-  }
+  auth: {
+    getToken: () => userStore.token,
+    shouldRefresh: () => userStore.isTokenExpiringSoon(),
+    refresh: async ({ raw, signal }) => {
+      const response = await raw<{ data: { token: string } }>({
+        method: 'POST',
+        url: '/auth/refresh-token',
+        data: { refreshToken: userStore.refreshToken },
+        signal,
+      })
+      const token = response.data.data.token
+      userStore.setToken(token)
+      return token
+    },
+    reauthenticate: async () => {
+      await reLoginDialog.open()
+      return userStore.token
+    },
+    isAuthRequest: config => config.url?.startsWith('/auth/') === true,
+  },
 })
 ```
 
-#### 2. 自定义字段名映射
+并发请求共享同一次刷新或重新登录。401 请求最多自动重放一次；`raw` 会自动
+设置 `skipAuth` 并关闭重试、缓存去重和取消跟踪，防止刷新接口递归。
 
-如果后端返回的字段名不标准（如 `items` 而非 `list`）：
+单次请求也可显式使用 `skipAuth: true`。
+
+## Vue 接入
 
 ```ts
-createRequestCore({
-  request: { baseURL: '/api' },
-  fieldAliases: {
-    data: ['result', 'data'],           // 数据层字段
-    list: ['items', 'records', 'list'], // 列表字段
-    total: ['totalCount', 'total']      // 总数字段
-  }
+// main.ts
+import { createRequestPlugin } from '@robot-admin/request-core/vue'
+import { request } from '@/services/request'
+
+app.use(createRequestPlugin(request))
+```
+
+这只通过 Vue InjectionKey 提供 Client，不写入 `window`，也不修改 Vue 全局类型。
+组件仍可通过配置显式传入 Client，适合多后端或多租户应用。
+
+### useRequest
+
+```ts
+import { useRequest } from '@robot-admin/request-core/vue'
+import { request } from '@/services/request'
+
+const user = useRequest(
+  ({ signal }, id: number) => request.get<User>(`/users/${id}`, { signal }),
+  { concurrency: 'takeLatest', keepPreviousData: true },
+)
+
+await user.run(1)
+```
+
+提供 `data/error/loading/run/cancel/reset`，并在 Vue 作用域销毁时自动取消。
+取消或重置后，即使业务执行器没有响应 `AbortSignal`，过期结果也不会回写；
+`onSuccess/onError` 仅用于观察生命周期，其自身异常不会篡改真实请求结果。
+
+## Headless useTableCrud
+
+```ts
+import { useTableCrud } from '@robot-admin/request-core/vue'
+import { request } from '@/services/request'
+
+const table = useTableCrud<User, UserFilters, UserSort>({
+  client: request,
+  autoLoad: 'mounted',
+  initialFilters: { keyword: '' },
+  query: ({ page, pageSize, filters, sort, signal }) =>
+    request.get('/users', {
+      params: { page, pageSize, ...filters, sort },
+      signal,
+      concurrency: 'takeLatest',
+    }),
+  mutations: {
+    create: (row, { signal }) => request.post('/users', row, { signal }),
+    update: (row, { signal }) =>
+      request.put(`/users/${row.id}`, row, { signal }),
+    remove: (row, { signal }) =>
+      request.delete(`/users/${row.id}`, { signal }),
+  },
+  createNewRow: () => ({ id: 0, name: '' }),
+})
+
+await table.search({ keyword: 'robot' })
+await table.resetSearch()
+```
+
+主要返回值：
+
+| 状态/方法 | 说明 |
+| --- | --- |
+| `rows`, `total`, `error`, `lastUpdated` | 数据与错误状态 |
+| `loading`, `isInitialLoading`, `isRefreshing` | 查询状态 |
+| `creating`, `updating`, `removing` | 独立变更状态 |
+| `filters`, `sort`, `page`, `pagination` | 查询条件与分页 |
+| `refresh/reload/search/resetSearch/setSort` | 查询操作 |
+| `create/save/remove/batchRemove/getDetail` | CRUD 操作 |
+| `createDraft/cancel/dispose` | 草稿和生命周期 |
+
+刷新采用 latest-wins，旧响应不会覆盖新数据；批量删除默认最多并发 4 个请求；
+关闭删除后刷新时会同步维护本地行和总数；组件作用域销毁会终止未完成任务。
+Message 适配器属于呈现观察层，其异常不会改变 CRUD 请求结果。
+
+### Naive UI 兼容层
+
+```ts
+import { useNaiveTableCrud } from '@robot-admin/request-core/naive'
+
+const table = useNaiveTableCrud({
+  client: request,
+  query: context => userApi.list(context),
+  columns,
 })
 ```
 
-#### 3. 单个接口特殊处理
+`useNaiveTableCrud` 只注入 Naive UI 的 Message/Dialog，数据能力与 `/vue` 完全
+共用。Element Plus 项目直接使用 `/vue`，在真实业务需要前无需额外 UI 适配包。
+
+## 兼容 API
+
+`createRequestCore()`、`getData()`、`postData()`、`putData()`、`patchData()`、
+`deleteData()` 继续可用。需要让这些全局兼容函数指向新 Client 时：
 
 ```ts
-useTableCrud({
-  api: { list: '/special/api' },
-  extractListData: (response) => ({
-    items: response.result?.data || [],
-    total: response.result?.count || 0
-  })
-})
+const request = createRequestClient({ setAsDefault: true })
 ```
 
----
+或者调用 `setDefaultRequestClient(request)`。全局兼容入口只保存“默认 Client”引用；
+请求运行状态仍属于具体实例。
 
-## 💡 最佳实践
+## 从 0.2.x 升级
 
-### ✅ 推荐做法
+1. 请求代码改从 `/axios` 导入，新代码优先使用 `createRequestClient()`。
+2. Vue 应用通过 `/vue` 的 `createRequestPlugin()` 注入 Client。
+3. Headless CRUD 从 `/vue` 导入；需要现有 Naive 消息行为时使用
+   `/naive` 的 `useNaiveTableCrud()`。
+4. 根入口和 `/crud` 暂时兼容，`/crud` 已标记废弃。
+5. `dedupe: true` 仍表示 take-latest；副作用方法不再隐式启用去重。
+6. 缓存、取消和 reLogin 现在按 Axios 实例隔离；多 Client 场景应通过各自控制器
+   清理状态。
 
-1. **统一初始化配置**
-   ```ts
-   // src/plugins/request-core.ts
-   export function setupRequestCore(app: App) {
-     app.use(createRequestCore({ /* 统一配置 */ }))
-   }
-   ```
+没有删除 0.2.x 的公开请求方法、配置字段或 Naive CRUD 交互能力。
 
-2. **使用 composable 封装业务逻辑**
-   ```ts
-   // composables/useUsers.ts
-   export function useUsers() {
-     return useTableCrud<User>({
-       api: { /* ... */ },
-       columns: [ /* ... */ ]
-     })
-   }
-   ```
-
-3. **开启缓存减少重复请求**
-   ```ts
-   getData('/api/config', { cache: { enabled: true, ttl: 600000 } })
-   ```
-
-4. **仅为幂等接口启用重试**
-   ```ts
-   getData('/api/report', { retry: { enabled: true, count: 3, jitter: true } })
-   ```
-
-### ❌ 避免的做法
-
-1. ❌ 不要在每个组件中重复配置 axios
-2. ❌ 不要禁用去重插件（除非有特殊需求）
-3. ❌ 不要在 useTableCrud 外部调用其内部方法
-4. ❌ 不要为付款、创建订单等非幂等 POST 盲目开启重试
-
----
-
-## 📖 完整类型定义
-
-```ts
-// 核心配置
-export type RequestCoreConfig = {
-  request: AxiosRequestConfig          // Axios 基础配置
-  successCodes?: (string | number)[]   // 成功状态码
-  fieldAliases?: FieldAliases          // 字段映射
-  interceptors?: InterceptorConfig     // 拦截器
-}
-
-// CRUD 配置
-export type UseTableCrudConfig<T> = {
-  api: ApiEndpoints                    // API 端点
-  columns: TableColumn[]               // 表格列
-  customActions?: CustomAction[]       // 自定义操作
-  idKey?: string                       // ID 字段名
-  defaultPageSize?: number             // 默认分页大小
-  autoLoad?: boolean                   // 是否自动加载
-  extractListData?: (res: any) => { items: T[]; total: number }
-}
-
-// 插件配置
-export type EnhancedAxiosRequestConfig = AxiosRequestConfig & {
-  cache?: CacheConfig                  // 缓存配置
-  retry?: RetryConfig                  // 重试配置
-  dedupe?: DedupeConfig                // 去重配置
-  cancel?: CancelConfig                // 取消配置
-}
-```
-
-查看完整类型定义：[src/index.ts](./src/index.ts)
-
-## 从 v0.1.x 升级到 v0.2.0
-
-- `axios` 现在是必须的 peerDependency，应用应显式安装 `axios ^1.7`；这可以避免
-  多 Axios 实例导致取消错误识别失效。
-- 纯请求场景建议改从 `@robot-admin/request-core/axios` 导入，避免引入 Vue 与
-  Naive UI；CRUD 可从 `@robot-admin/request-core/crud` 导入，根入口保持兼容。
-- POST 不再默认重试。确有幂等保障时，通过 `retryableMethods` 显式开启。
-- 去重和路由取消现在共享取消控制器，调用方 `AbortSignal` 也会参与同一取消链。
-- 401 协调使用共享 Promise；登录成功或取消后必须分别调用 `onReLoginSuccess()`
-  或 `onReLoginCancel()` 释放所有等待请求。
-
----
-
-## 🛠️ 开发
+## 开发与发布验证
 
 ```bash
-bun install       # 安装依赖
-bun run dev       # 开发模式（watch）
-bun run build     # 构建
-bun run type-check # 类型检查
+bun run type-check
+bun run test
+bun run build
+bun run check:package
+bun run verify
 ```
 
----
+`prepublishOnly` 会执行完整 `verify`，包含类型、测试、构建、publint、ESM/CJS
+入口、跨入口默认实例和依赖边界检查。
 
-## 📄 License
+## License
 
-MIT © [ChenYu](https://github.com/ChenyCHENYU)
+[MIT](./LICENSE)

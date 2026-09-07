@@ -1,10 +1,4 @@
-import { useNaiveTableCrud } from "../naive/useNaiveTableCrud";
-
-export { useNaiveTableCrud };
-
-/** @deprecated Prefer useTableCrud from /vue or useNaiveTableCrud from /naive. */
-export const useTableCrud = useNaiveTableCrud;
-
+export { useNaiveTableCrud } from "../naive/useNaiveTableCrud";
 export type {
   DataRecord,
   UseTableCrudConfig,

@@ -21,8 +21,10 @@ export function setupResponsePlugin(instance: AxiosInstance): void {
       cleanupAbortContext(response.config as EnhancedAxiosRequestConfig);
       return response;
     },
-    (error: any) => {
-      cleanupAbortContext(error?.config as EnhancedAxiosRequestConfig);
+    (error: unknown) => {
+      cleanupAbortContext(
+        (error as { config?: EnhancedAxiosRequestConfig })?.config,
+      );
       return Promise.reject(error);
     },
   );

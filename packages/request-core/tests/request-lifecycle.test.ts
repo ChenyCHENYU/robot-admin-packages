@@ -13,6 +13,7 @@ import {
   waitForReLogin,
 } from "../src/axios/request";
 import { generateRequestKey, MemoryCache } from "../src/axios/utils/helpers";
+import type { EnhancedAxiosRequestConfig } from "../src/axios/types";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -49,7 +50,7 @@ describe("shared abort lifecycle", () => {
     const request = instance.get("/signal", {
       signal: external.signal,
       cancel: false,
-    } as any);
+    } as EnhancedAxiosRequestConfig);
     await tick();
     external.abort();
 
@@ -71,7 +72,9 @@ describe("shared abort lifecycle", () => {
         }),
     });
 
-    const request = instance.get("/cancel-all", { dedupe: false } as any);
+    const request = instance.get("/cancel-all", {
+      dedupe: false,
+    } as EnhancedAxiosRequestConfig);
     await tick();
     cancelAllRequests();
 
@@ -190,7 +193,7 @@ describe("cache lifecycle", () => {
       cache: { enabled: true, ttl: 1000 },
       cancel: true,
       dedupe: true,
-    } as any;
+    } satisfies EnhancedAxiosRequestConfig;
 
     await expect(instance.get("/cache-lifecycle", config)).resolves.toMatchObject({
       data: { value: 1 },
@@ -254,7 +257,7 @@ describe("retry policy", () => {
     await expect(
       getInstance.get("/retry", {
         retry: { enabled: true, delay: 0, jitter: false },
-      } as any),
+      } as EnhancedAxiosRequestConfig),
     ).resolves.toMatchObject({ status: 200 });
     expect(getAttempts).toBe(2);
 
@@ -270,7 +273,11 @@ describe("retry policy", () => {
     });
 
     await expect(
-      postInstance.post("/charge", {}, { retry: true } as any),
+      postInstance.post(
+        "/charge",
+        {},
+        { retry: true } as EnhancedAxiosRequestConfig,
+      ),
     ).rejects.toMatchObject({ code: "ERR_NETWORK" });
     expect(postAttempts).toBe(1);
   });
@@ -291,7 +298,7 @@ describe("retry policy", () => {
     const request = instance.get("/backoff", {
       signal: external.signal,
       retry: { enabled: true, delay: 1000, jitter: false },
-    } as any);
+    } as EnhancedAxiosRequestConfig);
     await tick();
     external.abort();
 

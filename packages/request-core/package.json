@@ -1,7 +1,7 @@
 {
   "name": "@robot-admin/request-core",
-  "version": "0.2.0",
-  "description": "Axios request orchestration + CRUD composables for Vue 3",
+  "version": "0.4.0",
+  "description": "Instance-scoped Axios orchestration and headless CRUD composables for Vue 3",
   "type": "module",
   "keywords": [
     "vue",
@@ -12,9 +12,12 @@
   ],
   "author": "ChenYu <ycyplus@gmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ChenyCHENYU/robot-admin-packages",
+    "url": "git+https://github.com/ChenyCHENYU/robot-admin-packages.git",
     "directory": "packages/request-core"
   },
   "main": "./dist/index.cjs",
@@ -22,24 +25,62 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./axios": {
-      "types": "./dist/axios.d.ts",
-      "import": "./dist/axios.js",
-      "require": "./dist/axios.cjs"
+      "import": {
+        "types": "./dist/axios.d.ts",
+        "default": "./dist/axios.js"
+      },
+      "require": {
+        "types": "./dist/axios.d.cts",
+        "default": "./dist/axios.cjs"
+      }
     },
     "./crud": {
-      "types": "./dist/crud.d.ts",
-      "import": "./dist/crud.js",
-      "require": "./dist/crud.cjs"
+      "import": {
+        "types": "./dist/crud.d.ts",
+        "default": "./dist/crud.js"
+      },
+      "require": {
+        "types": "./dist/crud.d.cts",
+        "default": "./dist/crud.cjs"
+      }
+    },
+    "./vue": {
+      "import": {
+        "types": "./dist/vue.d.ts",
+        "default": "./dist/vue.js"
+      },
+      "require": {
+        "types": "./dist/vue.d.cts",
+        "default": "./dist/vue.cjs"
+      }
+    },
+    "./naive": {
+      "import": {
+        "types": "./dist/naive.d.ts",
+        "default": "./dist/naive.js"
+      },
+      "require": {
+        "types": "./dist/naive.d.cts",
+        "default": "./dist/naive.cjs"
+      }
     }
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md"
   ],
   "sideEffects": false,
   "publishConfig": {
@@ -51,8 +92,10 @@
     "build": "tsup",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
-    "type-check": "tsc --noEmit",
-    "prepublishOnly": "bun run build"
+    "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "check:package": "node ./node_modules/publint/src/cli.js && node ./scripts/verify-package.mjs",
+    "verify": "bun run type-check && bun run test && bun run build && bun run check:package",
+    "prepublishOnly": "bun run verify"
   },
   "peerDependencies": {
     "vue": "^3.4.0",
@@ -73,6 +116,7 @@
     "tsup": "^8.1.0",
     "vue": "^3.4.0",
     "naive-ui": "^2.38.0",
-    "axios": "^1.7.0"
+    "axios": "^1.7.0",
+    "publint": "0.3.24"
   }
 }

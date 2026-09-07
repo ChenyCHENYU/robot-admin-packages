@@ -45,15 +45,16 @@ export const FieldFinder = {
    * 查找第一个存在的字段值
    */
   findFirst<T>(
-    obj: Record<string, any> | null | undefined,
+    obj: object | null | undefined,
     aliases: readonly string[],
     defaultValue: T,
   ): T {
     if (!obj || typeof obj !== "object") return defaultValue;
 
+    const record = obj as Record<string, unknown>;
     for (const key of aliases) {
-      if (key in obj && obj[key] !== undefined) {
-        return obj[key] as T;
+      if (key in record && record[key] !== undefined) {
+        return record[key] as T;
       }
     }
     return defaultValue;
@@ -63,12 +64,13 @@ export const FieldFinder = {
    * 查找第一个存在的数字字段
    */
   findNumber(
-    obj: Record<string, any> | null | undefined,
+    obj: object | null | undefined,
     aliases: readonly string[],
     defaultValue = 0,
   ): number {
     const value = this.findFirst(obj, aliases, defaultValue);
-    return Number(value) || defaultValue;
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : defaultValue;
   },
 };
 
@@ -79,28 +81,37 @@ export const ResponseNormalizer = {
   /**
    * 判断响应是否成功
    */
-  isSuccess(res: any): boolean {
-    if (typeof res.success === "boolean") return res.success;
+  isSuccess(res: unknown): boolean {
+    if (!res || typeof res !== "object") return false;
+    const record = res as Record<string, unknown>;
+    if (typeof record.success === "boolean") return record.success;
+    if (!("code" in record)) return true;
     // 使用运行时配置的成功状态码
     const successCodes = getRuntimeSuccessCodes();
     return (
-      successCodes.includes(res.code) ||
-      successCodes.includes(String(res.code) as any)
+      successCodes.includes(record.code as number | string) ||
+      successCodes.some((code) => String(code) === String(record.code))
     );
   },
 
   /**
    * 标准化响应数据（提取 data 层）
    */
-  normalize<T = any>(res: any): { data: T; success: boolean; raw: any } {
-    // 如果响应没有标准结构，直接返回
-    if (!res || typeof res !== "object" || !("data" in res)) {
+  normalize<T = unknown>(
+    res: unknown,
+  ): { data: T; success: boolean; raw: unknown } {
+    if (!res || typeof res !== "object") {
       return { data: res as T, success: true, raw: res };
     }
 
     const aliases = getRuntimeFieldAliases();
+    const record = res as Record<string, unknown>;
+    const hasDataLayer = aliases.data.some((key) => key in record);
+    if (!hasDataLayer) {
+      return { data: res as T, success: ResponseNormalizer.isSuccess(res), raw: res };
+    }
     return {
-      data: FieldFinder.findFirst(res, aliases.data, res),
+      data: FieldFinder.findFirst(record, aliases.data, res) as T,
       success: ResponseNormalizer.isSuccess(res),
       raw: res,
     };
@@ -114,9 +125,9 @@ export const UrlUtils = {
   /**
    * 构建 URL（处理路径参数）
    */
-  buildUrl(endpoint: string, id?: string | number): string {
+  buildUrl(endpoint: string, id?: unknown): string {
     if (id !== undefined && endpoint.includes(":id")) {
-      return endpoint.replace(":id", String(id));
+      return endpoint.replace(":id", encodeURIComponent(String(id)));
     }
     return endpoint;
   },
@@ -137,20 +148,38 @@ export const DataExtractor = {
    * 5. { data: [...] }                                  // 直接数组
    * 6. [...]                                            // 纯数组
    */
-  extractList<T = any>(response: any): { items: T[]; total: number } {
+  extractList<T = unknown>(response: unknown): { items: T[]; total: number } {
     // 第一步：标准化响应，提取 data 层
     const normalized = ResponseNormalizer.normalize(response);
-    const dataLayer = normalized.data ?? response;
+    const dataLayer = normalized.data;
+    const aliases = getRuntimeFieldAliases();
+
+    if (Array.isArray(dataLayer)) {
+      const rootTotal = FieldFinder.findNumber(
+        response && typeof response === "object" ? response : null,
+        aliases.total,
+        dataLayer.length,
+      );
+      return { items: dataLayer as T[], total: rootTotal };
+    }
+
+    if (!dataLayer || typeof dataLayer !== "object") {
+      return { items: [], total: 0 };
+    }
 
     // 第二步：从 data 层提取列表数组（使用运行时配置）
-    const aliases = getRuntimeFieldAliases();
-    const list = FieldFinder.findFirst<any[]>(dataLayer, aliases.list, []);
+    const list = FieldFinder.findFirst<unknown[]>(dataLayer, aliases.list, []);
 
     // 第三步：提取总数（使用运行时配置）
-    const total = FieldFinder.findNumber(dataLayer, aliases.total, 0);
+    const rootTotal = FieldFinder.findNumber(
+      response && typeof response === "object" ? response : null,
+      aliases.total,
+      Array.isArray(list) ? list.length : 0,
+    );
+    const total = FieldFinder.findNumber(dataLayer, aliases.total, rootTotal);
 
     return {
-      items: Array.isArray(list) ? list : [],
+      items: Array.isArray(list) ? (list as T[]) : [],
       total,
     };
   },
@@ -158,7 +187,7 @@ export const DataExtractor = {
   /**
    * 从响应中提取详情数据
    */
-  extractDetail<T = any>(response: any): T | null {
+  extractDetail<T = unknown>(response: unknown): T | null {
     // 标准化响应
     const normalized = ResponseNormalizer.normalize(response);
     return normalized.data as T | null;
@@ -172,14 +201,14 @@ export const RowUtils = {
   /**
    * 从数组中查找行索引
    */
-  findIndex<T extends DataRecord>(items: T[], idKey: keyof T, id: any): number {
+  findIndex<T extends DataRecord>(items: T[], idKey: keyof T, id: unknown): number {
     return items.findIndex((item) => item[idKey] === id);
   },
 
   /**
    * 从数组中移除行
    */
-  remove<T extends DataRecord>(items: T[], idKey: keyof T, id: any): boolean {
+  remove<T extends DataRecord>(items: T[], idKey: keyof T, id: unknown): boolean {
     const index = this.findIndex(items, idKey, id);
     if (index !== -1) {
       items.splice(index, 1);
