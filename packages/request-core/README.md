@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/@robot-admin/request-core.svg)](./LICENSE)
 
 面向生产环境的实例化请求编排与 Vue 3 Headless CRUD 工具。当前版本：
-`0.4.0`。
+`0.4.1`。
 
 它保留 Axios 的完整能力，只收拢应用中最容易重复出错的部分：并发请求、缓存、
 取消、重试、Token 刷新、错误标准化以及列表 CRUD 生命周期。

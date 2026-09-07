@@ -1,8 +1,15 @@
 # @robot-admin/request-core
 
-> `0.4.0` is the cumulative release candidate. The `0.2.1` and `0.3.0`
-> sections below record the internal implementation milestones folded into it;
-> they are not separate publication requirements.
+> `0.4.0` is the cumulative feature release. The `0.2.1` and `0.3.0` sections
+> below record the internal implementation milestones folded into it; they were
+> not published as separate package versions.
+
+## 0.4.1
+
+### Patch Changes
+
+- Clarify the cumulative release history after the formal `0.4.0` publication.
+- Keep package and repository version references aligned; runtime behavior is unchanged.
 
 ## 0.4.0
 
