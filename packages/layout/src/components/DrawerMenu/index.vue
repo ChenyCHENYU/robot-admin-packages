@@ -2,7 +2,7 @@
  * @robot-admin/layout - DrawerMenu
  *
  * 抽屉式网格菜单
- * 用于 CardLayout 的 hover 触发的抽屉式功能导航
+ * 用于 C_CardLayout 的 hover 触发的抽屉式功能导航
  -->
 <template>
   <div
@@ -145,7 +145,7 @@ const handlers = inject<DrawerHandlers>(DRAWER_HANDLER_KEY, {
 
 const navigate = (item: MenuOptions) => {
   if (item.path) {
-    router.push(item.path);
+    void router.push(item.path);
     handlers.hide();
   }
 };

@@ -10,15 +10,15 @@
 
 ## 📦 包列表
 
-| 包名                                                   | 本仓库版本 | npm 最新版                                                     | 描述                                                       |
-| ------------------------------------------------------ | ---------- | -------------------------------------------------------------- | ---------------------------------------------------------- |
-| [@robot-admin/layout](./packages/layout)               | `3.1.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/layout)](https://www.npmjs.com/package/@robot-admin/layout) | 6 种布局、精简上下文适配、纯核心入口与安全扩展能力         |
-| [@robot-admin/theme](./packages/theme)                 | `0.4.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/theme)](https://www.npmjs.com/package/@robot-admin/theme) | 亮色/暗色/跟随系统、设计风格与安全持久化                   |
-| [@robot-admin/directives](./packages/directives)       | `2.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/directives)](https://www.npmjs.com/package/@robot-admin/directives) | 11 个 Vue 3 指令、应用级适配器、无障碍与严格生命周期清理    |
-| [@robot-admin/file-utils](./packages/file-utils)       | `3.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/file-utils)](https://www.npmjs.com/package/@robot-admin/file-utils) | 安全 Excel/ZIP/CSV、隔离配置及可取消的真流式大文件传输      |
-| [@robot-admin/request-core](./packages/request-core)   | `0.2.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/request-core)](https://www.npmjs.com/package/@robot-admin/request-core) | Axios 请求编排、6 类插件能力与 CRUD Composables             |
-| [@robot-admin/form-validate](./packages/form-validate) | `3.4.2`    | [![npm](https://img.shields.io/npm/v/@robot-admin/form-validate)](https://www.npmjs.com/package/@robot-admin/form-validate) | Naive UI / Element Plus 双框架类型安全表单验证规则库        |
-| [@robot-admin/git-standards](./packages/git-standards) | `1.0.4`    | [![npm](https://img.shields.io/npm/v/@robot-admin/git-standards)](https://www.npmjs.com/package/@robot-admin/git-standards) | 幂等初始化、配置备份与 4 种 Git 工程化预设                  |
+| 包名                                                   | 本仓库版本 | npm 最新版                                                                                                                  | 描述                                                     |
+| ------------------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| [@robot-admin/layout](./packages/layout)               | `3.2.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/layout)](https://www.npmjs.com/package/@robot-admin/layout)               | 6 种布局、Vue Headless/Naive 分层入口与作用域副作用      |
+| [@robot-admin/theme](./packages/theme)                 | `0.4.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/theme)](https://www.npmjs.com/package/@robot-admin/theme)                 | 亮色/暗色/跟随系统、设计风格与安全持久化                 |
+| [@robot-admin/directives](./packages/directives)       | `2.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/directives)](https://www.npmjs.com/package/@robot-admin/directives)       | 11 个 Vue 3 指令、应用级适配器、无障碍与严格生命周期清理 |
+| [@robot-admin/file-utils](./packages/file-utils)       | `3.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/file-utils)](https://www.npmjs.com/package/@robot-admin/file-utils)       | 安全 Excel/ZIP/CSV、隔离配置及可取消的真流式大文件传输   |
+| [@robot-admin/request-core](./packages/request-core)   | `0.2.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/request-core)](https://www.npmjs.com/package/@robot-admin/request-core)   | Axios 请求编排、6 类插件能力与 CRUD Composables          |
+| [@robot-admin/form-validate](./packages/form-validate) | `3.4.2`    | [![npm](https://img.shields.io/npm/v/@robot-admin/form-validate)](https://www.npmjs.com/package/@robot-admin/form-validate) | Naive UI / Element Plus 双框架类型安全表单验证规则库     |
+| [@robot-admin/git-standards](./packages/git-standards) | `1.0.4`    | [![npm](https://img.shields.io/npm/v/@robot-admin/git-standards)](https://www.npmjs.com/package/@robot-admin/git-standards) | 幂等初始化、配置备份与 4 种 Git 工程化预设               |
 
 > “本仓库版本”随版本提交更新；“npm 最新版”徽章反映注册表状态，发布传播期间可能短暂滞后。
 
@@ -183,12 +183,12 @@ robot/
 
 ### 使用场景
 
-| 场景               | 在 Robot_Admin 中执行           | 说明                              |
-| ------------------ | ------------------------------- | --------------------------------- |
-| 本地开发调试包源码 | `bun run dev:local`             | 使用相邻 Monorepo 源码与 HMR      |
+| 场景               | 在 Robot_Admin 中执行                                       | 说明                           |
+| ------------------ | ----------------------------------------------------------- | ------------------------------ |
+| 本地开发调试包源码 | `bun run dev:local`                                         | 使用相邻 Monorepo 源码与 HMR   |
 | 本地生产构建验证   | PowerShell: `$env:USE_LOCAL_PACKAGES='true'; bun run build` | 验证包源码与主项目生产构建集成 |
-| 日常开发（npm 包） | `bun run dev`                   | 使用已安装的 npm 稳定版           |
-| CI/CD 自动构建     | `bun install && bun run build`  | 从 npm 安装，无需本地链接          |
+| 日常开发（npm 包） | `bun run dev`                                               | 使用已安装的 npm 稳定版        |
+| CI/CD 自动构建     | `bun install && bun run build`                              | 从 npm 安装，无需本地链接      |
 
 ---
 

@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref, computed, watch } from "vue";
+import { ref, computed, onScopeDispose } from "vue";
 import type {
   SettingsState,
   ThemePreset,
@@ -17,14 +17,23 @@ import {
   TRANSITION_MAP,
 } from "../constants";
 export { adjustColor, sanitizeSettingsPatch } from "../core/settings";
-import { adjustColor, sanitizeSettingsPatch } from "../core/settings";
+import {
+  assertLayoutSettingsRelationships,
+  sanitizeSettingsPatch,
+} from "../core/settings";
+import { bindLayoutCssVariables } from "../composables/useLayoutCssVariables";
 
 /**
  * 创建设置管理 Store
  * @param options - 配置选项
  */
 export function createSettingsStore(options: SettingsStoreOptions = {}) {
-  const { id = "settings", defaults = {}, onThemeModeChange } = options;
+  const {
+    id = "settings",
+    defaults = {},
+    onThemeModeChange,
+    syncCssVariables = true,
+  } = options;
   if (typeof id !== "string" || !id.trim()) {
     throw new RangeError("Settings store id 不能为空");
   }
@@ -34,6 +43,8 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
     ...DEFAULT_SETTINGS,
     ...sanitizeSettingsPatch(defaults),
   };
+  assertLayoutSettingsRelationships(finalDefaults);
+  const resolvedDefaults = Object.freeze({ ...finalDefaults });
 
   return defineStore(id, () => {
     // ============ 状态定义 ============
@@ -109,58 +120,47 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
 
     // ============ 方法 ============
 
-    /**
-     * 同步 CSS Variables
-     */
-    const syncCSSVariables = () => {
-      if (typeof document === "undefined") return;
+    const cssVariableBinding = syncCssVariables
+      ? bindLayoutCssVariables(
+          {
+            primaryColor,
+            borderRadiusValue,
+            sidebarWidth,
+            sidebarCollapsedWidth,
+            headerHeight,
+            tagsViewHeight,
+          },
+          { legacyAliases: true },
+        )
+      : undefined;
+    if (cssVariableBinding) onScopeDispose(cssVariableBinding.dispose);
 
-      const root = document.documentElement;
-
-      // 主题色
-      root.style.setProperty("--primary-color", primaryColor.value);
-      root.style.setProperty(
-        "--primary-color-hover",
-        adjustColor(primaryColor.value, 10),
-      );
-      root.style.setProperty(
-        "--primary-color-pressed",
-        adjustColor(primaryColor.value, -10),
-      );
-
-      // 圆角
-      root.style.setProperty("--border-radius", borderRadiusValue.value);
-
-      // 尺寸
-      root.style.setProperty("--sidebar-width", `${sidebarWidth.value}px`);
-      root.style.setProperty(
-        "--sidebar-collapsed-width",
-        `${sidebarCollapsedWidth.value}px`,
-      );
-      root.style.setProperty("--header-height", `${headerHeight.value}px`);
-      root.style.setProperty("--tags-view-height", `${tagsViewHeight.value}px`);
-    };
+    /** 立即把当前设置同步到已配置的 CSS 变量作用域。 */
+    const syncCSSVariables = () => cssVariableBinding?.sync();
 
     /**
      * 应用主题预设方案
      * 注意：只应用颜色配置，不改变布局模式和主题模式
      */
     const applyPreset = async (preset: ThemePreset) => {
-      // 只应用主题色
-      primaryColor.value = preset.primaryColor;
+      const safePreset = sanitizeSettingsPatch({
+        primaryColor: preset.primaryColor,
+        ...preset.settings,
+      });
+
+      // 完整校验成功后再修改状态，避免部分应用。
+      primaryColor.value = safePreset.primaryColor!;
 
       // 应用其他细节配置（如果存在）
-      if (preset.settings) {
-        if (preset.settings.borderRadius)
-          borderRadius.value = preset.settings.borderRadius;
-        if (preset.settings.transitionType)
-          transitionType.value = preset.settings.transitionType;
-        if (preset.settings.showBreadcrumb !== undefined)
-          showBreadcrumb.value = preset.settings.showBreadcrumb;
-        if (preset.settings.showTagsView !== undefined)
-          showTagsView.value = preset.settings.showTagsView;
-        if (preset.settings.tagsViewStyle)
-          tagsViewStyle.value = preset.settings.tagsViewStyle;
+      if (safePreset.borderRadius) borderRadius.value = safePreset.borderRadius;
+      if (safePreset.transitionType)
+        transitionType.value = safePreset.transitionType;
+      if (safePreset.showBreadcrumb !== undefined)
+        showBreadcrumb.value = safePreset.showBreadcrumb;
+      if (safePreset.showTagsView !== undefined)
+        showTagsView.value = safePreset.showTagsView;
+      if (safePreset.tagsViewStyle) {
+        tagsViewStyle.value = safePreset.tagsViewStyle;
       }
     };
 
@@ -216,27 +216,12 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
       collapsed.value = !collapsed.value;
     };
 
-    // ============ 监听器 ============
-
-    // 监听配置变化，同步 CSS Variables
-    watch(
-      [
-        primaryColor,
-        borderRadiusValue,
-        sidebarWidth,
-        sidebarCollapsedWidth,
-        headerHeight,
-        tagsViewHeight,
-      ],
-      () => {
-        syncCSSVariables();
-      },
-      { immediate: true },
-    );
-
     // ============ 返回 ============
 
     return {
+      /** 当前 Store 实例实际使用的默认值。 */
+      defaults: resolvedDefaults,
+
       // 状态
       themeMode,
       primaryColor,

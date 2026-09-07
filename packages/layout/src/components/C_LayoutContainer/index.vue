@@ -17,19 +17,25 @@
  *   #drawer-menu  - Card 抽屉式菜单（骨架有默认）
  -->
 <template>
-  <div :class="['layout-container', isDark ? 'dark-mode' : 'light-mode']">
+  <div
+    data-ra-layout
+    :class="['layout-container', isDark ? 'dark-mode' : 'light-mode']"
+  >
     <!-- ═══════ Side 左侧菜单布局 ═══════ -->
-    <SideLayout v-if="layoutMode === 'side'" v-model:collapsed="sideCollapsed">
+    <C_SideLayout
+      v-if="layoutMode === 'side'"
+      v-model:collapsed="sideCollapsed"
+    >
       <template v-if="$slots.logo" #logo><slot name="logo" /></template>
       <template #menu>
         <slot name="menu" :collapsed="sideCollapsed" />
       </template>
       <template #header><slot name="header" /></template>
       <template #footer><slot name="footer" /></template>
-    </SideLayout>
+    </C_SideLayout>
 
     <!-- ═══════ Top 顶部菜单布局 ═══════ -->
-    <TopLayout v-else-if="layoutMode === 'top'">
+    <C_TopLayout v-else-if="layoutMode === 'top'">
       <template v-if="$slots.logo" #logo><slot name="logo" /></template>
       <template v-if="$slots['top-menu']" #menu
         ><slot name="top-menu"
@@ -41,17 +47,17 @@
         ><slot name="tags-view"
       /></template>
       <template v-if="$slots.footer" #footer><slot name="footer" /></template>
-    </TopLayout>
+    </C_TopLayout>
 
     <!-- ═══════ Mix 混合布局 ═══════ -->
-    <MixLayout v-else-if="layoutMode === 'mix'">
+    <C_MixLayout v-else-if="layoutMode === 'mix'">
       <template v-if="$slots.logo" #logo><slot name="logo" /></template>
       <template #header><slot name="header" /></template>
       <template v-if="$slots.footer" #footer><slot name="footer" /></template>
-    </MixLayout>
+    </C_MixLayout>
 
     <!-- ═══════ MixTop 顶部混合布局 ═══════ -->
-    <MixTopLayout v-else-if="layoutMode === 'mix-top'">
+    <C_MixTopLayout v-else-if="layoutMode === 'mix-top'">
       <template v-if="$slots.logo" #logo><slot name="logo" /></template>
       <template v-if="$slots.brand" #brand><slot name="brand" /></template>
       <template v-if="$slots['top-menu']" #top-menu
@@ -64,10 +70,10 @@
         ><slot name="tags-view"
       /></template>
       <template v-if="$slots.footer" #footer><slot name="footer" /></template>
-    </MixTopLayout>
+    </C_MixTopLayout>
 
     <!-- ═══════ ReverseHorizontalMix 反转混合布局 ═══════ -->
-    <ReverseHorizontalMixLayout
+    <C_ReverseHorizontalMixLayout
       v-else-if="layoutMode === 'reverse-horizontal-mix'"
     >
       <template v-if="$slots.logo" #logo><slot name="logo" /></template>
@@ -81,10 +87,10 @@
         ><slot name="tags-view"
       /></template>
       <template v-if="$slots.footer" #footer><slot name="footer" /></template>
-    </ReverseHorizontalMixLayout>
+    </C_ReverseHorizontalMixLayout>
 
-    <!-- ═══════ CardLayout 卡片布局 ═══════ -->
-    <CardLayout v-else-if="layoutMode === 'card-layout'">
+    <!-- ═══════ C_CardLayout 卡片布局 ═══════ -->
+    <C_CardLayout v-else-if="layoutMode === 'card-layout'">
       <template v-if="$slots['menu-trigger']" #menu-trigger
         ><slot name="menu-trigger"
       /></template>
@@ -99,7 +105,7 @@
         ><slot name="drawer-menu"
       /></template>
       <template v-if="$slots.footer" #footer><slot name="footer" /></template>
-    </CardLayout>
+    </C_CardLayout>
 
     <!-- ═══════ Fallback ═══════ -->
     <div v-else class="layout-coming-soon">
@@ -122,12 +128,12 @@ import {
 import "../../styles/layouts.scss";
 
 // 骨架组件
-import SideLayout from "../layouts/SideLayout/index.vue";
-import TopLayout from "../layouts/TopLayout/index.vue";
-import MixLayout from "../layouts/MixLayout/index.vue";
-import MixTopLayout from "../layouts/MixTopLayout/index.vue";
-import ReverseHorizontalMixLayout from "../layouts/ReverseHorizontalMixLayout/index.vue";
-import CardLayout from "../layouts/CardLayout/index.vue";
+import C_SideLayout from "../layouts/SideLayout/index.vue";
+import C_TopLayout from "../layouts/TopLayout/index.vue";
+import C_MixLayout from "../layouts/MixLayout/index.vue";
+import C_MixTopLayout from "../layouts/MixTopLayout/index.vue";
+import C_ReverseHorizontalMixLayout from "../layouts/ReverseHorizontalMixLayout/index.vue";
+import C_CardLayout from "../layouts/CardLayout/index.vue";
 
 defineOptions({ name: "C_LayoutContainer" });
 

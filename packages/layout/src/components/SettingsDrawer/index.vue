@@ -383,7 +383,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, inject } from "vue";
+import { ref, inject } from "vue";
 import {
   NDrawer,
   NDrawerContent,
@@ -403,11 +403,10 @@ import {
   useSettingsStore,
   type SettingsStoreInstance,
 } from "../../stores/settings";
-import { DEFAULT_SETTINGS } from "../../constants";
 import {
-  sanitizeLayoutSettingsConfig,
-  SETTINGS_CONFIG_SCHEMA_VERSION,
-} from "../../core/settings";
+  LayoutActionUnavailableError,
+  useSettingsController,
+} from "../../composables/useSettingsController";
 import { LAYOUT_SETTINGS_KEY } from "../../composables/useLayoutContext";
 import { COLOR_SWATCHES, LAYOUT_MODE_OPTIONS, THEME_PRESETS } from "./data";
 import type {
@@ -443,154 +442,14 @@ const settingsStore =
   props.store ?? injectedSettingsStore ?? useSettingsStore();
 const visible = defineModel<boolean>("show", { default: false });
 const activeTab = ref("appearance");
-
-// 功能开关：记录宿主原始状态，卸载时精确恢复，避免污染全局 class。
-const initialGrayMode =
-  typeof document !== "undefined" &&
-  document.documentElement.classList.contains("gray-mode");
-const initialColorWeakMode =
-  typeof document !== "undefined" &&
-  document.documentElement.classList.contains("color-weak-mode");
-const grayMode = ref(initialGrayMode);
-const colorWeakMode = ref(initialColorWeakMode);
-const watermarkEnabled = ref(false);
-const watermarkText = ref("Robot Admin");
-
-// 水印元素引用
-let watermarkEl: HTMLElement | null = null;
-
-// 创建水印函数
-const createWatermark = (text: string) => {
-  if (typeof document === "undefined") return;
-  // 移除旧水印
-  if (watermarkEl) {
-    watermarkEl.remove();
-    watermarkEl = null;
-  }
-
-  // 创建 canvas
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    message.error("当前浏览器无法创建水印画布");
-    return;
-  }
-  canvas.width = 200;
-  canvas.height = 150;
-
-  ctx.font = "14px Microsoft JhengHei";
-  ctx.fillStyle = "rgba(120, 120, 120, 0.15)";
-  ctx.rotate((-20 * Math.PI) / 180);
-  ctx.fillText(text, 0, 80);
-
-  // 创建水印容器
-  watermarkEl = document.createElement("div");
-  watermarkEl.dataset.robotAdminLayoutWatermark = "true";
-  watermarkEl.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    background-image: url(${canvas.toDataURL()});
-    background-repeat: repeat;
-    z-index: 9999;
-    user-select: none;
-  `;
-
-  document.body.appendChild(watermarkEl);
-};
-
-// 移除水印函数
-const removeWatermark = () => {
-  if (watermarkEl) {
-    watermarkEl.remove();
-    watermarkEl = null;
-  }
-};
-
-// 监听灰色模式
-watch(grayMode, (val) => {
-  if (typeof document !== "undefined") {
-    document.documentElement.classList.toggle("gray-mode", val);
-  }
+const settingsController = useSettingsController({
+  store: settingsStore,
+  actions: props.actions,
+  maxImportBytes: props.maxImportBytes,
+  onVisualEffectError: (text) => message.error(text),
 });
-
-// 监听色弱模式
-watch(colorWeakMode, (val) => {
-  if (typeof document !== "undefined") {
-    document.documentElement.classList.toggle("color-weak-mode", val);
-  }
-});
-
-// 监听水印开关
-watch(watermarkEnabled, (val) => {
-  if (val) {
-    createWatermark(watermarkText.value);
-  } else {
-    removeWatermark();
-  }
-});
-
-// 监听水印文本
-watch(watermarkText, (val) => {
-  if (watermarkEnabled.value) {
-    createWatermark(val);
-  }
-});
-
-// 获取系统信息
-const systemInfo = computed(() => {
-  if (typeof navigator === "undefined" || typeof window === "undefined") {
-    return {
-      browser: "Unknown",
-      os: "Unknown",
-      resolution: "Unknown",
-      pixelRatio: "Unknown",
-      language: "Unknown",
-      timezone: "Unknown",
-    };
-  }
-
-  const ua = navigator.userAgent;
-  let browser = "Unknown";
-  let os = "Unknown";
-
-  // 检测浏览器
-  if (ua.includes("Edg/")) browser = "Edge";
-  else if (ua.includes("Firefox")) browser = "Firefox";
-  else if (ua.includes("Chrome")) browser = "Chrome";
-  else if (ua.includes("Safari")) browser = "Safari";
-
-  // 检测操作系统
-  if (ua.includes("Windows")) os = "Windows";
-  else if (ua.includes("Mac")) os = "macOS";
-  else if (ua.includes("Android")) os = "Android";
-  else if (ua.includes("iOS")) os = "iOS";
-  else if (ua.includes("Linux")) os = "Linux";
-
-  return {
-    browser,
-    os,
-    resolution: `${window.screen.width} × ${window.screen.height}`,
-    pixelRatio: window.devicePixelRatio + "x",
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  };
-});
-
-// 组件卸载时清理水印
-onUnmounted(() => {
-  removeWatermark();
-  if (typeof document !== "undefined") {
-    document.documentElement.classList.toggle("gray-mode", initialGrayMode);
-    document.documentElement.classList.toggle(
-      "color-weak-mode",
-      initialColorWeakMode,
-    );
-  }
-});
+const { colorWeakMode, grayMode, systemInfo, watermarkEnabled, watermarkText } =
+  settingsController;
 
 // 处理布局切换 - 阻止抽屉关闭
 const handleLayoutChange = (value: LayoutMode, disabled?: boolean) => {
@@ -611,13 +470,13 @@ const isCurrentPreset = (preset: ThemePreset) => {
  * 应用预设方案
  */
 const handleApplyPreset = (preset: ThemePreset) => {
-  settingsStore.applyPreset(preset);
+  void settingsController.applyPreset(preset);
   message.success(`已应用「${preset.name}」主题方案`);
 };
 
 const handleThemeModeChange = async (mode: ThemeMode) => {
   try {
-    await settingsStore.updateThemeMode(mode);
+    await settingsController.updateThemeMode(mode);
   } catch {
     message.error("主题模式切换失败");
   }
@@ -628,11 +487,7 @@ const handleThemeModeChange = async (mode: ThemeMode) => {
  */
 const handleResetAppearance = async () => {
   try {
-    await settingsStore.updateThemeMode(DEFAULT_SETTINGS.themeMode);
-    settingsStore.primaryColor = DEFAULT_SETTINGS.primaryColor;
-    settingsStore.borderRadius = DEFAULT_SETTINGS.borderRadius;
-    settingsStore.transitionType = DEFAULT_SETTINGS.transitionType;
-    settingsStore.enableTransition = DEFAULT_SETTINGS.enableTransition;
+    await settingsController.resetAppearance();
     message.success("已恢复外观默认设置");
   } catch {
     message.error("恢复外观默认设置失败");
@@ -643,18 +498,7 @@ const handleResetAppearance = async () => {
  * 恢复布局默认设置
  */
 const handleResetLayout = () => {
-  settingsStore.layoutMode = DEFAULT_SETTINGS.layoutMode;
-  settingsStore.menuExpandMode = DEFAULT_SETTINGS.menuExpandMode;
-  settingsStore.fixedHeader = DEFAULT_SETTINGS.fixedHeader;
-  settingsStore.showBreadcrumb = DEFAULT_SETTINGS.showBreadcrumb;
-  settingsStore.showBreadcrumbIcon = DEFAULT_SETTINGS.showBreadcrumbIcon;
-  settingsStore.showTagsView = DEFAULT_SETTINGS.showTagsView;
-  settingsStore.tagsViewHeight = DEFAULT_SETTINGS.tagsViewHeight;
-  settingsStore.tagsViewStyle = DEFAULT_SETTINGS.tagsViewStyle;
-  settingsStore.showFooter = DEFAULT_SETTINGS.showFooter;
-  settingsStore.sidebarWidth = DEFAULT_SETTINGS.sidebarWidth;
-  settingsStore.sidebarCollapsedWidth = DEFAULT_SETTINGS.sidebarCollapsedWidth;
-  settingsStore.headerHeight = DEFAULT_SETTINGS.headerHeight;
+  settingsController.resetLayout();
   message.success("已恢复布局默认设置");
 };
 
@@ -668,13 +512,10 @@ const handleReset = () => {
     positiveText: "确认",
     negativeText: "取消",
     onPositiveClick: async () => {
-      const previousSettings = { ...settingsStore.settingsState };
       try {
-        settingsStore.resetSettings();
-        await settingsStore.updateThemeMode(settingsStore.themeMode);
+        await settingsController.resetAll();
         message.success("已恢复默认配置");
       } catch {
-        settingsStore.$patch(previousSettings);
         message.error("恢复默认配置失败");
       }
     },
@@ -691,14 +532,14 @@ const handleClearCache = () => {
     positiveText: "确认",
     negativeText: "取消",
     onPositiveClick: async () => {
-      if (!props.actions?.clearCache) {
-        message.warning("宿主应用未配置可安全清理的缓存");
-        return;
-      }
       try {
-        await props.actions.clearCache();
+        await settingsController.clearCache();
         message.success("缓存已清除");
-      } catch {
+      } catch (error) {
+        if (error instanceof LayoutActionUnavailableError) {
+          message.warning("宿主应用未配置可安全清理的缓存");
+          return;
+        }
         message.error("缓存清除失败");
       }
     },
@@ -709,38 +550,15 @@ const handleClearCache = () => {
  * 重新加载页面
  */
 const handleReload = () => {
-  if (props.actions?.reloadPage) {
-    props.actions.reloadPage();
-  } else if (typeof window !== "undefined") {
-    window.location.reload();
-  }
+  settingsController.reloadPage();
 };
 
 /**
  * 导出配置
  */
 const handleExportConfig = () => {
-  const config = {
-    schemaVersion: SETTINGS_CONFIG_SCHEMA_VERSION,
-    settings: settingsStore.settingsState,
-    gray: grayMode.value,
-    colorWeak: colorWeakMode.value,
-    watermark: {
-      enabled: watermarkEnabled.value,
-      text: watermarkText.value,
-    },
-    exportTime: new Date().toISOString(),
-  };
-  const blob = new Blob([JSON.stringify(config, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `robot-admin-config-${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  message.success("配置已导出");
+  if (settingsController.downloadConfig()) message.success("配置已导出");
+  else message.error("当前环境不支持配置导出");
 };
 
 /**
@@ -756,32 +574,7 @@ const handleImportConfig = () => {
     if (!file) return;
 
     try {
-      if (file.size > props.maxImportBytes) {
-        throw new RangeError("配置文件过大");
-      }
-      const text = await file.text();
-      // 先完成全量校验，成功后再修改任何状态，避免部分配置污染。
-      const imported = sanitizeLayoutSettingsConfig(JSON.parse(text));
-
-      // 应用配置
-      if (imported.settings !== undefined) {
-        const { themeMode, ...settingsPatch } = imported.settings;
-        if (themeMode !== undefined) {
-          await settingsStore.updateThemeMode(themeMode);
-        }
-        settingsStore.$patch(settingsPatch);
-      }
-      if (imported.gray !== undefined) {
-        grayMode.value = imported.gray;
-      }
-      if (imported.colorWeak !== undefined) {
-        colorWeakMode.value = imported.colorWeak;
-      }
-      if (imported.watermark !== undefined) {
-        watermarkEnabled.value = imported.watermark.enabled;
-        watermarkText.value = imported.watermark.text;
-      }
-
+      await settingsController.importFile(file);
       message.success("配置已导入");
     } catch (error) {
       message.error("配置文件格式错误");

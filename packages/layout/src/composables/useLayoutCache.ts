@@ -43,7 +43,7 @@ export function shouldCacheRoute(
  * @example
  * ```vue
  * <script setup>
- * import { useLayoutCache } from '@robot-admin/layout'
+ * import { useLayoutCache } from '@robot-admin/layout/vue'
  *
  * const { cachedViews, maxCacheCount } = useLayoutCache({ maxCacheCount: 30 })
  * </script>

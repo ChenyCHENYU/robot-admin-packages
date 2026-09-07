@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.2.0
+
+### Minor Changes
+
+- Add layered `@robot-admin/layout/vue` and `@robot-admin/layout/naive` entrypoints. The Naive entry aggregates the Vue API for one-entry consumption, all runtime entries preserve shared InjectionKey/Store identity, and the Vue entry contains no Naive UI or Element Plus imports; the 3.x root entry remains fully compatible.
+- Decouple `createLayoutContext()` from the package Pinia Store through the structural `LayoutSettingsSource` contract and add safe host-menu normalization.
+- Extract UI-independent settings transactions, responsive-menu measurement, icon fallback, CSS-variable binding, and the shared routed-content renderer for reuse by future UI adapters.
+- Scope layout selectors and animation names, add `--ra-layout-*` variables, support reactive custom CSS variable targets, and restore detached/disposed targets without allowing post-disposal writes while preserving 3.x legacy variables by default.
+- Restore custom Store defaults correctly from SettingsDrawer, establish `C_*Layout` as the single canonical component naming system, and retain unprefixed 3.1 names only as deprecated compatibility exports until 4.0.
+- Add browser contracts for all six layouts, typed/legacy collapse interoperability, scoped side effects, structural Store adapters, and CI verification of source, package, ESM/CJS and dependency boundaries.
+
 ## 3.1.0
 
 ### Minor Changes

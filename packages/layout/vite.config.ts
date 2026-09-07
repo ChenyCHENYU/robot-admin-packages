@@ -9,14 +9,20 @@ export default defineConfig({
     dts({
       insertTypesEntry: true,
       rollupTypes: true,
+      entryRoot: resolve(__dirname, "src"),
     }),
   ],
   build: {
     lib: {
-      entry: resolve(__dirname, "src/index.ts"),
+      entry: {
+        index: resolve(__dirname, "src/index.ts"),
+        "vue/index": resolve(__dirname, "src/vue/index.ts"),
+        "naive/index": resolve(__dirname, "src/naive/index.ts"),
+      },
       name: "RobotAdminLayout",
       formats: ["es", "cjs"],
-      fileName: (format) => `index.${format === "es" ? "js" : "cjs"}`,
+      fileName: (format, entryName) =>
+        `${entryName}.${format === "es" ? "js" : "cjs"}`,
     },
     // Vite 8: rollupOptions → rolldownOptions
     rolldownOptions: {

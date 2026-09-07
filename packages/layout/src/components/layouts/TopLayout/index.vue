@@ -1,5 +1,5 @@
 <!--
- * @robot-admin/layout - TopLayout
+ * @robot-admin/layout - C_TopLayout
  *
  * 顶部导航布局骨架
  * Logo+品牌 | 水平菜单 | 操作区 → 标签页 → 内容区 → 页脚
@@ -77,13 +77,7 @@
     <NLayout>
       <NLayoutContent class="main-content">
         <div class="page-content">
-          <RouterView v-slot="{ Component, route }">
-            <Transition :name="transitionName" mode="out-in">
-              <KeepAlive :include="cachedViews" :max="maxCacheCount">
-                <component :is="Component" :key="route.path" />
-              </KeepAlive>
-            </Transition>
-          </RouterView>
+          <LayoutRouterView />
         </div>
       </NLayoutContent>
 
@@ -103,19 +97,17 @@ import {
   useLayoutContext,
   DEFAULT_BRAND_CONFIG,
 } from "../../../composables/useLayoutContext";
-import { useLayoutCache } from "../../../composables/useLayoutCache";
 import ResponsiveMenu from "../../ResponsiveMenu/index.vue";
+import LayoutRouterView from "../../LayoutRouterView/index.vue";
 
-defineOptions({ name: "TopLayout" });
+defineOptions({ name: "C_TopLayout" });
 
 const ctx = useLayoutContext();
-const { cachedViews, maxCacheCount } = useLayoutCache();
 
 const isDarkMode = ctx.isDark;
 const menus = computed(() => ctx.menus.value);
 const showTagsView = computed(() => ctx.showTagsView.value);
 const tagsViewHeight = computed(() => ctx.tagsViewHeight.value);
 const showFooter = computed(() => ctx.showFooter.value);
-const transitionName = computed(() => ctx.transitionName.value);
 const brand = { ...DEFAULT_BRAND_CONFIG, ...ctx.brand };
 </script>

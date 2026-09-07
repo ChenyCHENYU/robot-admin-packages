@@ -1,5 +1,5 @@
 <!--
- * @robot-admin/layout - SideLayout
+ * @robot-admin/layout - C_SideLayout
  *
  * 左侧菜单布局骨架
  * 经典的左侧导航 + 右侧内容布局，使用 NLayout/NLayoutSider 实现
@@ -35,13 +35,7 @@
       <slot name="header" />
 
       <NLayoutContent class="content-with-header p16px app-content">
-        <RouterView v-slot="{ Component, route }">
-          <Transition :name="ctx.transitionName.value" mode="out-in">
-            <KeepAlive :include="cachedViews" :max="maxCacheCount">
-              <component :is="Component" :key="route.path" />
-            </KeepAlive>
-          </Transition>
-        </RouterView>
+        <LayoutRouterView />
       </NLayoutContent>
 
       <slot name="footer" />
@@ -53,9 +47,9 @@
 import { computed, ref, watch } from "vue";
 import { NLayout, NLayoutSider, NLayoutContent } from "naive-ui";
 import { useLayoutContext } from "../../../composables/useLayoutContext";
-import { useLayoutCache } from "../../../composables/useLayoutCache";
+import LayoutRouterView from "../../LayoutRouterView/index.vue";
 
-defineOptions({ name: "SideLayout" });
+defineOptions({ name: "C_SideLayout" });
 
 const props = withDefaults(
   defineProps<{
@@ -70,7 +64,6 @@ const emit = defineEmits<{
 }>();
 
 const ctx = useLayoutContext();
-const { cachedViews, maxCacheCount } = useLayoutCache();
 
 // 内部折叠状态，与 prop 双向同步
 const _collapsed = ref(props.collapsed);

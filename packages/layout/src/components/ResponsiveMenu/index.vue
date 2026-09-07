@@ -2,11 +2,11 @@
  * @robot-admin/layout - ResponsiveMenu
  *
  * 响应式水平菜单
- * 用于 TopLayout / MixTopLayout / ReverseHorizontalMixLayout 的水平菜单
+ * 用于 C_TopLayout / C_MixTopLayout / C_ReverseHorizontalMixLayout 的水平菜单
  * 自动检测容器宽度，溢出项放入“更多”下拉菜单，使用 NMenu (naive-ui) 渲染
  -->
 <template>
-  <div ref="containerRef" class="responsive-menu">
+  <div :ref="setContainerRef" class="responsive-menu">
     <div class="responsive-menu__visible">
       <NMenu
         v-if="visibleOptions.length > 0"
@@ -40,12 +40,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, h } from "vue";
+import { computed, h } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NMenu, NDropdown, NButton } from "naive-ui";
 import type { MenuOption, DropdownOption } from "naive-ui";
 import type { MenuOptions } from "../../types/menu";
 import { useLayoutContext } from "../../composables/useLayoutContext";
+import { useResponsiveMenu } from "../../composables/useResponsiveMenu";
 
 defineOptions({ name: "ResponsiveMenu" });
 
@@ -58,9 +59,13 @@ const route = useRoute();
 const router = useRouter();
 const ctx = useLayoutContext();
 
-// 安全包装
-const menuData = computed(() => props.data || []);
 const activeKey = computed(() => route.path);
+const { containerRef, visibleItems, hiddenItems } = useResponsiveMenu({
+  data: () => props.data || [],
+});
+const setContainerRef = (element: unknown) => {
+  containerRef.value = element instanceof HTMLElement ? element : undefined;
+};
 
 // 根据主题选择菜单样式
 const isDarkMode = ctx.isDark;
@@ -138,152 +143,49 @@ const renderIcon = (icon: string, size = 18) => {
 
 // ============ 菜单转换 ============
 
-const convertToMenuOption = (item: MenuOptions): MenuOption => ({
-  key: item.path || "",
-  label: item.meta?.title || item.name || "",
-  icon: item.meta?.icon ? renderIcon(item.meta.icon, 18) : undefined,
-  children: item.children?.length
-    ? item.children.map(convertToMenuOption)
-    : undefined,
-});
+const getStringIcon = (item: MenuOptions) =>
+  item.meta?.icon ?? (typeof item.icon === "string" ? item.icon : undefined);
 
-// ============ 响应式计算 ============
-
-const containerRef = ref<HTMLElement>();
-const visibleItems = ref<MenuOptions[]>([]);
-const hiddenItems = ref<MenuOptions[]>([]);
+const convertToMenuOption = (item: MenuOptions): MenuOption => {
+  const icon = getStringIcon(item);
+  return {
+    key: item.path || item.key || "",
+    label: item.meta?.title || item.label || item.name || "",
+    icon: icon ? renderIcon(icon, 18) : undefined,
+    children: item.children?.length
+      ? item.children.map(convertToMenuOption)
+      : undefined,
+  };
+};
 
 const visibleOptions = computed<MenuOption[]>(() =>
   visibleItems.value.map(convertToMenuOption),
 );
 
 const dropdownOptions = computed<DropdownOption[]>(() =>
-  hiddenItems.value.map((item) => ({
-    key: item.path || "",
-    label: item.meta?.title || item.name || "",
-    icon: item.meta?.icon ? renderIcon(item.meta.icon, 16) : undefined,
-    children: item.children?.length
-      ? item.children.map((child) => ({
-          key: child.path || "",
-          label: child.meta?.title || child.name || "",
-          icon: child.meta?.icon ? renderIcon(child.meta.icon, 16) : undefined,
-        }))
-      : undefined,
-  })),
+  hiddenItems.value.map((item) => {
+    const icon = getStringIcon(item);
+    return {
+      key: item.path || item.key || "",
+      label: item.meta?.title || item.label || item.name || "",
+      icon: icon ? renderIcon(icon, 16) : undefined,
+      children: item.children?.length
+        ? item.children.map((child) => {
+            const childIcon = getStringIcon(child);
+            return {
+              key: child.path || child.key || "",
+              label: child.meta?.title || child.label || child.name || "",
+              icon: childIcon ? renderIcon(childIcon, 16) : undefined,
+            };
+          })
+        : undefined,
+    };
+  }),
 );
 
 const handleSelect = (key: string) => {
-  if (key) router.push(key);
+  if (key) void router.push(key);
 };
-
-// ============ 宽度估算 ============
-
-const estimateItemWidth = (item: MenuOptions): number => {
-  const ITEM_PADDING = 36; // itemPadding: "0 18px" → 18*2
-  const ITEM_MARGIN = 8;
-  const ICON_WIDTH = 26;
-  const EXTRA = 8;
-
-  const title = item.meta?.title || item.name || "";
-  let textWidth = 0;
-  for (const char of title) {
-    const code = char.charCodeAt(0);
-    // CJK / 全角字符约 15px（14px 字号下的实际宽度）
-    if (
-      (code >= 0x4e00 && code <= 0x9fff) || // CJK 统一汉字
-      (code >= 0x3400 && code <= 0x4dbf) || // CJK 扩展 A
-      (code >= 0x3000 && code <= 0x303f) || // CJK 符号
-      (code >= 0xff00 && code <= 0xffef) || // 全角字符
-      (code >= 0x3040 && code <= 0x309f) || // 平假名
-      (code >= 0x30a0 && code <= 0x30ff) // 片假名
-    ) {
-      textWidth += 15;
-    } else {
-      textWidth += 8;
-    }
-  }
-  const iconWidth = item.meta?.icon ? ICON_WIDTH : 0;
-
-  return textWidth + iconWidth + ITEM_PADDING + ITEM_MARGIN + EXTRA;
-};
-
-const calculateVisibleCount = (containerWidth: number): number => {
-  if (!menuData.value.length) return 0;
-
-  const MORE_BTN_WIDTH = 80;
-  const SAFETY = 15;
-
-  let totalWidth = 0;
-  for (const item of menuData.value) {
-    totalWidth += estimateItemWidth(item);
-  }
-
-  if (totalWidth + SAFETY <= containerWidth) {
-    return menuData.value.length;
-  }
-
-  let usedWidth = 0;
-  let count = 0;
-  const available = containerWidth - MORE_BTN_WIDTH - SAFETY;
-
-  for (const item of menuData.value) {
-    const w = estimateItemWidth(item);
-    if (usedWidth + w <= available) {
-      usedWidth += w;
-      count++;
-    } else break;
-  }
-
-  return Math.max(count, 1);
-};
-
-const calculateVisibleItems = () => {
-  if (!containerRef.value || !menuData.value.length) return;
-
-  const containerWidth = containerRef.value.offsetWidth;
-  // 隐藏容器交由 ResizeObserver 在重新可见时触发，避免无限 nextTick 循环。
-  if (containerWidth <= 0) return;
-
-  const count = calculateVisibleCount(containerWidth);
-  visibleItems.value = menuData.value.slice(0, count);
-  hiddenItems.value = menuData.value.slice(count);
-};
-
-// ============ 防抖 & ResizeObserver ============
-
-let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-const debouncedCalculate = () => {
-  if (resizeTimer) clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => calculateVisibleItems(), 100);
-};
-
-let resizeObserver: ResizeObserver | null = null;
-
-onMounted(() => {
-  nextTick(() => calculateVisibleItems());
-  if (containerRef.value && typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => debouncedCalculate());
-    resizeObserver.observe(containerRef.value);
-  } else if (typeof window !== "undefined") {
-    window.addEventListener("resize", debouncedCalculate, { passive: true });
-  }
-});
-
-onUnmounted(() => {
-  resizeObserver?.disconnect();
-  if (typeof window !== "undefined") {
-    window.removeEventListener("resize", debouncedCalculate);
-  }
-  if (resizeTimer) clearTimeout(resizeTimer);
-});
-
-watch(
-  () => props.data,
-  () => nextTick(() => calculateVisibleItems()),
-  {
-    deep: true,
-  },
-);
 </script>
 
 <style scoped>

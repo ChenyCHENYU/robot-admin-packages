@@ -19,21 +19,23 @@
 .layout-container {
   // 菜单项圆角
   --menu-border-radius: 10px;
-  
+
   // 一级菜单父项激活效果（子菜单展开状态）- 较淡
-  --menu-parent-gradient-start: rgba(99, 102, 241, 0.10);
+  --menu-parent-gradient-start: rgba(99, 102, 241, 0.1);
   --menu-parent-gradient-end: rgba(139, 92, 246, 0.06);
   --menu-parent-border-color: rgba(99, 102, 241, 0.45);
   --menu-parent-border-width: 2px;
-  --menu-parent-shadow: 0 2px 6px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(99, 102, 241, 0.06);
-  
+  --menu-parent-shadow:
+    0 2px 6px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(99, 102, 241, 0.06);
+
   // 二级菜单选中效果（当前页面）- 明显更亮，层级清晰
   --menu-selected-gradient-start: rgba(99, 102, 241, 0.22);
   --menu-selected-gradient-end: rgba(139, 92, 246, 0.16);
   --menu-selected-border-color: rgba(99, 102, 241, 0.75);
   --menu-selected-border-width: 3px;
-  --menu-selected-shadow: 0 2px 12px rgba(99, 102, 241, 0.22), 0 4px 24px rgba(99, 102, 241, 0.15);
-  
+  --menu-selected-shadow:
+    0 2px 12px rgba(99, 102, 241, 0.22), 0 4px 24px rgba(99, 102, 241, 0.15);
+
   // 毛玻璃效果强度
   --menu-parent-blur: 14px;
   --menu-parent-saturate: 130%;
@@ -66,7 +68,7 @@
   overflow-x: hidden;
 }
 
-.main-content {
+:where(.layout-container) .main-content {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
@@ -76,12 +78,12 @@
 }
 
 // ==================== 主题相关样式 ====================
-[data-theme='light'] .layout-container .light-theme,
+[data-theme="light"] .layout-container .light-theme,
 .layout-container .light-theme {
   background-color: var(--app-bg-body);
 }
 
-[data-theme='dark'] .layout-container .dark-theme,
+[data-theme="dark"] .layout-container .dark-theme,
 .layout-container .dark-theme {
   background-color: var(--app-bg-body);
 }
@@ -97,25 +99,25 @@
 }
 
 // ==================== 侧边栏和菜单样式 ====================
-.layout-sider {
+:where(.layout-container) .layout-sider {
   transform: translateZ(0);
   backface-visibility: hidden;
   contain: layout style paint;
 }
 
-.layout-sider.light-theme {
+:where(.layout-container) .layout-sider.light-theme {
   background-color: var(--app-menu-bg);
 }
 
-.layout-sider.dark-theme {
+:where(.layout-container) .layout-sider.dark-theme {
   background-color: var(--app-menu-bg);
 }
 
-.layout-sider .n-scrollbar-rail {
+:where(.layout-container) .layout-sider .n-scrollbar-rail {
   width: 0 !important;
 }
 
-.layout-sider .n-scrollbar-content {
+:where(.layout-container) .layout-sider .n-scrollbar-content {
   padding-right: 0 !important;
 }
 
@@ -127,7 +129,7 @@
   overflow: hidden;
 }
 
-.menu-scroll-container {
+:where(.layout-container) .menu-scroll-container {
   height: calc(100vh - 56px);
   overflow-y: scroll;
   scrollbar-width: none;
@@ -137,7 +139,7 @@
   flex-direction: column;
 }
 
-.menu-scroll-container::-webkit-scrollbar {
+:where(.layout-container) .menu-scroll-container::-webkit-scrollbar {
   display: none;
 }
 
@@ -195,15 +197,17 @@
   will-change: transform;
 
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       rgba(255, 255, 255, 0.08) 0%,
-      rgba(255, 255, 255, 0.04) 100%);
+      rgba(255, 255, 255, 0.04) 100%
+    );
     border-radius: 10px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: -1;
@@ -222,7 +226,7 @@
   padding: 10px 16px;
 
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -272,14 +276,20 @@
 .layout-container .n-menu-item--selected,
 .layout-container .n-menu-item-content--selected {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
-  
+
   &::before {
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       var(--menu-selected-gradient-start, rgba(99, 102, 241, 0.22)) 0%,
-      var(--menu-selected-gradient-end, rgba(139, 92, 246, 0.16)) 100%) !important;
+      var(--menu-selected-gradient-end, rgba(139, 92, 246, 0.16)) 100%
+    ) !important;
     border-radius: var(--menu-border-radius, 10px);
     box-shadow:
-      var(--menu-selected-shadow, 0 2px 12px rgba(99, 102, 241, 0.22), 0 4px 24px rgba(99, 102, 241, 0.15)),
+      var(
+        --menu-selected-shadow,
+        0 2px 12px rgba(99, 102, 241, 0.22),
+        0 4px 24px rgba(99, 102, 241, 0.15)
+      ),
       inset 0 1px 2px rgba(99, 102, 241, 0.12),
       inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
@@ -288,11 +298,14 @@
 .layout-container .n-menu-item--selected .n-menu-item-content,
 .layout-container .n-menu-item-content--selected {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
-  backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
-  -webkit-backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
+  backdrop-filter: blur(var(--menu-selected-blur, 16px))
+    saturate(var(--menu-selected-saturate, 135%));
+  -webkit-backdrop-filter: blur(var(--menu-selected-blur, 16px))
+    saturate(var(--menu-selected-saturate, 135%));
 
   &::after {
-    border-left: var(--menu-selected-border-width, 3px) solid var(--menu-selected-border-color, rgba(99, 102, 241, 0.75));
+    border-left: var(--menu-selected-border-width, 3px) solid
+      var(--menu-selected-border-color, rgba(99, 102, 241, 0.75));
     border-radius: var(--menu-border-radius, 10px);
     box-shadow:
       0 0 14px rgba(99, 102, 241, 0.25),
@@ -314,25 +327,34 @@
 /* 子菜单父项样式 - 一级菜单展开状态（较淡玻璃质感）*/
 .layout-container .n-menu-item-content--child-active {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
-  
+
   &::before {
-    background: linear-gradient(135deg,
-      var(--menu-parent-gradient-start, rgba(99, 102, 241, 0.10)) 0%,
-      var(--menu-parent-gradient-end, rgba(139, 92, 246, 0.06)) 100%) !important;
+    background: linear-gradient(
+      135deg,
+      var(--menu-parent-gradient-start, rgba(99, 102, 241, 0.1)) 0%,
+      var(--menu-parent-gradient-end, rgba(139, 92, 246, 0.06)) 100%
+    ) !important;
     border-radius: var(--menu-border-radius, 10px);
     box-shadow:
-      var(--menu-parent-shadow, 0 2px 6px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(99, 102, 241, 0.06)),
+      var(
+        --menu-parent-shadow,
+        0 2px 6px rgba(99, 102, 241, 0.1),
+        0 4px 12px rgba(99, 102, 241, 0.06)
+      ),
       inset 0 1px 2px rgba(99, 102, 241, 0.06),
       inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
   &::after {
-    border-left: var(--menu-parent-border-width, 2px) solid var(--menu-parent-border-color, rgba(99, 102, 241, 0.45));
+    border-left: var(--menu-parent-border-width, 2px) solid
+      var(--menu-parent-border-color, rgba(99, 102, 241, 0.45));
     border-radius: var(--menu-border-radius, 10px);
   }
 
-  backdrop-filter: blur(var(--menu-parent-blur, 14px)) saturate(var(--menu-parent-saturate, 130%));
-  -webkit-backdrop-filter: blur(var(--menu-parent-blur, 14px)) saturate(var(--menu-parent-saturate, 130%));
+  backdrop-filter: blur(var(--menu-parent-blur, 14px))
+    saturate(var(--menu-parent-saturate, 130%));
+  -webkit-backdrop-filter: blur(var(--menu-parent-blur, 14px))
+    saturate(var(--menu-parent-saturate, 130%));
 }
 
 /* 一级菜单项对齐 */
@@ -351,41 +373,49 @@
 }
 
 // ==================== 主题优化 ====================
-.dark-theme {
+:where(.layout-container) .dark-theme {
   color-scheme: dark;
 
   .layout-container .n-menu-item::before {
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       rgba(255, 255, 255, 0.08) 0%,
-      rgba(255, 255, 255, 0.04) 100%);
+      rgba(255, 255, 255, 0.04) 100%
+    );
     box-shadow:
       0 2px 4px rgba(0, 0, 0, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .layout-container .n-menu-item:hover::before {
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.08) 100%);
+      rgba(255, 255, 255, 0.08) 100%
+    );
   }
 }
 
-.light-theme {
+:where(.layout-container) .light-theme {
   color-scheme: light;
 
   .layout-container .n-menu-item::before {
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       rgba(255, 255, 255, 0.6) 0%,
-      rgba(255, 255, 255, 0.4) 100%);
+      rgba(255, 255, 255, 0.4) 100%
+    );
     box-shadow:
       0 2px 4px rgba(0, 0, 0, 0.04),
       inset 0 1px 0 rgba(255, 255, 255, 0.8);
   }
 
   .layout-container .n-menu-item:hover::before {
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       rgba(255, 255, 255, 0.8) 0%,
-      rgba(255, 255, 255, 0.6) 100%);
+      rgba(255, 255, 255, 0.6) 100%
+    );
   }
 
   .layout-container .n-menu-item-content::after {
@@ -433,29 +463,36 @@
 
 .layout-container
   .n-menu.n-menu--collapsed
-    .n-menu-item-content--child-active
-    .n-menu-item-content__icon
- {
+  .n-menu-item-content--child-active
+  .n-menu-item-content__icon {
   color: var(--n-item-color-active) !important;
 }
 
 /* 折叠菜单选中状态 - 使用二级选中效果变量 */
 .layout-container .n-menu.n-menu--collapsed .n-menu-item-content--child-active {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
-  
+
   &::before {
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       var(--menu-selected-gradient-start, rgba(99, 102, 241, 0.22)) 0%,
-      var(--menu-selected-gradient-end, rgba(139, 92, 246, 0.16)) 100%) !important;
+      var(--menu-selected-gradient-end, rgba(139, 92, 246, 0.16)) 100%
+    ) !important;
     border-radius: var(--menu-border-radius, 10px);
     box-shadow:
-      var(--menu-selected-shadow, 0 2px 12px rgba(99, 102, 241, 0.22), 0 4px 24px rgba(99, 102, 241, 0.15)),
+      var(
+        --menu-selected-shadow,
+        0 2px 12px rgba(99, 102, 241, 0.22),
+        0 4px 24px rgba(99, 102, 241, 0.15)
+      ),
       inset 0 1px 2px rgba(99, 102, 241, 0.12),
       inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
 
-  backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
-  -webkit-backdrop-filter: blur(var(--menu-selected-blur, 16px)) saturate(var(--menu-selected-saturate, 135%));
+  backdrop-filter: blur(var(--menu-selected-blur, 16px))
+    saturate(var(--menu-selected-saturate, 135%));
+  -webkit-backdrop-filter: blur(var(--menu-selected-blur, 16px))
+    saturate(var(--menu-selected-saturate, 135%));
 
   &::after {
     border-radius: var(--menu-border-radius, 10px);
@@ -478,7 +515,7 @@
 }
 
 /* 折叠菜单图标颜色 */
-.n-menu--collapsed .n-menu-item-content__icon {
+:where(.layout-container) .n-menu--collapsed .n-menu-item-content__icon {
   color: rgba(229, 231, 235, 0.9) !important;
 }
 
@@ -488,7 +525,7 @@
   min-width: 0;
 }
 
-.no-horizontal-scroll {
+:where(.layout-container) .no-horizontal-scroll {
   overflow-x: hidden !important;
 }
 
@@ -557,16 +594,18 @@
   position: relative;
 
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     bottom: 0;
     left: 16px;
     right: 16px;
     height: 1px;
-    background: linear-gradient(to right,
+    background: linear-gradient(
+      to right,
       transparent,
       rgba(99, 102, 241, 0.2),
-      transparent);
+      transparent
+    );
   }
 }
 
@@ -574,10 +613,12 @@
 .layout-container .n-menu-divider {
   margin: 8px 16px;
   height: 1px;
-  background: linear-gradient(to right,
+  background: linear-gradient(
+    to right,
     transparent,
     rgba(255, 255, 255, 0.1),
-    transparent);
+    transparent
+  );
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -585,21 +626,35 @@
 /* 加载状态优化 */
 .layout-container .n-menu-item.n-menu-item--loading {
   &::before {
-    background: linear-gradient(90deg,
+    background: linear-gradient(
+      90deg,
       rgba(99, 102, 241, 0.1) 0%,
       rgba(139, 92, 246, 0.2) 50%,
-      rgba(99, 102, 241, 0.1) 100%);
+      rgba(99, 102, 241, 0.1) 100%
+    );
     background-size: 200% 100%;
-    animation: shimmer 2s infinite;
+    animation: ra-layout-shimmer 2s infinite;
   }
 }
 
-@keyframes shimmer {
+@keyframes ra-layout-shimmer {
   0% {
     background-position: -200% 0;
   }
   100% {
     background-position: 200% 0;
+  }
+}
+
+@keyframes ra-layout-pulse-glow {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
   }
 }
 
@@ -621,56 +676,56 @@
 // ==================== ⚡ 页面切换过渡动画 ====================
 
 // 滑动效果
-.fade-slide-enter-active,
-.fade-slide-leave-active {
+:where(.layout-container) .fade-slide-enter-active,
+:where(.layout-container) .fade-slide-leave-active {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.fade-slide-enter-from {
+:where(.layout-container) .fade-slide-enter-from {
   opacity: 0;
   transform: translateX(20px);
 }
 
-.fade-slide-leave-to {
+:where(.layout-container) .fade-slide-leave-to {
   opacity: 0;
   transform: translateX(-20px);
 }
 
 // 淡入效果
-.fade-transform-enter-active,
-.fade-transform-leave-active {
+:where(.layout-container) .fade-transform-enter-active,
+:where(.layout-container) .fade-transform-leave-active {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.fade-transform-enter-from {
+:where(.layout-container) .fade-transform-enter-from {
   opacity: 0;
   transform: scale(0.95);
 }
 
-.fade-transform-leave-to {
+:where(.layout-container) .fade-transform-leave-to {
   opacity: 0;
   transform: scale(1.05);
 }
 
 // 缩放效果
-.fade-zoom-enter-active,
-.fade-zoom-leave-active {
+:where(.layout-container) .fade-zoom-enter-active,
+:where(.layout-container) .fade-zoom-leave-active {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.fade-zoom-enter-from {
+:where(.layout-container) .fade-zoom-enter-from {
   opacity: 0;
   transform: scale(0.8);
 }
 
-.fade-zoom-leave-to {
+:where(.layout-container) .fade-zoom-leave-to {
   opacity: 0;
   transform: scale(0.8);
 }
 
 // ==================== 🎨 布局开发中提示样式 ====================
 
-.layout-coming-soon {
+:where(.layout-container) .layout-coming-soon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -678,7 +733,7 @@
   background-color: var(--app-bg-content);
 }
 
-.coming-soon-content {
+:where(.layout-container) .coming-soon-content {
   text-align: center;
   max-width: 400px;
   padding: 40px;
@@ -687,19 +742,19 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
-.coming-soon-icon {
+:where(.layout-container) .coming-soon-icon {
   font-size: 64px;
   margin-bottom: 16px;
 }
 
-.coming-soon-title {
+:where(.layout-container) .coming-soon-title {
   font-size: 24px;
   font-weight: 600;
   margin-bottom: 8px;
   color: var(--app-text-primary);
 }
 
-.coming-soon-desc {
+:where(.layout-container) .coming-soon-desc {
   font-size: 16px;
   color: var(--app-text-secondary);
   line-height: 1.5;

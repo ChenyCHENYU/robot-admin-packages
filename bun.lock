@@ -84,7 +84,7 @@
     },
     "packages/layout": {
       "name": "@robot-admin/layout",
-      "version": "3.1.0",
+      "version": "3.2.0",
       "devDependencies": {
         "@types/node": "^22.13.9",
         "@vitejs/plugin-vue": "^6.0.5",
@@ -109,6 +109,9 @@
         "vue": "^3.4.0",
         "vue-router": "^4.0.0",
       },
+      "optionalPeers": [
+        "naive-ui",
+      ],
     },
     "packages/request-core": {
       "name": "@robot-admin/request-core",

@@ -7,10 +7,7 @@ import { createPinia } from "pinia";
 import { NDialogProvider, NMessageProvider } from "naive-ui";
 import SettingsDrawer from "../src/components/SettingsDrawer/index.vue";
 import { createSettingsStore } from "../src/stores/settings";
-import type {
-  SettingsDrawerActions,
-  SettingsStoreOptions,
-} from "../src/types";
+import type { SettingsDrawerActions, SettingsStoreOptions } from "../src/types";
 
 const wrappers: VueWrapper[] = [];
 
@@ -46,6 +43,7 @@ function mountDrawer({
   const pinia = createPinia();
   const store = createSettingsStore({
     id: `settings-drawer-${Math.random()}`,
+    syncCssVariables: false,
     ...storeOptions,
   })(pinia);
   const Host = defineComponent({
@@ -81,6 +79,13 @@ async function confirmDialog() {
 
 beforeEach(() => {
   document.documentElement.classList.remove("gray-mode", "color-weak-mode");
+  for (const name of [
+    "--primary-color",
+    "--ra-layout-primary-color",
+    "--ra-layout-sidebar-width",
+  ]) {
+    document.documentElement.style.removeProperty(name);
+  }
   localStorage.clear();
 });
 
@@ -106,6 +111,56 @@ describe("SettingsDrawer browser interactions", () => {
     mountDrawer();
     await flushPromises();
     expect(document.body.textContent).toContain("布局配置");
+  });
+
+  it("restores CSS variables owned by a disposed settings store", async () => {
+    document.documentElement.style.setProperty("--primary-color", "#111111");
+    const pinia = createPinia();
+    const store = createSettingsStore({ id: "settings-css-owner" })(pinia);
+
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--ra-layout-primary-color",
+      ),
+    ).toBe("#409eff");
+    expect(
+      document.documentElement.style.getPropertyValue("--primary-color"),
+    ).toBe("#409eff");
+
+    store.$dispose();
+    await nextTick();
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--ra-layout-primary-color",
+      ),
+    ).toBe("");
+    expect(
+      document.documentElement.style.getPropertyValue("--primary-color"),
+    ).toBe("#111111");
+  });
+
+  it("resets sections to the active store defaults", async () => {
+    const { store } = mountDrawer({
+      storeOptions: {
+        defaults: { primaryColor: "#722ed1", sidebarWidth: 260 },
+      },
+    });
+    store.primaryColor = "#409eff";
+    store.sidebarWidth = 300;
+
+    findButton("恢复外观默认设置").click();
+    await flushPromises();
+    expect(store.primaryColor).toBe("#722ed1");
+
+    const layoutTab = [...document.body.querySelectorAll(".n-tabs-tab")].find(
+      (item) => item.textContent?.includes("布局"),
+    );
+    if (!(layoutTab instanceof HTMLElement)) throw new Error("未找到布局页签");
+    layoutTab.click();
+    await flushPromises();
+    findButton("恢复布局默认设置").click();
+    await flushPromises();
+    expect(store.sidebarWidth).toBe(260);
   });
 
   it("delegates cache clearing to the host without touching unrelated storage", async () => {
@@ -224,7 +279,9 @@ describe("SettingsDrawer browser interactions", () => {
 
     wrapper.unmount();
 
-    expect(document.documentElement.classList.contains("gray-mode")).toBe(false);
+    expect(document.documentElement.classList.contains("gray-mode")).toBe(
+      false,
+    );
     expect(document.documentElement.classList.contains("color-weak-mode")).toBe(
       false,
     );

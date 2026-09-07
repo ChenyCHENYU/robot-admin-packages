@@ -2,7 +2,7 @@
  * @robot-admin/layout - SideMenu
  *
  * 右侧二级菜单侧边栏
- * 用于 ReverseHorizontalMixLayout 的右侧二级菜单
+ * 用于 C_ReverseHorizontalMixLayout 的右侧二级菜单
  -->
 <template>
   <template v-if="menus.length > 0">

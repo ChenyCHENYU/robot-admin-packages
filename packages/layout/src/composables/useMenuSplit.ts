@@ -9,7 +9,6 @@ import {
   ref,
   computed,
   watch,
-  onMounted,
   toValue,
   type ComputedRef,
   type Ref,
@@ -20,8 +19,8 @@ import type { MenuOptions } from "../types/menu";
 
 export interface UseMenuSplitOptions {
   /** 菜单数据（响应式） */
-  menus: ComputedRef<MenuOptions[]>;
-  /** 是否使用悬浮式二级菜单（MixLayout 的 toggle 模式） */
+  menus: MaybeRefOrGetter<readonly MenuOptions[]>;
+  /** 是否使用悬浮式二级菜单（C_MixLayout 的 toggle 模式） */
   floatingSecondMenu?: MaybeRefOrGetter<boolean>;
 }
 
@@ -32,11 +31,11 @@ export interface UseMenuSplitReturn {
   activeFirstMenuItem: ComputedRef<MenuOptions | undefined>;
   /** 当前一级菜单对应的二级菜单列表 */
   currentSecondMenus: ComputedRef<MenuOptions[]>;
-  /** 悬浮的菜单项（MixLayout 使用） */
+  /** 悬浮的菜单项（C_MixLayout 使用） */
   hoveredMenuItem: Ref<MenuOptions | null>;
   /** 实际展示的菜单项（hovered 优先，fallback 到 active） */
   displayMenuItem: ComputedRef<MenuOptions | null>;
-  /** 是否显示悬浮二级菜单（MixLayout 使用） */
+  /** 是否显示悬浮二级菜单（C_MixLayout 使用） */
   showSecondMenu: Ref<boolean>;
   /** 处理一级菜单点击 */
   handleFirstMenuClick: (item: MenuOptions) => void;
@@ -64,7 +63,7 @@ export function isPathSegmentPrefix(
  * 菜单拆分 Composable
  *
  * 提供一级/二级菜单拆分状态管理、路由自动匹配、菜单点击处理。
- * 供 MixLayout / MixTopLayout / ReverseHorizontalMixLayout 共用。
+ * 供 C_MixLayout / C_MixTopLayout / C_ReverseHorizontalMixLayout 共用。
  *
  * @example
  * ```ts
@@ -96,7 +95,9 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
 
   // ============ 查找一级菜单 ============
 
-  const findActiveTopMenu = (items: MenuOptions[]): MenuOptions | null => {
+  const findActiveTopMenu = (
+    items: readonly MenuOptions[],
+  ): MenuOptions | null => {
     for (const item of items) {
       if (isMenuItemActive(item.path)) return item;
       if (item.children?.length) {
@@ -110,7 +111,7 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
   // ============ 计算属性 ============
 
   const activeFirstMenuItem = computed(() =>
-    menus.value.find((item) => item.path === activeFirstMenu.value),
+    toValue(menus).find((item) => item.path === activeFirstMenu.value),
   );
 
   const currentSecondMenus = computed(
@@ -122,7 +123,7 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
   const handleFirstMenuClick = (item: MenuOptions) => {
     if (item.disabled) return;
     if (toValue(floatingSecondMenu)) {
-      // MixLayout: 纯点击模式
+      // C_MixLayout: 纯点击模式
       if (item.children && item.children.length > 0) {
         if (showSecondMenu.value && activeFirstMenu.value === item.path) {
           // 点击同一个已展开的菜单 → 关闭
@@ -136,24 +137,24 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
         // 没有子菜单 → 关闭二级面板并跳转
         activeFirstMenu.value = item.path || "";
         showSecondMenu.value = false;
-        if (item.path) router.push(item.path);
+        if (item.path) void router.push(item.path);
       }
     } else {
       // MixTop / Reverse: 直接切换
       if (!item.children || item.children.length === 0) {
-        if (item.path) router.push(item.path);
+        if (item.path) void router.push(item.path);
       }
     }
   };
 
   const handleSecondMenuClick = (item: MenuOptions) => {
-    if (!item.disabled && item.path) router.push(item.path);
+    if (!item.disabled && item.path) void router.push(item.path);
   };
 
   // ============ 路由自动匹配 ============
 
   const updateActiveMenuByRoute = () => {
-    const menuList = menus.value;
+    const menuList = toValue(menus);
     const matchedFirstMenu = findActiveTopMenu(menuList);
     if (matchedFirstMenu) {
       activeFirstMenu.value = matchedFirstMenu.path || "";
@@ -167,20 +168,10 @@ export function useMenuSplit(options: UseMenuSplitOptions): UseMenuSplitReturn {
   };
 
   watch(
-    () => route.path,
+    [() => route.path, () => toValue(menus)],
     () => updateActiveMenuByRoute(),
     { immediate: true },
   );
-
-  watch(
-    menus,
-    (newMenus) => {
-      if (newMenus && newMenus.length > 0) updateActiveMenuByRoute();
-    },
-    { immediate: true },
-  );
-
-  onMounted(() => updateActiveMenuByRoute());
 
   return {
     activeFirstMenu,

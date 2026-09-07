@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/layout",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Composable Vue layout and settings system for Robot Admin",
   "type": "module",
   "keywords": [
@@ -49,8 +49,29 @@
         "default": "./dist/core/index.cjs"
       }
     },
+    "./vue": {
+      "import": {
+        "types": "./dist/vue/index.d.ts",
+        "default": "./dist/vue/index.js"
+      },
+      "require": {
+        "types": "./dist/vue/index.d.cts",
+        "default": "./dist/vue/index.cjs"
+      }
+    },
+    "./naive": {
+      "import": {
+        "types": "./dist/naive/index.d.ts",
+        "default": "./dist/naive/index.js"
+      },
+      "require": {
+        "types": "./dist/naive/index.d.cts",
+        "default": "./dist/naive/index.cjs"
+      }
+    },
     "./style": "./dist/index.css",
     "./css": "./dist/index.css",
+    "./naive/style": "./dist/index.css",
     "./style.scss": "./src/styles/settings.scss",
     "./layouts.scss": "./src/styles/layouts.scss"
   },
@@ -67,7 +88,7 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vue-tsc --noEmit && vite build && tsup --config tsup.core.config.ts && node scripts/finalize-build.mjs",
+    "build": "vue-tsc --noEmit && vite build && tsup --config tsup.core.config.ts && tsup --config tsup.vue.config.ts && node scripts/finalize-build.mjs",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
     "type-check": "vue-tsc --noEmit",
@@ -80,6 +101,11 @@
     "vue-router": "^4.0.0",
     "pinia": "^2.0.0 || ^3.0.0",
     "naive-ui": "^2.38.0"
+  },
+  "peerDependenciesMeta": {
+    "naive-ui": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.13.9",

@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/layout.svg)](https://www.npmjs.com/package/@robot-admin/layout)
 [![license](https://img.shields.io/npm/l/@robot-admin/layout.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
 
-当前版本：`3.1.0`。
+当前版本：`3.2.0`。
 
 ---
 
@@ -18,7 +18,8 @@
 - 🧭 **菜单展开方式** - 内置传统展开 / 右侧面板两种菜单展开模式配置
 - 🔌 **插槽系统** - 灵活的 slot 机制，主项目仅关注业务组件
 - 🪄 **精简适配** - `provideLayout()` 从最小宿主输入自动创建完整响应式上下文
-- 🎨 **CSS 变量同步** - 配置变更自动同步到 CSS 变量，样式实时响应
+- 🧱 **分层入口** - `core` / `vue` / `naive` 按依赖边界独立消费
+- 🎨 **作用域样式** - 支持带命名空间的 CSS 变量、指定挂载目标与精确清理
 - ♿ **键盘与焦点可访问性** - 抽屉/菜单支持 Escape、方向键、焦点恢复与语义属性
 - 🛡️ **安全设置导入** - 对枚举、布尔值、数值范围与主题色进行运行时校验
 - 🚀 **TypeScript** - 完整类型支持
@@ -28,33 +29,21 @@
 ## 🏗️ 架构设计
 
 ```
-┌──────────────────────────────────────┐
-│  主项目 (Robot_Admin)                 │
-│  ├─ useLayoutBridge() 适配器          │
-│  └─ 提供业务插槽 (Header/Menu/Tags)   │
-└──────────────┬───────────────────────┘
-               │ LayoutContext (provide/inject)
-               ▼
-┌──────────────────────────────────────┐
-│  @robot-admin/layout（Vue + Naive UI）│
-│  ├─ C_LayoutContainer (智能容器)      │
-│  │   └─ 根据 layoutMode 自动调度      │
-│  ├─ layouts/ (6 种布局骨架)           │
-│  │   ├─ SideLayout                    │
-│  │   ├─ TopLayout                     │
-│  │   ├─ MixLayout                     │
-│  │   ├─ MixTopLayout                  │
-│  │   ├─ ReverseHorizontalMixLayout    │
-│  │   └─ CardLayout                    │
-│  └─ SettingsDrawer (设置 UI)          │
-└──────────────────────────────────────┘
+@robot-admin/layout/core
+  └─ 设置协议、校验、常量、纯函数（无运行时依赖）
 
-┌──────────────────────────────────────┐
-│  @robot-admin/layout/core             │
-│  设置协议、运行时校验、常量和纯函数    │
-│  不依赖 Vue / Pinia / UI 框架          │
-└──────────────────────────────────────┘
+@robot-admin/layout/vue
+  └─ Context、Store、Router、Headless Controller（不依赖 UI 组件库）
+
+@robot-admin/layout/naive
+  └─ 聚合 vue 层 + 现有 6 种布局、响应式菜单、SettingsDrawer（Naive UI 呈现）
+
+@robot-admin/layout
+  └─ 3.x 兼容入口，继续聚合 vue + naive，不改变历史用法
 ```
+
+未来 Element Plus 适配只复用 `core` 与 `vue` 层并新增呈现入口，不复制设置事务、菜单测量、
+缓存或六套布局状态逻辑。
 
 ---
 
@@ -63,6 +52,8 @@
 ```
 src/
 ├── index.ts                           # 主入口（统一导出）
+├── vue/index.ts                       # Vue Headless 入口（无 UI 库）
+├── naive/index.ts                     # Naive UI 呈现入口
 ├── setup.ts                           # 一键初始化 setupLayout()
 ├── core/                              # 无框架设置协议、校验与纯函数
 │   ├── index.ts
@@ -72,22 +63,22 @@ src/
 │   ├── C_LayoutContainer/             # 智能布局容器（主入口组件）
 │   │   └── index.vue
 │   ├── layouts/                       # 📐 6 种布局骨架
-│   │   ├── SideLayout/                #   左侧菜单布局
+│   │   ├── SideLayout/                #   C_SideLayout 左侧菜单布局
 │   │   │   ├── index.vue
 │   │   │   └── index.scss
-│   │   ├── TopLayout/                 #   顶部菜单布局
+│   │   ├── TopLayout/                 #   C_TopLayout 顶部菜单布局
 │   │   │   ├── index.vue
 │   │   │   └── index.scss
-│   │   ├── MixLayout/                 #   左侧混合布局
+│   │   ├── MixLayout/                 #   C_MixLayout 左侧混合布局
 │   │   │   ├── index.vue
 │   │   │   └── index.scss
-│   │   ├── MixTopLayout/              #   顶部混合布局
+│   │   ├── MixTopLayout/              #   C_MixTopLayout 顶部混合布局
 │   │   │   ├── index.vue
 │   │   │   └── index.scss
-│   │   ├── ReverseHorizontalMixLayout/ #  反转混合布局
+│   │   ├── ReverseHorizontalMixLayout/ #  C_ReverseHorizontalMixLayout
 │   │   │   ├── index.vue
 │   │   │   └── index.scss
-│   │   └── CardLayout/                #   卡片布局
+│   │   └── CardLayout/                #   C_CardLayout 卡片布局
 │   │       ├── index.vue
 │   │       └── index.scss
 │   ├── SettingsDrawer/                # ⚙️ 设置抽屉
@@ -103,8 +94,12 @@ src/
 ├── composables/
 │   ├── useLayoutContext.ts            # LayoutContext provide/inject
 │   ├── createLayoutContext.ts         # 最小宿主输入适配助手
+│   ├── useLayoutCssVariables.ts       # 作用域 CSS 变量绑定
+│   ├── useResponsiveMenu.ts           # UI 无关的菜单测量
+│   ├── useSettingsController.ts       # UI 无关的设置事务与副作用
 │   ├── useLayoutCache.ts              # 页面缓存管理
 │   └── useMenuSplit.ts                # 菜单拆分（一级/二级分离）
+├── utils/menu.ts                      # 宿主菜单标准化
 ├── stores/
 │   └── settings.ts                    # 布局设置 Pinia Store
 ├── styles/
@@ -125,10 +120,20 @@ src/
 bun add @robot-admin/layout naive-ui
 ```
 
-**Peer Dependencies**: `vue ^3.4` · `vue-router ^4.0` · `pinia ^2.0 || ^3.0` · `naive-ui ^2.38`
+**Peer Dependencies**: `vue ^3.4` · `vue-router ^4.0` · `pinia ^2.0 || ^3.0`。
+`naive-ui ^2.38` 仅在使用根入口或 `/naive` 时需要，并已声明为 optional peer。
 
-> 3.0 仍完整保留现有 Naive UI 组件、交互和样式。状态校验等无 UI 能力可从
-> `@robot-admin/layout/core` 独立导入，为后续适配其他 UI 框架预留稳定边界；当前版本不包含 Element Plus 视图适配器。
+> `@robot-admin/layout/vue` 不导入 Naive UI 或 Element Plus。当前版本建立了双 UI 适配边界，
+> 但尚未发布 Element Plus 呈现组件，避免在没有真实项目验证时制造第二套未使用 UI。
+
+### 入口选择
+
+| 使用场景                     | 唯一推荐入口                  | 说明                                  |
+| ---------------------------- | ----------------------------- | ------------------------------------- |
+| 新建或升级 Naive UI 项目     | `@robot-admin/layout/naive`   | 聚合组件、Store、Context 和工具       |
+| Element Plus 项目复用布局逻辑 | `@robot-admin/layout/vue`     | 无 UI 库依赖，视图暂由宿主实现        |
+| Node/服务端只处理设置协议    | `@robot-admin/layout/core`    | 无 Vue、Pinia、Router 和 UI 运行时    |
+| 现有 3.x 项目                | `@robot-admin/layout`         | 兼容入口，可继续使用，不要求立即迁移  |
 
 ---
 
@@ -140,8 +145,8 @@ bun add @robot-admin/layout naive-ui
 // main.ts
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import { setupLayout } from "@robot-admin/layout";
-import "@robot-admin/layout/style"; // 导入样式
+import { setupLayout } from "@robot-admin/layout/naive";
+import "@robot-admin/layout/naive/style"; // Naive UI 布局样式
 import App from "./App.vue";
 
 const app = createApp(App);
@@ -180,7 +185,7 @@ import {
   provideLayout,
   useSettingsStore,
   type MenuOptions,
-} from "@robot-admin/layout";
+} from "@robot-admin/layout/naive";
 
 const props = defineProps<{
   menus: MenuOptions[];
@@ -205,7 +210,7 @@ provideLayout({
 <script setup lang="ts">
 import { ref } from "vue";
 import { NDialogProvider, NMessageProvider } from "naive-ui";
-import { SettingsDrawer } from "@robot-admin/layout";
+import { SettingsDrawer } from "@robot-admin/layout/naive";
 
 const visible = ref(false);
 const settingsActions = {
@@ -268,7 +273,7 @@ const settingsActions = {
 ### `useSettingsStore()`
 
 ```typescript
-import { useSettingsStore } from "@robot-admin/layout";
+import { useSettingsStore } from "@robot-admin/layout/vue";
 
 const settings = useSettingsStore();
 
@@ -288,45 +293,65 @@ settings.resetSettings();
 
 ### 设置属性一览
 
-| 属性                    | 默认值      | 作用方      | 说明                         |
-| ----------------------- | ----------- | ----------- | ---------------------------- |
-| `themeMode`             | `'light'`   | 宿主回调    | 标准主题模式                 |
-| `primaryColor`          | `'#409eff'` | 包内        | 主题色与派生 CSS 变量        |
-| `borderRadius`          | `'medium'`  | 包内        | 圆角 CSS 变量                |
-| `transitionType`        | `'slide'`   | 包内        | 页面动画类型                 |
-| `enableTransition`      | `true`      | 包内        | 是否启用页面动画             |
-| `layoutMode`            | `'side'`    | 包内        | 当前布局模式                 |
-| `menuExpandMode`        | `'inline'`  | 宿主菜单    | 菜单展开方式                 |
-| `collapsed`             | `false`     | 包内/宿主   | 共享侧栏折叠状态             |
-| `fixedHeader`           | `true`      | 宿主头部    | 固定头部策略                 |
-| `showBreadcrumb`        | `true`      | 宿主头部    | 显示面包屑                   |
-| `showBreadcrumbIcon`    | `true`      | 宿主头部    | 显示面包屑图标               |
-| `showTagsView`          | `true`      | 包内        | 显示标签页                   |
-| `tagsViewHeight`        | `44`        | 包内        | 标签页高度 (px)              |
-| `tagsViewStyle`         | `'default'` | 宿主标签页  | 标签页风格                   |
-| `showFooter`            | `true`      | 包内        | 显示页脚                     |
-| `sidebarWidth`          | `220`       | 包内        | 侧边栏宽度 (px)              |
-| `sidebarCollapsedWidth` | `64`        | 包内        | 折叠宽度 (px)                |
-| `headerHeight`          | `56`        | 包内/宿主   | 头部高度 (px)                |
-| `enableHotkeys`         | `true`      | 宿主扩展    | 是否启用宿主快捷键           |
-| `version`               | `'3.1.0'`   | 配置元数据  | 当前默认配置来源版本         |
+| 属性                    | 默认值      | 作用方     | 说明                                 |
+| ----------------------- | ----------- | ---------- | ------------------------------------ |
+| `themeMode`             | `'light'`   | 宿主回调   | 标准主题模式                         |
+| `primaryColor`          | `'#409eff'` | 包内       | 主题色与派生 CSS 变量                |
+| `borderRadius`          | `'medium'`  | 包内       | 圆角 CSS 变量                        |
+| `transitionType`        | `'slide'`   | 包内       | 页面动画类型                         |
+| `enableTransition`      | `true`      | 包内       | 是否启用页面动画                     |
+| `layoutMode`            | `'side'`    | 包内       | 当前布局模式                         |
+| `menuExpandMode`        | `'inline'`  | 宿主菜单   | 菜单展开方式                         |
+| `collapsed`             | `false`     | 包内/宿主  | 共享侧栏折叠状态                     |
+| `fixedHeader`           | `true`      | 宿主头部   | 固定头部策略                         |
+| `showBreadcrumb`        | `true`      | 宿主头部   | 显示面包屑                           |
+| `showBreadcrumbIcon`    | `true`      | 宿主头部   | 显示面包屑图标                       |
+| `showTagsView`          | `true`      | 包内       | 显示标签页                           |
+| `tagsViewHeight`        | `44`        | 包内       | 标签页高度 (px)                      |
+| `tagsViewStyle`         | `'default'` | 宿主标签页 | 标签页风格                           |
+| `showFooter`            | `true`      | 包内       | 显示页脚                             |
+| `sidebarWidth`          | `220`       | 包内       | 侧边栏宽度 (px)                      |
+| `sidebarCollapsedWidth` | `64`        | 包内       | 折叠宽度 (px)                        |
+| `headerHeight`          | `56`        | 包内/宿主  | 头部高度 (px)                        |
+| `enableHotkeys`         | `true`      | 宿主扩展   | 是否启用宿主快捷键                   |
+| `version`               | `'3.2.0'`   | 兼容字段   | 已废弃；配置迁移请使用 schemaVersion |
 
 “宿主”字段由 Store 和导入导出协议统一维护，但布局包不会越权修改宿主业务组件；这种边界
 避免重复实现面包屑、快捷键和标签页等业务能力。
 
 ### CSS 变量
 
-配置变更自动同步到以下 CSS 变量：
+默认 Store 同时维护带命名空间的新变量与 3.x 兼容变量：
 
 ```css
---primary-color: #409eff;
---primary-color-hover: #66b1ff;
---primary-color-pressed: #3a8ee6;
---sidebar-width: 220px;
---sidebar-collapsed-width: 64px;
---header-height: 56px;
---tags-view-height: 40px;
---border-radius: 6px;
+--ra-layout-primary-color: #409eff;
+--ra-layout-primary-color-hover: #4aa8ff;
+--ra-layout-primary-color-pressed: #368af5;
+--ra-layout-sidebar-width: 220px;
+--ra-layout-sidebar-collapsed-width: 64px;
+--ra-layout-header-height: 56px;
+--ra-layout-tags-view-height: 44px;
+--ra-layout-border-radius: 6px;
+```
+
+微前端或嵌入式页面可以关闭默认根节点同步，并绑定到自己的容器；`dispose()` 会恢复目标原值：
+
+```typescript
+import {
+  bindLayoutCssVariables,
+  createSettingsStore,
+} from "@robot-admin/layout/vue";
+
+const settings = createSettingsStore({
+  id: "workspace-settings",
+  syncCssVariables: false,
+})();
+const cssBinding = bindLayoutCssVariables(settings, {
+  target: document.querySelector("#workspace"),
+});
+
+// 微前端卸载时
+cssBinding.dispose();
 ```
 
 ---
@@ -368,6 +393,7 @@ interface SettingsStoreOptions {
   id?: string;
   defaults?: Partial<SettingsState>;
   onThemeModeChange?: (mode: ThemeMode) => void | Promise<void>;
+  syncCssVariables?: boolean;
 }
 ```
 
@@ -378,7 +404,7 @@ interface SettingsStoreOptions {
 ### 自定义 Settings Store
 
 ```typescript
-import { createSettingsStore } from "@robot-admin/layout";
+import { createSettingsStore } from "@robot-admin/layout/vue";
 
 export const useSettingsStore = createSettingsStore({
   // 多实例或微前端中必须保证唯一；单实例可省略
@@ -397,7 +423,7 @@ export const useSettingsStore = createSettingsStore({
 
 ```typescript
 import { sanitizeLayoutSettingsConfig } from "@robot-admin/layout/core";
-import { useSettingsStore } from "@robot-admin/layout";
+import { useSettingsStore } from "@robot-admin/layout/vue";
 
 const imported = JSON.parse(await file.text());
 // 一次校验完整文件，失败时不会产生部分状态写入。
@@ -418,13 +444,31 @@ settings.$patch(safePatch);
 `useLayoutCache()` 默认不会输出开发日志，也不会向 `window` 暴露调试函数；仅在
 受控的本地开发场景显式设置 `enableDevLog` / `exposeToWindow`。
 
+### `C_*Layout` 命名约定
+
+`C_LayoutContainer`、`C_SideLayout`、`C_TopLayout` 等是唯一推荐、持续维护的公开组件名称，
+与 Robot_Admin 的全局公共组件规范一致。无前缀名称不再作为第二套用法出现在示例中；它们只为
+已发布的 3.1 消费方保留为带 `@deprecated` 标记的 3.x 兼容出口，并指向同一个组件对象，
+不会产生第二份实现。新代码统一使用 `C_*`，4.0 再删除无前缀兼容名称。
+
+### 3.2 升级说明
+
+- 新增 `/vue` 与 `/naive` 独立入口；`/naive` 聚合 Vue Headless 能力，Naive 项目只需一个
+  脚本入口，3.x 根入口继续完全兼容。
+- `createLayoutContext()` 改为依赖结构化 `LayoutSettingsSource`，可接入包内 Pinia Store、
+  宿主 Store 或其他 Vue 响应式状态。
+- 新增 `useSettingsController()`、`useResponsiveMenu()`、`normalizeLayoutMenus()` 和
+  `bindLayoutCssVariables()`，供其他 UI 适配器复用。
+- SettingsDrawer 已复用 Headless controller，自定义 Store 的局部重置会恢复该实例自己的默认值。
+- 布局样式、动画名和新 CSS 变量使用 `ra-layout` 边界；旧 CSS 变量在 3.x 继续同步。
+- `C_SideLayout` 等 `C_*Layout` 重新确立为唯一正式组件名称；无前缀名称仅作为带
+  `@deprecated` 标记的 3.x 兼容出口，4.0 移除。
+
 ### 3.1 升级说明
 
 - 新增 `createLayoutContext()` 与 `provideLayout()`，用于精简普通项目的上下文桥接代码。
 - 原有 `LayoutContext`、`provideLayoutContext()` 和所有组件/插槽继续兼容。
-- `C_SideLayout` 等旧别名已正式标记为废弃，3.x 仍保留，计划在 4.0 移除；请改用
-  `SideLayout`、`TopLayout`、`MixLayout`、`MixTopLayout`、
-  `ReverseHorizontalMixLayout`、`CardLayout`。
+- 3.1 曾建议从 `C_*Layout` 迁移到无前缀名称；3.2 已根据项目统一命名规范纠正该策略。
 
 ### 3.0 升级说明
 
@@ -435,13 +479,18 @@ settings.$patch(safePatch);
 - 缓存清理改为宿主白名单动作；从 2.x 升级时请传入 `actions.clearCache`。
 - `@robot-admin/theme` 不再是 peer dependency；需要主题联动时使用 `onThemeModeChange`。
 
-多 Store 实例可以拥有独立状态，但默认 CSS 变量和设置抽屉的灰度、色弱、水印属于页面级
-视觉效果；同一页面应由一个布局宿主统一管理，避免多个应用同时争用 `document` 根节点。
+多 Store 实例可以拥有独立状态。CSS 变量可通过 `bindLayoutCssVariables()` 隔离到宿主容器；
+设置抽屉也已支持由 adapter controller 指定视觉根节点和水印容器。默认值仍保持页面级行为，
+保证 3.x 现有项目无迁移成本。
 
 ### 单独使用布局骨架
 
 ```typescript
-import { SideLayout, TopLayout, MixLayout } from "@robot-admin/layout";
+import {
+  C_SideLayout,
+  C_TopLayout,
+  C_MixLayout,
+} from "@robot-admin/layout/naive";
 ```
 
 > ⚠️ 直接使用骨架组件需自行提供 `LayoutContext`（通过 `provide`），推荐使用 `C_LayoutContainer`
@@ -450,7 +499,7 @@ import { SideLayout, TopLayout, MixLayout } from "@robot-admin/layout";
 
 ```typescript
 // 方式 1：编译后 CSS（推荐）
-import "@robot-admin/layout/style";
+import "@robot-admin/layout/naive/style";
 
 // 方式 2：SCSS 源文件（可定制）
 import "@robot-admin/layout/style.scss";

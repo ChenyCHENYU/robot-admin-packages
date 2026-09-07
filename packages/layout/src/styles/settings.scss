@@ -50,13 +50,17 @@
   overflow: hidden;
 
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--n-color-target), var(--n-color-target));
+    background: linear-gradient(
+      90deg,
+      var(--n-color-target),
+      var(--n-color-target)
+    );
     opacity: 0;
     transition: opacity 0.3s ease;
     border-radius: 3px 3px 0 0;
@@ -65,7 +69,11 @@
   &:hover {
     border-color: var(--n-color-target);
     transform: translateY(-4px);
-    box-shadow: 0 8px 16px var(--primary-color-shadow, rgba(32, 128, 240, 0.12));
+    box-shadow: 0 8px 16px
+      var(
+        --ra-layout-primary-color-shadow,
+        var(--primary-color-shadow, rgba(32, 128, 240, 0.12))
+      );
 
     &::before {
       opacity: 1;
@@ -83,7 +91,11 @@
   &.active {
     border-color: var(--n-color-target);
     background: var(--n-color-target-light);
-    box-shadow: 0 8px 20px var(--primary-color-shadow, rgba(32, 128, 240, 0.2));
+    box-shadow: 0 8px 20px
+      var(
+        --ra-layout-primary-color-shadow,
+        var(--primary-color-shadow, rgba(32, 128, 240, 0.2))
+      );
 
     &::before {
       opacity: 1;
@@ -154,7 +166,7 @@
 .color-value {
   width: 80px;
   font-size: 13px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   color: var(--n-text-color-2);
 }
 
@@ -191,13 +203,17 @@
   overflow: hidden;
 
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--n-color-target), var(--n-color-target));
+    background: linear-gradient(
+      90deg,
+      var(--n-color-target),
+      var(--n-color-target)
+    );
     opacity: 0;
     transition: opacity 0.3s ease;
     border-radius: 3px 3px 0 0;
@@ -205,7 +221,11 @@
 
   &:hover:not(.disabled) {
     border-color: var(--n-color-target);
-    box-shadow: 0 8px 16px var(--primary-color-shadow, rgba(32, 128, 240, 0.12));
+    box-shadow: 0 8px 16px
+      var(
+        --ra-layout-primary-color-shadow,
+        var(--primary-color-shadow, rgba(32, 128, 240, 0.12))
+      );
     transform: translateY(-4px);
 
     &::before {
@@ -225,19 +245,29 @@
   &.active {
     border-color: var(--n-color-target);
     background: var(--n-color-target-light);
-    box-shadow: 0 8px 20px var(--primary-color-shadow, rgba(32, 128, 240, 0.2));
+    box-shadow: 0 8px 20px
+      var(
+        --ra-layout-primary-color-shadow,
+        var(--primary-color-shadow, rgba(32, 128, 240, 0.2))
+      );
 
     &::before {
       opacity: 1;
     }
-    
+
     // 选中状态：图标和文字都变主题色
     .layout-svg {
-      color: var(--primary-color, #409eff) !important;
+      color: var(
+        --ra-layout-primary-color,
+        var(--primary-color, #409eff)
+      ) !important;
     }
-    
+
     .layout-label {
-      color: var(--primary-color, #409eff) !important;
+      color: var(
+        --ra-layout-primary-color,
+        var(--primary-color, #409eff)
+      ) !important;
       font-weight: 600;
     }
   }
@@ -274,7 +304,7 @@
 .layout-svg {
   width: 64px;
   height: 48px;
-  color: #999;  // 默认：灰色
+  color: #999; // 默认：灰色
   transition: all 0.3s ease;
 }
 
@@ -387,5 +417,5 @@
   font-size: 13px;
   color: var(--n-text-color);
   font-weight: 600;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: "Consolas", "Monaco", monospace;
 }

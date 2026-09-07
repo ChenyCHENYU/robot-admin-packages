@@ -54,6 +54,15 @@ export interface LayoutSettingsConfig extends LayoutVisualEffects {
   settings?: Partial<SettingsState>;
 }
 
+/** 校验需要跨字段判断的布局尺寸约束。 */
+export function assertLayoutSettingsRelationships(
+  settings: Pick<SettingsState, "sidebarCollapsedWidth" | "sidebarWidth">,
+): void {
+  if (settings.sidebarCollapsedWidth > settings.sidebarWidth) {
+    throw new RangeError("sidebarCollapsedWidth 不能大于 sidebarWidth");
+  }
+}
+
 /**
  * 校验来自配置文件等不可信来源的设置。
  * 未知键为向前兼容而忽略；已知键的非法值会让整次导入失败。

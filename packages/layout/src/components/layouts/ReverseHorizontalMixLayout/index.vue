@@ -1,5 +1,5 @@
 <!--
- * @robot-admin/layout - ReverseHorizontalMixLayout
+ * @robot-admin/layout - C_ReverseHorizontalMixLayout
  *
  * 反转混合布局骨架
  * 顶部一级菜单 + 右侧二级菜单侧边栏 + 左侧内容区
@@ -79,13 +79,7 @@
       <NLayout class="content-layout">
         <NLayoutContent class="main-content">
           <div class="page-content">
-            <RouterView v-slot="{ Component, route }">
-              <Transition :name="transitionName" mode="out-in">
-                <KeepAlive :include="cachedViews" :max="maxCacheCount">
-                  <component :is="Component" :key="route.path" />
-                </KeepAlive>
-              </Transition>
-            </RouterView>
+            <LayoutRouterView />
           </div>
         </NLayoutContent>
 
@@ -234,27 +228,26 @@
 
 <script setup lang="ts">
 import "./index.scss";
-import { ref, computed, h, defineComponent } from "vue";
+import { ref, computed } from "vue";
 import { NLayout, NLayoutContent } from "naive-ui";
 import {
   useLayoutContext,
   DEFAULT_BRAND_CONFIG,
 } from "../../../composables/useLayoutContext";
-import { useLayoutCache } from "../../../composables/useLayoutCache";
 import { useMenuSplit } from "../../../composables/useMenuSplit";
 import ResponsiveMenu from "../../ResponsiveMenu/index.vue";
+import LayoutRouterView from "../../LayoutRouterView/index.vue";
+import { useLayoutIcon } from "../../../composables/useLayoutIcon";
 
-defineOptions({ name: "ReverseHorizontalMixLayout" });
+defineOptions({ name: "C_ReverseHorizontalMixLayout" });
 
 const ctx = useLayoutContext();
-const { cachedViews, maxCacheCount } = useLayoutCache();
 
 const isDarkMode = ctx.isDark;
 const menus = computed(() => ctx.menus.value);
 const showTagsView = computed(() => ctx.showTagsView.value);
 const tagsViewHeight = computed(() => ctx.tagsViewHeight.value);
 const showFooter = computed(() => ctx.showFooter.value);
-const transitionName = computed(() => ctx.transitionName.value);
 const brand = { ...DEFAULT_BRAND_CONFIG, ...ctx.brand };
 
 const menuSplit = useMenuSplit({
@@ -268,22 +261,5 @@ const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
 };
 
-const LayoutIcon =
-  ctx.iconComponent ??
-  defineComponent({
-    name: "LayoutIcon",
-    props: { name: String, size: { type: Number, default: 18 } },
-    setup(props) {
-      return () =>
-        h("i", {
-          class: props.name,
-          style: {
-            fontSize: `${props.size}px`,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          },
-        });
-    },
-  });
+const LayoutIcon = useLayoutIcon();
 </script>

@@ -1,5 +1,6 @@
 export {
   adjustColor,
+  assertLayoutSettingsRelationships,
   sanitizeLayoutSettingsConfig,
   sanitizeSettingsPatch,
   SETTINGS_CONFIG_SCHEMA_VERSION,

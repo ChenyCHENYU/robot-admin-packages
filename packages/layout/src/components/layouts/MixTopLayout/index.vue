@@ -1,5 +1,5 @@
 <!--
- * @robot-admin/layout - MixTopLayout
+ * @robot-admin/layout - C_MixTopLayout
  *
  * 顶部混合布局骨架
  * 左侧一级菜单 + 顶部二级水平菜单 + 内容区
@@ -127,13 +127,7 @@
       <NLayout class="content-layout">
         <NLayoutContent class="main-content">
           <div class="page-content">
-            <RouterView v-slot="{ Component, route }">
-              <Transition :name="transitionName" mode="out-in">
-                <KeepAlive :include="cachedViews" :max="maxCacheCount">
-                  <component :is="Component" :key="route.path" />
-                </KeepAlive>
-              </Transition>
-            </RouterView>
+            <LayoutRouterView />
           </div>
         </NLayoutContent>
 
@@ -147,27 +141,26 @@
 
 <script setup lang="ts">
 import "./index.scss";
-import { computed, h, defineComponent } from "vue";
+import { computed } from "vue";
 import { NLayout, NLayoutContent } from "naive-ui";
 import {
   useLayoutContext,
   DEFAULT_BRAND_CONFIG,
 } from "../../../composables/useLayoutContext";
-import { useLayoutCache } from "../../../composables/useLayoutCache";
 import { useMenuSplit } from "../../../composables/useMenuSplit";
 import ResponsiveMenu from "../../ResponsiveMenu/index.vue";
+import LayoutRouterView from "../../LayoutRouterView/index.vue";
+import { useLayoutIcon } from "../../../composables/useLayoutIcon";
 
-defineOptions({ name: "MixTopLayout" });
+defineOptions({ name: "C_MixTopLayout" });
 
 const ctx = useLayoutContext();
-const { cachedViews, maxCacheCount } = useLayoutCache();
 
 const isDarkMode = ctx.isDark;
 const menus = computed(() => ctx.menus.value);
 const showTagsView = computed(() => ctx.showTagsView.value);
 const tagsViewHeight = computed(() => ctx.tagsViewHeight.value);
 const showFooter = computed(() => ctx.showFooter.value);
-const transitionName = computed(() => ctx.transitionName.value);
 const brand = { ...DEFAULT_BRAND_CONFIG, ...ctx.brand };
 
 const menuSplit = useMenuSplit({
@@ -175,22 +168,5 @@ const menuSplit = useMenuSplit({
   floatingSecondMenu: computed(() => false),
 });
 
-const LayoutIcon =
-  ctx.iconComponent ??
-  defineComponent({
-    name: "LayoutIcon",
-    props: { name: String, size: { type: Number, default: 18 } },
-    setup(props) {
-      return () =>
-        h("i", {
-          class: props.name,
-          style: {
-            fontSize: `${props.size}px`,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          },
-        });
-    },
-  });
+const LayoutIcon = useLayoutIcon();
 </script>

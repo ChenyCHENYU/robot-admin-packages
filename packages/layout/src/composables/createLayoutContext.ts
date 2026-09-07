@@ -1,11 +1,6 @@
-import {
-  computed,
-  toValue,
-  type Component,
-  type MaybeRefOrGetter,
-} from "vue";
+import { computed, toValue, type Component, type MaybeRefOrGetter } from "vue";
 import type { MenuOptions } from "../types/menu";
-import type { SettingsStoreInstance } from "../stores/settings";
+import type { LayoutMode, MenuExpandMode } from "../core/types";
 import {
   DEFAULT_BRAND_CONFIG,
   provideLayoutContext,
@@ -13,10 +8,32 @@ import {
   type LayoutContext,
 } from "./useLayoutContext";
 
+/**
+ * 布局桥接所需的最小设置协议。
+ *
+ * 默认 Pinia Store 天然满足该协议，宿主也可以传入其他响应式 Store，
+ * 避免上下文助手与具体状态管理实现强绑定。
+ */
+export interface LayoutSettingsSource {
+  layoutMode: LayoutMode;
+  collapsed: boolean;
+  menuExpandMode: MenuExpandMode;
+  sidebarWidth: number;
+  sidebarCollapsedWidth: number;
+  showFooter: boolean;
+  showTagsView: boolean;
+  tagsViewHeight: number;
+  headerHeight: number;
+  transitionName: string;
+  showBreadcrumb: boolean;
+  showBreadcrumbIcon: boolean;
+  fixedHeader: boolean;
+}
+
 /** 创建标准布局上下文所需的最小宿主适配。 */
 export interface CreateLayoutContextOptions {
   /** 布局设置 Store，可使用默认 Store 或 createSettingsStore() 创建的实例。 */
-  settings: SettingsStoreInstance;
+  settings: LayoutSettingsSource;
   /** 宿主菜单；支持普通值、Ref、ComputedRef 或 getter。 */
   menus: MaybeRefOrGetter<MenuOptions[]>;
   /** 宿主暗色状态；支持普通值、Ref、ComputedRef 或 getter。 */

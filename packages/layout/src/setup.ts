@@ -14,7 +14,7 @@ import { LAYOUT_SETTINGS_KEY } from "./composables/useLayoutContext";
  *
  * @example
  * ```ts
- * import { setupLayout } from '@robot-admin/layout'
+ * import { setupLayout } from '@robot-admin/layout/vue'
  * setupLayout(app, {
  *   onThemeModeChange: async (mode) => {
  *     const themeStore = useThemeStore()

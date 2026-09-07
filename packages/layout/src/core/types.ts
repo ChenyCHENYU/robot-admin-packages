@@ -38,6 +38,7 @@ export interface SettingsState {
   sidebarCollapsedWidth: number;
   headerHeight: number;
   enableHotkeys: boolean;
+  /** @deprecated 包版本不应参与配置迁移，请使用 SETTINGS_CONFIG_SCHEMA_VERSION。 */
   version: string;
 }
 
@@ -57,6 +58,8 @@ export interface SettingsStoreOptions {
   id?: string;
   defaults?: Partial<SettingsState>;
   onThemeModeChange?: (mode: ThemeMode) => void | Promise<void>;
+  /** 是否自动同步 CSS 变量；默认 true，微前端可关闭后自行绑定作用域。 */
+  syncCssVariables?: boolean;
 }
 
 /** 由宿主应用实现的高副作用操作。 */

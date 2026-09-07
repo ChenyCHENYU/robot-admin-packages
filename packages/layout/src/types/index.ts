@@ -17,4 +17,4 @@ export type {
   TransitionType,
 } from "../core/types";
 
-export type { MenuOptions, MenuTag, MenuItemType } from "./menu";
+export type { MenuMeta, MenuOptions, MenuTag, MenuItemType } from "./menu";

@@ -15,12 +15,30 @@ import type { VNode } from "vue";
  */
 export type MenuItemType = "group" | "divider" | "item";
 
+/** 可由宿主通过交叉类型安全扩展的菜单元数据。 */
+export interface MenuMeta extends Record<string, unknown> {
+  /** 页面标题 */
+  title?: string;
+  /** 菜单项的图标 */
+  icon?: string;
+  /** 是否在菜单中隐藏 */
+  hidden?: boolean;
+  /** 是否固定在标签栏 */
+  affix?: boolean;
+  /** 是否缓存该页面 */
+  keepAlive?: boolean;
+  /** 是否全屏显示 */
+  full?: boolean;
+  /** 外部链接 URL */
+  link?: string;
+}
+
 /**
  * 菜单选项的详细类型定义
  */
-export interface MenuOptions {
+export interface MenuOptions<TMeta extends MenuMeta = MenuMeta> {
   /** 菜单项类型（分组/分割线） */
-  type?: "group" | "divider";
+  type?: MenuItemType;
   /** 唯一标识 */
   key?: string;
   /** 菜单跳转路径 */
@@ -38,26 +56,9 @@ export interface MenuOptions {
   /** 是否禁用此菜单项 */
   disabled?: boolean;
   /** 元数据 */
-  meta?: {
-    /** 页面标题 */
-    title?: string;
-    /** 菜单项的图标 */
-    icon?: string;
-    /** 是否在菜单中隐藏 */
-    hidden?: boolean;
-    /** 是否固定在标签栏 */
-    affix?: boolean;
-    /** 是否缓存该页面 */
-    keepAlive?: boolean;
-    /** 是否全屏显示 */
-    full?: boolean;
-    /** 外部链接 URL */
-    link?: string;
-    /** 扩展属性 */
-    [key: string]: any;
-  };
+  meta?: TMeta;
   /** 子菜单 */
-  children?: MenuOptions[];
+  children?: MenuOptions<TMeta>[];
 }
 
 /**

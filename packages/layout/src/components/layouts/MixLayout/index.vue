@@ -1,5 +1,5 @@
 <!--
- * @robot-admin/layout - MixLayout
+ * @robot-admin/layout - C_MixLayout
  *
  * 混合布局骨架
  * 左侧一级菜单图标栏 + 悬浮二级菜单弹出面板 + 右侧内容区
@@ -125,13 +125,7 @@
 
       <NLayout>
         <NLayoutContent class="content-with-header p16px app-content">
-          <RouterView v-slot="{ Component, route }">
-            <Transition :name="transitionName" mode="out-in">
-              <KeepAlive :include="cachedViews" :max="maxCacheCount">
-                <component :is="Component" :key="route.path" />
-              </KeepAlive>
-            </Transition>
-          </RouterView>
+          <LayoutRouterView />
         </NLayoutContent>
 
         <template v-if="showFooter">
@@ -144,24 +138,23 @@
 
 <script setup lang="ts">
 import "./index.scss";
-import { computed, h, defineComponent } from "vue";
+import { computed } from "vue";
 import { NLayout, NLayoutContent } from "naive-ui";
 import {
   useLayoutContext,
   DEFAULT_BRAND_CONFIG,
 } from "../../../composables/useLayoutContext";
-import { useLayoutCache } from "../../../composables/useLayoutCache";
 import { useMenuSplit } from "../../../composables/useMenuSplit";
+import LayoutRouterView from "../../LayoutRouterView/index.vue";
+import { useLayoutIcon } from "../../../composables/useLayoutIcon";
 
-defineOptions({ name: "MixLayout" });
+defineOptions({ name: "C_MixLayout" });
 
 const ctx = useLayoutContext();
-const { cachedViews, maxCacheCount } = useLayoutCache();
 
 const isDarkMode = ctx.isDark;
 const menus = computed(() => ctx.menus.value);
 const showFooter = computed(() => ctx.showFooter.value);
-const transitionName = computed(() => ctx.transitionName.value);
 const brand = { ...DEFAULT_BRAND_CONFIG, ...ctx.brand };
 
 const menuSplit = useMenuSplit({
@@ -170,22 +163,5 @@ const menuSplit = useMenuSplit({
 });
 
 // 图标组件：优先使用消费方提供的，否则用 CSS class 渲染
-const LayoutIcon =
-  ctx.iconComponent ??
-  defineComponent({
-    name: "LayoutIcon",
-    props: { name: String, size: { type: Number, default: 18 } },
-    setup(props) {
-      return () =>
-        h("i", {
-          class: props.name,
-          style: {
-            fontSize: `${props.size}px`,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          },
-        });
-    },
-  });
+const LayoutIcon = useLayoutIcon();
 </script>
