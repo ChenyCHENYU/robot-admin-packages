@@ -18,6 +18,7 @@ describe("theme store lifecycle", () => {
         setItem: vi.fn(() => {
           throw new DOMException("quota", "QuotaExceededError");
         }),
+        removeItem: vi.fn(),
       },
       matchMedia: vi.fn(() => ({
         matches: false,
@@ -61,5 +62,103 @@ describe("theme store lifecycle", () => {
     setActivePinia(createPinia());
     const store = createThemeStore({ id: "theme-validation-test" })();
     await expect(store.setMode("invalid" as never)).rejects.toThrow(RangeError);
+    await expect(store.setDesignStyle("invalid" as never)).rejects.toThrow(
+      RangeError,
+    );
+  });
+
+  it("cleans invalid persisted values and validates store namespaces", () => {
+    const removeItem = vi.fn();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn((key: string) =>
+          key === "invalid-mode" ? "sepia" : "legacy-style",
+        ),
+        setItem: vi.fn(),
+        removeItem,
+      },
+    });
+
+    setActivePinia(createPinia());
+    const store = createThemeStore({
+      id: "theme-invalid-storage-test",
+      storageKey: "invalid-mode",
+      designStyleStorageKey: "invalid-style",
+    })();
+
+    expect(store.mode).toBe("system");
+    expect(store.designStyle).toBe("glass-morphism");
+    expect(removeItem).toHaveBeenCalledWith("invalid-mode");
+    expect(removeItem).toHaveBeenCalledWith("invalid-style");
+    expect(() => createThemeStore({ id: " " })).toThrow(TypeError);
+    expect(() =>
+      createThemeStore({
+        storageKey: "same-key",
+        designStyleStorageKey: "same-key",
+      }),
+    ).toThrow(TypeError);
+  });
+
+  it("resolves system mode before init and applies compatible design styles", async () => {
+    const attributes = new Map<string, string>();
+    const setItem = vi.fn();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn(() => null),
+        setItem,
+        removeItem: vi.fn(),
+      },
+      matchMedia: vi.fn(() => ({ matches: true })),
+    });
+    vi.stubGlobal("document", {
+      documentElement: {
+        setAttribute: (name: string, value: string) =>
+          attributes.set(name, value),
+      },
+    });
+
+    setActivePinia(createPinia());
+    const store = createThemeStore({
+      id: "theme-system-before-init-test",
+      enableTransition: false,
+    })();
+
+    await store.setMode("system");
+    expect(store.isDark).toBe(true);
+    expect(attributes.get("data-theme")).toBe("dark");
+
+    await store.setMode("light");
+    await store.setDesignStyle("dark-tech");
+    expect(store.mode).toBe("dark");
+    expect(attributes.get("data-design-style")).toBe("dark-tech");
+    expect(setItem).toHaveBeenCalledWith("theme-mode", "dark");
+  });
+
+  it("supports legacy media listeners and removes them on destroy", () => {
+    const addListener = vi.fn();
+    const removeListener = vi.fn();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+      matchMedia: vi.fn(() => ({
+        matches: false,
+        addListener,
+        removeListener,
+      })),
+    });
+    vi.stubGlobal("document", {
+      documentElement: { setAttribute: vi.fn() },
+    });
+
+    setActivePinia(createPinia());
+    const store = createThemeStore({ id: "theme-legacy-listener-test" })();
+    store.init();
+    store.destroy();
+
+    expect(addListener).toHaveBeenCalledOnce();
+    expect(removeListener).toHaveBeenCalledOnce();
   });
 });

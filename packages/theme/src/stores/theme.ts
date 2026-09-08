@@ -1,20 +1,20 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import type { ThemeMode, DesignStyle, ThemeStoreOptions } from "../types";
+import type {
+  ThemeMode,
+  DesignStyle,
+  ResolvedThemeMode,
+  ThemeStoreOptions,
+} from "../types";
 import { DEFAULT_THEME_OPTIONS, DESIGN_STYLE_CONFIGS } from "../constants";
 import { useViewTransition } from "../composables/useViewTransition";
-
-/** 合法主题模式集合（用于校验 localStorage 中的脏值） */
-const VALID_THEME_MODES: ReadonlySet<ThemeMode> = new Set<ThemeMode>([
-  "light",
-  "dark",
-  "system",
-]);
-
-/** 合法设计风格集合 */
-const VALID_DESIGN_STYLES: ReadonlySet<DesignStyle> = new Set<DesignStyle>(
-  Object.keys(DESIGN_STYLE_CONFIGS) as DesignStyle[],
-);
+import {
+  DESIGN_STYLES,
+  THEME_MODES,
+  isDesignStyle,
+  isThemeMode,
+  resolveThemeMode,
+} from "../core/theme";
 
 /**
  * 安全读取 localStorage（兼容隐私模式 / 配额限制 / SSR）
@@ -40,6 +40,38 @@ function safeSetItem(key: string, value: string): void {
   }
 }
 
+/** 安全删除无效的历史存储值。 */
+function safeRemoveItem(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // 存储不可用时保持内存状态，不阻断主题初始化。
+  }
+}
+
+/** 校验 Store 字符串选项，避免空标识和存储键冲突。 */
+function assertNonEmptyOption(name: string, value: string): void {
+  if (value.trim().length === 0) {
+    throw new TypeError(`${name} 不能为空`);
+  }
+}
+
+/** 安全读取当前系统颜色偏好。 */
+function readSystemIsDark(): boolean {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return false;
+  }
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 创建主题管理 Store
  * @param options - 配置选项
@@ -54,11 +86,17 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
     id = "theme",
   } = options;
 
-  if (!VALID_THEME_MODES.has(defaultMode)) {
+  if (!isThemeMode(defaultMode)) {
     throw new RangeError(`未知的默认主题模式: ${String(defaultMode)}`);
   }
-  if (!VALID_DESIGN_STYLES.has(defaultDesignStyle)) {
+  if (!isDesignStyle(defaultDesignStyle)) {
     throw new RangeError(`未知的默认设计风格: ${String(defaultDesignStyle)}`);
+  }
+  assertNonEmptyOption("id", id);
+  assertNonEmptyOption("storageKey", storageKey);
+  assertNonEmptyOption("designStyleStorageKey", designStyleStorageKey);
+  if (storageKey === designStyleStorageKey) {
+    throw new TypeError("主题模式和设计风格不能共用同一个存储键");
   }
 
   return defineStore(id, () => {
@@ -67,10 +105,8 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
     // 从 localStorage 读取并校验保存的模式（脏值回退到默认值）
     const savedModeRaw =
       typeof window !== "undefined" ? safeGetItem(storageKey) : null;
-    const savedMode =
-      savedModeRaw && VALID_THEME_MODES.has(savedModeRaw as ThemeMode)
-        ? (savedModeRaw as ThemeMode)
-        : null;
+    const savedMode = isThemeMode(savedModeRaw) ? savedModeRaw : null;
+    if (savedModeRaw !== null && savedMode === null) safeRemoveItem(storageKey);
 
     // ============ 状态定义 ============
 
@@ -85,11 +121,12 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       typeof window !== "undefined"
         ? safeGetItem(designStyleStorageKey)
         : null;
-    const savedDesignStyle =
-      savedDesignStyleRaw &&
-      VALID_DESIGN_STYLES.has(savedDesignStyleRaw as DesignStyle)
-        ? (savedDesignStyleRaw as DesignStyle)
-        : null;
+    const savedDesignStyle = isDesignStyle(savedDesignStyleRaw)
+      ? savedDesignStyleRaw
+      : null;
+    if (savedDesignStyleRaw !== null && savedDesignStyle === null) {
+      safeRemoveItem(designStyleStorageKey);
+    }
 
     /** 当前设计风格 */
     const designStyle = ref<DesignStyle>(
@@ -100,10 +137,7 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
 
     /** 当前是否为暗色模式 */
     const isDark = computed(() => {
-      if (mode.value === "system") {
-        return systemIsDark.value;
-      }
-      return mode.value === "dark";
+      return resolveThemeMode(mode.value, systemIsDark.value) === "dark";
     });
 
     /** 当前设计风格配置（只读） */
@@ -189,8 +223,12 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
      * @param newMode - 新的主题模式
      */
     const setMode = async (newMode: ThemeMode) => {
-      if (!VALID_THEME_MODES.has(newMode)) {
+      if (!isThemeMode(newMode)) {
         throw new RangeError(`未知的主题模式: ${String(newMode)}`);
+      }
+
+      if (!initialized && (mode.value === "system" || newMode === "system")) {
+        systemIsDark.value = readSystemIsDark();
       }
 
       // 记录切换前的视觉状态
@@ -223,10 +261,9 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
      * 切换主题模式（在 light/dark/system 之间循环）
      */
     const toggleMode = async () => {
-      const modes: ThemeMode[] = ["light", "dark", "system"];
-      const currentIndex = modes.indexOf(mode.value);
-      const nextIndex = (currentIndex + 1) % modes.length;
-      await setMode(modes[nextIndex]);
+      const currentIndex = THEME_MODES.indexOf(mode.value);
+      const nextIndex = (currentIndex + 1) % THEME_MODES.length;
+      await setMode(THEME_MODES[nextIndex]);
     };
 
     /**
@@ -246,6 +283,12 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       if (!config) {
         throw new RangeError(`未知的设计风格: ${String(style)}`);
       }
+      const supportedThemeModes: readonly ResolvedThemeMode[] =
+        config.supportedThemeModes;
+
+      if (!initialized && mode.value === "system") {
+        systemIsDark.value = readSystemIsDark();
+      }
 
       // 更新设计风格状态
       designStyle.value = style;
@@ -254,11 +297,11 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       // 自动适配主题模式（例如 dark-tech 仅支持暗色）
       const resolvedVisual = isDark.value ? "dark" : "light";
       if (
-        config.supportedThemeModes.length > 0 &&
-        !config.supportedThemeModes.includes(resolvedVisual)
+        supportedThemeModes.length > 0 &&
+        !supportedThemeModes.includes(resolvedVisual)
       ) {
         // 直接更新 mode，由 syncThemeAttr 一次性同步所有变更
-        mode.value = config.supportedThemeModes[0];
+        mode.value = supportedThemeModes[0];
         safeSetItem(storageKey, mode.value);
       }
 
@@ -274,11 +317,9 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
      * 循环切换设计风格
      */
     const toggleDesignStyle = async () => {
-      const styles = Object.keys(DESIGN_STYLE_CONFIGS) as DesignStyle[];
-      if (styles.length === 0) return;
-      const currentIndex = styles.indexOf(designStyle.value);
-      const nextIndex = (currentIndex + 1) % styles.length;
-      await setDesignStyle(styles[nextIndex]);
+      const currentIndex = DESIGN_STYLES.indexOf(designStyle.value);
+      const nextIndex = (currentIndex + 1) % DESIGN_STYLES.length;
+      await setDesignStyle(DESIGN_STYLES[nextIndex]);
     };
 
     // ============ 返回 ============

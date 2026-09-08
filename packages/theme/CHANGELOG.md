@@ -1,5 +1,15 @@
 # @robot-admin/theme
 
+## 0.4.1
+
+### Patch Changes
+
+- Keep state, storage and DOM attributes consistent when View Transition is unavailable or fails, and make concurrent transition markers safe.
+- Resolve system color preference before pre-init actions, clean invalid persisted values, and reject empty or conflicting Store options.
+- Freeze published theme metadata, add reduced-motion CSS fallbacks, and preserve the existing visual selectors and public API.
+- Add lifecycle, persistence, compatibility, transition and package-boundary verification.
+- Correct README integration guidance and ship license, changelog and security policy in the npm artifact.
+
 ## 0.4.0
 
 ### Minor Changes

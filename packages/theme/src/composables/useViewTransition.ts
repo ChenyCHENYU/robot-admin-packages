@@ -7,16 +7,51 @@ export interface ViewTransitionOptions {
   transitioningClass?: string;
 }
 
+const DEFAULT_TRANSITIONING_CLASS = "theme-transitioning";
+const activeTransitionClasses = new WeakMap<
+  HTMLElement,
+  Map<string, number>
+>();
+
 /**
  * 检查用户是否开启了“减少动态效果”偏好（无障碍）。
  * 开启后应跳过动画，直接更新 DOM。
  */
 function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return false;
+  }
+
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
+/** 为并发过渡安全地增加根元素标记类。 */
+function retainTransitionClass(root: HTMLElement, className: string): void {
+  const classCounts = activeTransitionClasses.get(root) ?? new Map();
+  const count = classCounts.get(className) ?? 0;
+  if (count === 0) root.classList.add(className);
+  classCounts.set(className, count + 1);
+  activeTransitionClasses.set(root, classCounts);
+}
+
+/** 仅在最后一个并发过渡完成后移除根元素标记类。 */
+function releaseTransitionClass(root: HTMLElement, className: string): void {
+  const classCounts = activeTransitionClasses.get(root);
+  const count = classCounts?.get(className) ?? 0;
+  if (count <= 1) {
+    classCounts?.delete(className);
+    root.classList.remove(className);
+    if (classCounts?.size === 0) activeTransitionClasses.delete(root);
+    return;
+  }
+  classCounts?.set(className, count - 1);
 }
 
 /**
@@ -28,7 +63,8 @@ export async function useViewTransition(
   callback: () => void | Promise<void>,
   options: ViewTransitionOptions = {},
 ): Promise<void> {
-  const { transitioningClass = "theme-transitioning" } = options;
+  const transitioningClass =
+    options.transitioningClass?.trim() || DEFAULT_TRANSITIONING_CLASS;
 
   // SSR 环境或 API 不支持：直接执行回调
   if (
@@ -48,20 +84,15 @@ export async function useViewTransition(
   const root = document.documentElement;
 
   // 添加标记类，用于禁用所有 CSS transitions（防止冲突）
-  root.classList.add(transitioningClass);
+  retainTransitionClass(root, transitioningClass);
 
   let callbackStarted = false;
-  let callbackFailed = false;
-  let callbackError: unknown;
-  const guardedCallback = async () => {
+  let callbackPromise: Promise<void> | undefined;
+  const guardedCallback = () => {
+    if (callbackPromise) return callbackPromise;
     callbackStarted = true;
-    try {
-      await callback();
-    } catch (error) {
-      callbackFailed = true;
-      callbackError = error;
-      throw error;
-    }
+    callbackPromise = Promise.resolve().then(callback);
+    return callbackPromise;
   };
 
   try {
@@ -70,25 +101,12 @@ export async function useViewTransition(
     // 等待过渡完成
     await transition.finished;
   } catch (error) {
-    // callback 失败属于业务错误，必须原样传播给调用方
-    if (callbackFailed) throw callbackError;
-
-    // 区分浏览器主动跳过/中断过渡与真实 API 错误
-    const isAbort =
-      typeof DOMException !== "undefined" &&
-      error instanceof DOMException &&
-      (error.name === "AbortError" ||
-        error.name === "InvalidStateError" ||
-        error.name === "NotAllowedError");
-    if (isAbort) {
-      // startViewTransition 在执行 callback 前失败时，仍需保证 DOM 更新完成
-      if (!callbackStarted) await callback();
-      return;
-    }
-    throw error;
+    // 浏览器过渡属于渐进增强：无论 API 如何失败，都必须完成且只完成一次 DOM 更新。
+    // 如果业务 callback 自身失败，await 会继续将原始错误传播给调用方。
+    if (!callbackStarted) await guardedCallback();
+    else await callbackPromise;
   } finally {
-    // 移除标记类
-    root.classList.remove(transitioningClass);
+    releaseTransitionClass(root, transitioningClass);
   }
 }
 

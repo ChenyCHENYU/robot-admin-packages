@@ -137,11 +137,12 @@
     },
     "packages/theme": {
       "name": "@robot-admin/theme",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "devDependencies": {
         "@types/node": "^22.13.9",
         "naive-ui": "^2.41.0",
         "pinia": "^3.0.1",
+        "publint": "0.3.24",
         "sass": "^1.86.0",
         "tsup": "^8.3.5",
         "typescript": "~5.8.0",

@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/theme.svg)](https://www.npmjs.com/package/@robot-admin/theme)
 [![license](https://img.shields.io/npm/l/@robot-admin/theme.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
 
-当前版本：`0.4.0`。
+当前版本：`0.4.1`。
 
 ## 特性
 
@@ -13,7 +13,7 @@
 - 🎨 **View Transition API** — 丝滑流畅的主题切换动画
 - 🔮 **设计风格系统** — Glass Morphism / Corporate Minimal / Dark Tech 三套风格
 - 💾 **安全持久化** — 自动保存偏好，并容忍隐私模式、配额耗尽和历史脏值
-- 🛡️ **三层解耦** — 基础主题、菜单风格、设计风格互不冲突
+- 🛡️ **职责分层** — 本包管理明暗和设计风格，菜单风格由消费方独立管理
 - ⚙️ **高度可配置** — 支持独立 Store id、存储键、默认值与过渡开关
 - ♿ **无障碍与 SSR** — 尊重 reduced-motion，服务端和不支持 View Transition 时安全降级
 - 🚀 **TypeScript** — 完整的类型支持
@@ -24,8 +24,8 @@
 bun add @robot-admin/theme
 ```
 
-**Peer Dependencies**：`vue ^3.4` · `pinia ^2 || ^3`；只有使用 Naive UI
-主题类型或集成时才需要可选 peer `naive-ui ^2.38`。
+**Peer Dependencies**：`vue ^3.4` · `pinia ^2 || ^3`。当前设计风格 CSS 面向
+Naive UI 与 Robot `C_*` 组件；`naive-ui ^2.38` 为可选 peer，纯 Store 使用无需安装。
 
 ## 快速开始
 
@@ -89,10 +89,10 @@ Layer 2: 菜单风格 (MenuTheme)     → 仅侧边栏菜单   → data-menu-the
 Layer 3: 设计风格 (DesignStyle)   → 主内容区组件    → data-design-style  （本包管理）
 ```
 
-三层之间**互不耦合、互不覆盖**：
+三层通过不同的 HTML 属性分区，职责边界如下：
 
 - **菜单风格** — 由消费方的扩展 Store 独立管理（`data-menu-theme`），控制 `.n-menu` / `.n-menu-item` 样式
-- **设计风格** — 仅作用于主内容区的 Naive UI 组件（`.n-card`、`.n-button`、`.n-input` 等），**绝不涉及**菜单相关组件
+- **设计风格** — 作用于属性范围内的 Naive UI 与 Robot `C_*` 组件，不覆盖 `.n-menu` 相关选择器
 - **基础主题** — 为两者提供全局 `dark` / `light` CSS 变量基础
 
 ## 设计风格
@@ -122,12 +122,13 @@ const useMyThemeStore = createThemeStore({
   storageKey: 'theme-mode',                        // localStorage 键名（主题）
   designStyleStorageKey: 'robot-admin-design-style', // localStorage 键名（设计风格）
   enableTransition: true,                          // 启用 View Transition 过渡动画
-  id: 'my-theme',                                  // 多实例时必须使用不同 Pinia Store id
+  id: 'my-theme',                                  // Pinia Store id
 })
 ```
 
 Store 的 `init()` 可重复调用且只注册一次系统主题监听；测试、HMR 或显式卸载时
-调用 `destroy()` 释放监听器。
+调用 `destroy()` 释放监听器。同一 document 默认只应存在一个主题所有者；自定义
+`id` 用于 Pinia 命名，不代表 DOM 和存储已经自动隔离。
 
 #### `useThemeStore()`
 
@@ -137,11 +138,14 @@ Store 的 `init()` 可重复调用且只注册一次系统主题监听；测试�
 
 | 属性 | 类型 | 说明 |
 |------|------|------|
-| `mode` | `Ref<ThemeMode>` | 当前主题模式 (`'light'` / `'dark'` / `'system'`) |
-| `systemIsDark` | `Ref<boolean>` | 系统是否为暗色模式 |
-| `isDark` | `ComputedRef<boolean>` | 当前是否为暗色模式（已解析 system） |
-| `designStyle` | `Ref<DesignStyle>` | 当前设计风格标识 |
-| `currentDesignStyleConfig` | `ComputedRef<DesignStyleConfig>` | 当前设计风格的完整配置对象 |
+| `mode` | `ThemeMode` | 当前主题模式 (`'light'` / `'dark'` / `'system'`) |
+| `systemIsDark` | `boolean` | 系统是否为暗色模式 |
+| `isDark` | `boolean`（只读 getter） | 当前是否为暗色模式（已解析 system） |
+| `designStyle` | `DesignStyle` | 当前设计风格标识 |
+| `currentDesignStyleConfig` | `DesignStyleConfig`（只读 getter） | 当前设计风格的完整配置对象 |
+
+> Pinia 会自动解包 Store 中的 ref/computed。请通过 `setMode()`、`setDesignStyle()`
+> 等 action 修改状态，避免直接赋值绕过持久化和 DOM 同步。
 
 ### Store 方法
 
@@ -218,7 +222,8 @@ import type {
 
 ## 在 Robot Admin 中集成
 
-Robot Admin 已有一个扩展 Store（`s_themeStore`）管理基础主题和菜单风格。集成设计风格**无需修改现有代码**，只需以下步骤：
+Robot Admin 可通过扩展 Store 组合基础主题、Naive UI overrides 和菜单风格。扩展层
+应将本包 Store 作为明暗与设计风格的唯一来源，并只保存增量 overrides。
 
 ### Step 1：引入 CSS（在 main.ts 或全局入口）
 
@@ -267,7 +272,7 @@ export const s_themeStore = defineStore('theme-extended', () => {
 ```vue
 <template>
   <NSelect
-    v-model:value="themeStore.designStyle"
+    :value="themeStore.designStyle"
     :options="styleOptions"
     @update:value="themeStore.setDesignStyle($event)"
   />
@@ -283,19 +288,19 @@ const styleOptions = Object.entries(DESIGN_STYLE_CONFIGS).map(([value, config]) 
 </script>
 ```
 
-## 升级到 v0.4.0
+## 升级到 v0.4.1
 
-v0.4.0 保持现有 Store 调用方式兼容，并强化运行时边界：
+v0.4.1 保持现有 Store、CSS 路径和视觉表现兼容，并强化运行时边界：
 
 | 变更点 | 升级说明 |
 |--------|----------|
-| `ThemeStoreOptions.id` | 多实例应用应为每个 Store 指定唯一 id；默认实例无需修改 |
+| `ThemeStoreOptions.id` | 仅作为 Pinia Store id；同一 document 仍建议只有一个主题所有者 |
 | `destroy()` | 应用卸载、测试或 HMR 清理时建议调用，普通单页应用可不调用 |
-| `useViewTransition` | 移除无效的 `duration` 选项；请改用 CSS 设置动画时长 |
-| 存储值校验 | 非法主题/风格值会回退到安全默认值，不再直接断言为合法类型 |
-| 持久化失败 | Safari 隐私模式或存储配额异常不会阻断主题切换 |
+| `useViewTransition` | 浏览器过渡失败时保证 DOM 回调恰好执行一次，并支持并发调用 |
+| 存储值校验 | 非法主题/风格值会回退并清理；空键和冲突键会立即报错 |
+| 系统主题 | 在 `init()` 前调用 system 相关 action 也会安全解析系统偏好 |
 
-从 v0.2/v0.3 升级通常只需更新依赖；若曾传入 `duration`，删除该字段即可。
+从 v0.4.0 升级无需修改调用代码。
 
 ```bash
 bun add @robot-admin/theme@latest

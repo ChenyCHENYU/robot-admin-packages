@@ -170,6 +170,17 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  [data-design-style="dark-tech"][data-theme="dark"] {
+    .n-card,
+    .n-button,
+    .n-input,
+    .c-table-wrapper {
+      transition: none !important;
+    }
+  }
+}
+
 /* ===========================================
  * Layer 3: 组件库 C_* 组件增强
  * =========================================== */

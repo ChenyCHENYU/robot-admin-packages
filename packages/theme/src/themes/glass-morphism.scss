@@ -163,9 +163,19 @@ html[data-design-style="glass-morphism"] body {
   border-radius: var(--dt-radius);
   box-shadow: var(--dt-card-shadow);
   transition: box-shadow var(--dt-transition);
-  }
+}
 
 [data-design-style="glass-morphism"] .c-action-bar {
   border: 1px solid var(--dt-card-border);
   border-radius: var(--dt-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-design-style="glass-morphism"] {
+    .n-card,
+    .n-button,
+    .c-table-wrapper {
+      transition: none !important;
+    }
+  }
 }

@@ -3,6 +3,9 @@
  */
 export type ThemeMode = "light" | "dark" | "system";
 
+/** 实际呈现到页面的主题模式 */
+export type ResolvedThemeMode = Exclude<ThemeMode, "system">;
+
 /**
  * 设计风格类型
  * - glass-morphism: 拟态玻璃（毛玻璃 + 半透明 + 内发光）
@@ -30,13 +33,13 @@ export interface ThemeConfig {
  */
 export interface DesignStyleConfig {
   /** 风格名称 */
-  name: string;
+  readonly name: string;
   /** 风格描述 */
-  description: string;
+  readonly description: string;
   /** 支持的视觉模式（light / dark），用于兼容性校验 */
-  supportedThemeModes: Array<"light" | "dark">;
+  readonly supportedThemeModes: readonly ResolvedThemeMode[];
   /** 推荐搭配的菜单风格标识（供消费方参考，不强制） */
-  recommendedMenuTheme: string;
+  readonly recommendedMenuTheme: string;
 }
 
 /**
@@ -53,6 +56,6 @@ export interface ThemeStoreOptions {
   designStyleStorageKey?: string;
   /** 是否启用 View Transition API */
   enableTransition?: boolean;
-  /** Pinia Store 唯一标识（默认 "theme"，多实例自定义时需区分避免冲突） */
+  /** Pinia Store 唯一标识（默认 "theme"） */
   id?: string;
 }
