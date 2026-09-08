@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/@robot-admin/request-core.svg)](./LICENSE)
 
 面向生产环境的实例化请求编排与 Vue 3 Headless CRUD 工具。当前版本：
-`0.4.1`。
+`0.5.0`。
 
 它保留 Axios 的完整能力，只收拢应用中最容易重复出错的部分：并发请求、缓存、
 取消、重试、Token 刷新、错误标准化以及列表 CRUD 生命周期。
@@ -18,6 +18,7 @@
 - 重试支持幂等方法白名单、指数退避、抖动、`Retry-After` 和总时间预算。
 - Token 主动刷新、并发 401 恢复和重新登录均使用 single-flight。
 - `RequestError` 统一业务、HTTP、网络、超时、取消和配置错误。
+- `createTableCrud()` 以函数式应用预配置消除类继承和页面级分页映射重复。
 - Vue 层不依赖具体 UI；Naive UI 仅作为可选兼容适配层。
 - ESM、CJS 和 TypeScript 类型入口均经过发布前验证。
 
@@ -30,7 +31,7 @@ bun add @robot-admin/request-core axios
 | 入口 | 依赖边界 | 用途 |
 | --- | --- | --- |
 | `@robot-admin/request-core/axios` | Axios | 推荐的请求 Client、策略及兼容 API |
-| `@robot-admin/request-core/vue` | Axios + Vue | `useRequest`、Headless `useTableCrud`、Client 注入 |
+| `@robot-admin/request-core/vue` | Axios + Vue | `useRequest`、Headless `useTableCrud/createTableCrud`、Client 注入 |
 | `@robot-admin/request-core/naive` | Axios + Vue + Naive UI | `useNaiveTableCrud` 兼容适配 |
 | `@robot-admin/request-core` | 完整兼容入口 | 旧项目平滑迁移，当前仍会引用 Naive UI |
 | `@robot-admin/request-core/crud` | 兼容入口 | 已废弃，迁移到 `/vue` 或 `/naive` |
@@ -272,6 +273,44 @@ await table.search({ keyword: 'robot' })
 await table.resetSearch()
 ```
 
+### 函数式单表预配置
+
+同一项目中的 Client、加载时机、分页字段名等通常完全相同。使用
+`createTableCrud()` 定义一次应用约定，页面只保留自己的接口、筛选项和变更函数：
+
+```ts
+// src/composables/useAppTable.ts
+import { createTableCrud } from '@robot-admin/request-core/vue'
+import { request } from '@/services/request'
+
+export const useAppTable = createTableCrud({
+  client: request,
+  autoLoad: 'mounted',
+  defaultPageSize: 20,
+  listParams: { page: 'current', pageSize: 'size' },
+})
+
+// user-page.ts
+const table = useAppTable<User, UserFilters>({
+  api: { list: '/users' },
+  initialFilters: { keyword: '' },
+  mutations: {
+    create: (row, { signal }) => request.post('/users', row, { signal }),
+    update: (row, { signal }) =>
+      request.put(`/users/${row.id}`, row, { signal }),
+    remove: (row, { signal }) =>
+      request.delete(`/users/${row.id}`, { signal }),
+  },
+})
+```
+
+工厂只保存配置快照，每次调用仍创建完全隔离的响应式状态。页面配置可以覆盖任意
+默认项；`listParams` 对象用于重命名或省略 `page/pageSize/sort`，函数形式则可完全
+接管参数生成。复杂页面仍直接使用 `useTableCrud()`，不需要迁移到另一套抽象。
+
+使用侧不需要把整个返回对象逐项转发。控制器代码可保留 `table` 能力对象，Vue
+模板只解构实际使用的字段，避免形成新的“大而全返回值”约定。
+
 主要返回值：
 
 | 状态/方法 | 说明 |
@@ -301,7 +340,8 @@ const table = useNaiveTableCrud({
 ```
 
 `useNaiveTableCrud` 只注入 Naive UI 的 Message/Dialog，数据能力与 `/vue` 完全
-共用。Element Plus 项目直接使用 `/vue`，在真实业务需要前无需额外 UI 适配包。
+共用。Element Plus 或其他 Vue UI 项目直接使用 `/vue` 并在应用边界传入可选 `ui`
+适配器；表格、查询表单、列配置和工具栏继续由项目自己的呈现层负责。
 
 ## 兼容 API
 

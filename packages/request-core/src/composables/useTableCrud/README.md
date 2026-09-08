@@ -43,6 +43,35 @@ const table = useTableCrud<Employee, Filters>({
 })
 ```
 
+## 应用级函数式预配置
+
+```ts
+import { createTableCrud } from '@robot-admin/request-core/vue'
+
+export const useAppTable = createTableCrud({
+  client: request,
+  autoLoad: 'mounted',
+  defaultPageSize: 20,
+  listParams: { page: 'current', pageSize: 'size' },
+})
+
+const table = useAppTable<Employee, Filters>({
+  api: { list: '/employees' },
+  initialFilters: { keyword: '' },
+})
+```
+
+`createTableCrud()` 返回一个带应用默认值的 `useTableCrud`。它不创建单例状态、不
+绑定表格组件，也不要求继承基类；每次调用都会创建独立状态，且页面可覆盖任意
+默认项。建议控制器保留 `table` 能力对象，只向模板解构实际需要的字段。
+
+`listParams` 有两种模式：
+
+- `{ page: 'current', pageSize: 'size', sort: 'order' }`：只调整通用字段名；字段值为
+  `false` 时省略该字段。
+- `context => ({ ... })`：由页面完全生成列表参数，适合特殊接口。函数形式会替代
+  工厂级字段映射。
+
 `query` 可以直接返回 `{ items, total }`，也可以返回以下兼容结构：
 
 - `{ data: { list, total } }`
@@ -58,6 +87,7 @@ const table = useTableCrud<Employee, Filters>({
 | `query(context)` | 推荐的类型化列表查询函数 |
 | `mutations` | 可选的 create/update/remove/batchRemove/get 函数 |
 | `client` | 显式 Client；省略时读取 Vue 注入 |
+| `listParams` | 使用 `api.list` 时重命名/省略通用参数，或完全自定义参数映射 |
 | `initialFilters`, `initialSort` | 初始筛选和排序 |
 | `defaultPageSize` | 默认 10 |
 | `defaultPaginationEnabled` | 默认 true |
@@ -70,8 +100,8 @@ const table = useTableCrud<Employee, Filters>({
 | `onError` | 统一接收标准化 RequestError |
 
 `api: { list, get, create, update, remove, batchRemove }` 字符串配置仍可兼容旧项目，
-新代码优先使用函数式 `query/mutations`，以支持 mock、动态 URL、不同 HTTP 方法和
-完整类型推导。
+标准单表可结合 `createTableCrud()` 减少重复；动态 URL、特殊 HTTP 方法或复杂聚合
+查询优先使用函数式 `query/mutations`，以保留完整类型推导。
 
 ## 返回值
 

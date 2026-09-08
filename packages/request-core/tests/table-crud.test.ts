@@ -1,5 +1,8 @@
 import { effectScope } from "vue";
 import { describe, expect, it } from "vitest";
+import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
+import { createRequestClient } from "../src/client/client";
+import { createTableCrud } from "../src/composables/useTableCrud/createTableCrud";
 import { useTableCrud } from "../src/composables/useTableCrud/useTableCrud";
 
 interface Row {
@@ -13,6 +16,13 @@ function deferred<T>() {
     resolve = done;
   });
   return { promise, resolve };
+}
+
+function response(
+  config: InternalAxiosRequestConfig,
+  data: unknown,
+): AxiosResponse {
+  return { data, status: 200, statusText: "OK", headers: {}, config };
 }
 
 describe("headless useTableCrud", () => {
@@ -123,5 +133,92 @@ describe("headless useTableCrud", () => {
     await expect(table.remove({ id: 1, name: "row" })).resolves.toBeUndefined();
     expect(table.rows.value).toEqual([]);
     expect(table.total.value).toBe(0);
+  });
+
+  it("creates isolated tables from shared application defaults", async () => {
+    const useAppTable = createTableCrud({
+      autoLoad: false,
+      defaultPageSize: 50,
+      refreshAfterMutation: false,
+    });
+    const first = useAppTable<Row, { keyword: string }>({
+      initialFilters: { keyword: "first" },
+      query: async () => ({ items: [], total: 0 }),
+    });
+    const second = useAppTable<Row, { keyword: string }>({
+      defaultPageSize: 10,
+      initialFilters: { keyword: "second" },
+      query: async () => ({ items: [], total: 0 }),
+    });
+
+    first.filters.value.keyword = "changed";
+
+    expect(first.page.size).toBe(50);
+    expect(second.page.size).toBe(10);
+    expect(second.filters.value.keyword).toBe("second");
+  });
+
+  it("maps legacy list pagination without per-page query boilerplate", async () => {
+    let requestParams: unknown;
+    const client = createRequestClient({
+      request: {
+        adapter: async (config) => {
+          requestParams = config.params;
+          return response(config, { items: [], total: 0 });
+        },
+      },
+    });
+    const useAppTable = createTableCrud({
+      client,
+      autoLoad: false,
+      listParams: { page: "current", pageSize: "size", sort: "order" },
+    });
+    const table = useAppTable<Row, { keyword: string }, { field: string }>({
+      api: { list: "/users" },
+      initialFilters: { keyword: "robot" },
+      initialSort: { field: "name" },
+      listParams: { sort: false },
+    });
+
+    await table.refresh();
+
+    expect(requestParams).toEqual({
+      current: 1,
+      size: 10,
+      keyword: "robot",
+    });
+    client.dispose();
+  });
+
+  it("allows a page to fully control legacy list parameters", async () => {
+    let requestParams: unknown;
+    const client = createRequestClient({
+      request: {
+        adapter: async (config) => {
+          requestParams = config.params;
+          return response(config, { items: [], total: 0 });
+        },
+      },
+    });
+    const table = useTableCrud<Row, { keyword: string }>({
+      api: { list: "/users" },
+      client,
+      autoLoad: false,
+      initialFilters: { keyword: "robot" },
+      listParams: ({ page, pageSize, filters }) => ({
+        pageIndex: page - 1,
+        limit: pageSize,
+        search: filters.keyword,
+      }),
+    });
+
+    await table.refresh();
+
+    expect(requestParams).toEqual({
+      pageIndex: 0,
+      limit: 10,
+      search: "robot",
+    });
+    client.dispose();
   });
 });

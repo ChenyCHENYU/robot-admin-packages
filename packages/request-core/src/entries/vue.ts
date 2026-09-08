@@ -10,6 +10,7 @@ export type {
   UseRequestOptions,
   UseRequestReturn,
 } from "../vue/useRequest";
+export { createTableCrud } from "../composables/useTableCrud/createTableCrud";
 export { useTableCrud } from "../composables/useTableCrud/useTableCrud";
 export type {
   DataRecord,
@@ -19,6 +20,10 @@ export type {
   TableColumn,
   TableQueryContext,
   TableQueryResult,
+  TableListParamKeys,
+  TableListParams,
+  TableCrudDefaults,
+  TableCrudFactory,
   CrudMutations,
   CrudUiAdapter,
   CrudMessageApi,

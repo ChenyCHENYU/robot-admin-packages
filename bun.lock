@@ -115,7 +115,7 @@
     },
     "packages/request-core": {
       "name": "@robot-admin/request-core",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "devDependencies": {
         "@types/node": "^20.14.0",
         "axios": "^1.7.0",

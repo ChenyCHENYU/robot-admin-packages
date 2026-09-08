@@ -2,7 +2,7 @@ import {
   createRequestClient,
   type RequestConfig,
 } from "../src/entries/axios";
-import { useTableCrud } from "../src/entries/vue";
+import { createTableCrud, useTableCrud } from "../src/entries/vue";
 
 interface User {
   id: number;
@@ -41,6 +41,21 @@ function verifyTableTypes(): void {
   });
   table.rows.value[0]?.name.toUpperCase();
   void table.search({ keyword: "Robot" });
+
+  const useAppTable = createTableCrud({
+    client,
+    autoLoad: false,
+    listParams: { page: "current", pageSize: "size" },
+  });
+  const configured = useAppTable<User, { keyword: string }>({
+    api: { list: "/users" },
+    initialFilters: { keyword: "" },
+    listParams: ({ page, filters }) => ({
+      current: page,
+      keyword: filters.keyword,
+    }),
+  });
+  configured.rows.value[0]?.id.toFixed();
 }
 
 void verifyClientTypes;

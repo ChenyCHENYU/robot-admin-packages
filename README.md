@@ -16,7 +16,7 @@
 | [@robot-admin/theme](./packages/theme)                 | `0.4.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/theme)](https://www.npmjs.com/package/@robot-admin/theme)                 | 亮色/暗色/跟随系统、设计风格与安全持久化                 |
 | [@robot-admin/directives](./packages/directives)       | `2.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/directives)](https://www.npmjs.com/package/@robot-admin/directives)       | 11 个 Vue 3 指令、应用级适配器、无障碍与严格生命周期清理 |
 | [@robot-admin/file-utils](./packages/file-utils)       | `3.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/file-utils)](https://www.npmjs.com/package/@robot-admin/file-utils)       | 安全 Excel/ZIP/CSV、隔离配置及可取消的真流式大文件传输   |
-| [@robot-admin/request-core](./packages/request-core)   | `0.4.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/request-core)](https://www.npmjs.com/package/@robot-admin/request-core)   | 实例化 Axios 编排、认证恢复与 Headless CRUD Composables  |
+| [@robot-admin/request-core](./packages/request-core)   | `0.5.0`    | [![npm](https://img.shields.io/npm/v/@robot-admin/request-core)](https://www.npmjs.com/package/@robot-admin/request-core)   | 实例化 Axios 编排、认证恢复与函数式 Headless CRUD         |
 | [@robot-admin/form-validate](./packages/form-validate) | `3.4.2`    | [![npm](https://img.shields.io/npm/v/@robot-admin/form-validate)](https://www.npmjs.com/package/@robot-admin/form-validate) | Naive UI / Element Plus 双框架类型安全表单验证规则库     |
 | [@robot-admin/git-standards](./packages/git-standards) | `1.0.4`    | [![npm](https://img.shields.io/npm/v/@robot-admin/git-standards)](https://www.npmjs.com/package/@robot-admin/git-standards) | 幂等初始化、配置备份与 4 种 Git 工程化预设               |
 

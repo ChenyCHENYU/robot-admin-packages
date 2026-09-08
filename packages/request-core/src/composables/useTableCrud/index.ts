@@ -9,6 +9,7 @@
  */
 
 // ==================== 主函数 ====================
+export { createTableCrud } from "./createTableCrud";
 export { useTableCrud } from "./useTableCrud";
 
 // ==================== 类型 ====================
@@ -27,6 +28,10 @@ export type {
   // 主配置
   UseTableCrudConfig,
   UseTableCrudReturn,
+  TableCrudDefaults,
+  TableCrudFactory,
+  TableListParamKeys,
+  TableListParams,
 } from "./types";
 
 // ==================== 常量 ====================

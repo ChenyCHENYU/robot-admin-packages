@@ -76,6 +76,7 @@ export { MemoryCache, generateRequestKey } from "./axios/utils/helpers";
 
 /** @deprecated Prefer useTableCrud from /vue or useNaiveTableCrud from /naive. */
 export { useTableCrud } from "./entries/crud";
+export { createTableCrud } from "./composables/useTableCrud/createTableCrud";
 export { useNaiveTableCrud } from "./naive/useNaiveTableCrud";
 export type {
   DataRecord,
@@ -89,4 +90,8 @@ export type {
   DetailItem,
   DetailSection,
   DetailConfig,
+  TableListParamKeys,
+  TableListParams,
+  TableCrudDefaults,
+  TableCrudFactory,
 } from "./composables/useTableCrud/types";

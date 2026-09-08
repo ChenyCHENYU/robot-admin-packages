@@ -66,6 +66,19 @@ export interface TableQueryResult<T> {
   total: number;
 }
 
+export interface TableListParamKeys {
+  /** Query parameter receiving the current page. Set to false to omit it. */
+  page?: string | false;
+  /** Query parameter receiving the page size. Set to false to omit it. */
+  pageSize?: string | false;
+  /** Query parameter receiving the sort object. Set to false to omit it. */
+  sort?: string | false;
+}
+
+export type TableListParams<Filters extends object, Sort extends object> =
+  | TableListParamKeys
+  | ((context: TableQueryContext<Filters, Sort>) => Record<string, unknown>);
+
 export interface TableMutationContext {
   signal: AbortSignal;
 }
@@ -123,6 +136,11 @@ export interface UseTableCrudConfig<
 > {
   /** Legacy string endpoints. Prefer query/mutations for typed applications. */
   api?: ApiEndpoints;
+  /**
+   * Maps list state to query parameters when api.list is used. A function fully
+   * controls the parameters; an object only renames or omits standard fields.
+   */
+  listParams?: TableListParams<Filters, Sort>;
   query?: (
     context: TableQueryContext<Filters, Sort>,
   ) => Promise<TableQueryResult<T> | unknown>;
@@ -145,6 +163,28 @@ export interface UseTableCrudConfig<
   ui?: CrudUiAdapter;
   detailTitle?: (row: T) => string;
   onError?: (error: RequestError, operation: string) => void | Promise<void>;
+}
+
+/** Stable application-level defaults shared by a table CRUD factory. */
+export interface TableCrudDefaults {
+  client?: RequestClient;
+  defaultPageSize?: number;
+  defaultPaginationEnabled?: boolean;
+  autoLoad?: boolean | "mounted";
+  refreshAfterMutation?: boolean;
+  batchConcurrency?: number;
+  ui?: CrudUiAdapter;
+  listParams?: TableListParamKeys;
+}
+
+export interface TableCrudFactory {
+  <
+    T extends DataRecord,
+    Filters extends object = Record<string, unknown>,
+    Sort extends object = Record<string, unknown>,
+  >(
+    config: UseTableCrudConfig<T, Filters, Sort>,
+  ): UseTableCrudReturn<T, Filters, Sort>;
 }
 
 export interface DetailModal<T> {

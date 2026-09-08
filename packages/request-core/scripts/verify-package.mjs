@@ -11,7 +11,12 @@ const entrypoints = [
     name: "root",
     esm: "dist/index.js",
     cjs: "dist/index.cjs",
-    exports: ["createRequestClient", "createRequestCore", "useTableCrud"],
+    exports: [
+      "createRequestClient",
+      "createRequestCore",
+      "createTableCrud",
+      "useTableCrud",
+    ],
   },
   {
     name: "axios",
@@ -23,7 +28,12 @@ const entrypoints = [
     name: "vue",
     esm: "dist/vue.js",
     cjs: "dist/vue.cjs",
-    exports: ["createRequestPlugin", "useRequest", "useTableCrud"],
+    exports: [
+      "createRequestPlugin",
+      "createTableCrud",
+      "useRequest",
+      "useTableCrud",
+    ],
   },
   {
     name: "naive",

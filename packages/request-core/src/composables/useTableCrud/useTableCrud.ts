@@ -28,7 +28,9 @@ import type {
   CrudMessageApi,
   DataRecord,
   TableActions,
+  TableListParamKeys,
   TablePageState,
+  TableQueryContext,
   TableQueryResult,
   UseTableCrudConfig,
   UseTableCrudReturn,
@@ -78,6 +80,41 @@ function asQueryResult<T>(value: unknown): TableQueryResult<T> | null {
     : null;
 }
 
+function resolveParamKey(
+  value: string | false | undefined,
+  fallback: string,
+): string | false {
+  if (value === false) return false;
+  if (value === undefined) return fallback;
+  if (value.trim().length === 0) {
+    throw new RangeError("List parameter keys cannot be empty strings.");
+  }
+  return value;
+}
+
+function buildListParams<Filters extends object, Sort extends object>(
+  context: TableQueryContext<Filters, Sort>,
+  keys: TableListParamKeys = {},
+): Record<string, unknown> {
+  const pageKey = resolveParamKey(keys.page, "page");
+  const pageSizeKey = resolveParamKey(keys.pageSize, "pageSize");
+  const sortKey = resolveParamKey(keys.sort, "sort");
+  const paginationParams: Record<string, unknown> = {};
+
+  if (context.paginationEnabled) {
+    if (pageKey !== false) paginationParams[pageKey] = context.page;
+    if (pageSizeKey !== false) paginationParams[pageSizeKey] = context.pageSize;
+  }
+
+  return {
+    ...paginationParams,
+    ...(context.filters as Record<string, unknown>),
+    ...(context.sort && sortKey !== false
+      ? { [sortKey]: context.sort }
+      : {}),
+  };
+}
+
 export function useTableCrud<
   T extends DataRecord,
   Filters extends object = Record<string, unknown>,
@@ -87,6 +124,7 @@ export function useTableCrud<
 ): UseTableCrudReturn<T, Filters, Sort> {
   const {
     api,
+    listParams,
     query,
     mutations = {},
     columns = [],
@@ -219,24 +257,21 @@ export function useTableCrud<
   };
 
   const requestList = async (signal: AbortSignal): Promise<unknown> => {
-    if (query) {
-      return query({
-        page: page.current,
-        pageSize: page.size,
-        paginationEnabled: paginationEnabled.value,
-        filters: filters.value,
-        sort: sort.value,
-        signal,
-      });
-    }
-    const paginationParams = paginationEnabled.value
-      ? { page: page.current, pageSize: page.size }
-      : {};
-    const params = {
-      ...paginationParams,
-      ...(filters.value as Record<string, unknown>),
-      ...(sort.value ? { sort: sort.value } : {}),
+    const context: TableQueryContext<Filters, Sort> = {
+      page: page.current,
+      pageSize: page.size,
+      paginationEnabled: paginationEnabled.value,
+      filters: filters.value,
+      sort: sort.value,
+      signal,
     };
+    if (query) {
+      return query(context);
+    }
+    const params =
+      typeof listParams === "function"
+        ? listParams(context)
+        : buildListParams(context, listParams);
     return client
       ? client.get(api!.list, { params, signal, concurrency: "takeLatest" })
       : getData(api!.list, { params, signal, dedupe: true });

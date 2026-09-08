@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/request-core",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Instance-scoped Axios orchestration and headless CRUD composables for Vue 3",
   "type": "module",
   "keywords": [

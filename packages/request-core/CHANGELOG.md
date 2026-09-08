@@ -4,6 +4,20 @@
 > below record the internal implementation milestones folded into it; they were
 > not published as separate package versions.
 
+## 0.5.0
+
+### Minor Changes
+
+- Add the UI-independent `createTableCrud()` factory so applications can define a
+  request client, lifecycle defaults and standard list parameter names once without
+  class inheritance or shared reactive state.
+- Add `listParams` object and function mappings for endpoint-based tables, supporting
+  backend conventions such as `current/size` without repeated page adapters.
+- Document the intended split between the headless request/table state and project-owned
+  Naive UI, Element Plus or other presentation components.
+- Expand runtime, public-type and package-entry verification for the new factory and
+  parameter mapping behavior.
+
 ## 0.4.1
 
 ### Patch Changes
