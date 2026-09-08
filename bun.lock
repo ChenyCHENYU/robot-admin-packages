@@ -137,7 +137,7 @@
     },
     "packages/theme": {
       "name": "@robot-admin/theme",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "devDependencies": {
         "@types/node": "^22.13.9",
         "naive-ui": "^2.41.0",

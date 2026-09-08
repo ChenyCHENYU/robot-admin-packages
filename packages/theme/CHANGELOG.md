@@ -1,5 +1,11 @@
 # @robot-admin/theme
 
+## 0.5.1
+
+### Patch Changes
+
+- Re-export Naive UI `GlobalTheme` and `GlobalThemeOverrides` types from `/naive` so consumers do not depend on framework-internal declaration paths.
+
 ## 0.5.0
 
 ### Minor Changes

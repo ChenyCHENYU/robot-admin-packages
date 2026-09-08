@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/theme",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Layered theme primitives, Pinia store and Naive UI adapter for Robot Admin",
   "type": "module",
   "keywords": [

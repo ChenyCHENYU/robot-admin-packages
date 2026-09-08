@@ -5,3 +5,4 @@ export type {
   NaiveThemeOptions,
   NaiveThemeOverridesSource,
 } from "../naive";
+export type { GlobalTheme, GlobalThemeOverrides } from "naive-ui";

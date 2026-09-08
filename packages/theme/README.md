@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/theme.svg)](https://www.npmjs.com/package/@robot-admin/theme)
 [![license](https://img.shields.io/npm/l/@robot-admin/theme.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/packages/theme/LICENSE)
 
-当前版本：`0.5.0`。
+当前版本：`0.5.1`。
 
 ## 能力边界
 
@@ -71,6 +71,7 @@ DOM 属性和存储空间已经自动隔离。
 ```typescript
 import { computed } from 'vue'
 import {
+  type GlobalThemeOverrides,
   useNaiveTheme,
   useThemeStore,
 } from '@robot-admin/theme/naive'
@@ -220,13 +221,16 @@ data-menu-theme    -> 菜单呈现，由 layout/消费方管理
 
 ## 从 0.4.x 升级
 
-0.5.0 不删除原 API 或 CSS 路径：
+0.5.x 不删除原 API 或 CSS 路径：
 
 1. 通用 Vue 项目建议从 `/vue` 导入。
 2. Naive UI 项目建议从 `/naive` 导入，并用 `/naive/styles` 替代三条样式导入。
 3. 原来的根入口仍等价于 `/vue`。
 4. `syncAcrossTabs` 默认开启；传入自定义 `storage` 时不会隐式监听 window storage。
 5. dark-tech 等受限风格下，后续 `setMode()` 也会继续保持兼容，不会形成非法组合。
+
+0.5.1 额外从 `/naive` 导出 `GlobalTheme` 与 `GlobalThemeOverrides` 类型，消费方
+无需再依赖 Naive UI 内部类型路径。
 
 ## License
 
