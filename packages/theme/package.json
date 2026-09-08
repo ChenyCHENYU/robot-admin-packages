@@ -1,7 +1,7 @@
 {
   "name": "@robot-admin/theme",
-  "version": "0.4.1",
-  "description": "Theme switching and management system for Robot Admin",
+  "version": "0.5.0",
+  "description": "Layered theme primitives, Pinia store and Naive UI adapter for Robot Admin",
   "type": "module",
   "keywords": [
     "vue",
@@ -36,6 +36,37 @@
         "default": "./dist/index.cjs"
       }
     },
+    "./core": {
+      "import": {
+        "types": "./dist/core.d.ts",
+        "default": "./dist/core.js"
+      },
+      "require": {
+        "types": "./dist/core.d.cts",
+        "default": "./dist/core.cjs"
+      }
+    },
+    "./vue": {
+      "import": {
+        "types": "./dist/vue.d.ts",
+        "default": "./dist/vue.js"
+      },
+      "require": {
+        "types": "./dist/vue.d.cts",
+        "default": "./dist/vue.cjs"
+      }
+    },
+    "./naive": {
+      "import": {
+        "types": "./dist/naive.d.ts",
+        "default": "./dist/naive.js"
+      },
+      "require": {
+        "types": "./dist/naive.d.cts",
+        "default": "./dist/naive.cjs"
+      }
+    },
+    "./naive/styles": "./dist/styles/naive.css",
     "./styles/glass-morphism.css": "./dist/styles/glass-morphism.css",
     "./styles/corporate-minimal.css": "./dist/styles/corporate-minimal.css",
     "./styles/dark-tech.css": "./dist/styles/dark-tech.css"
@@ -62,7 +93,7 @@
     "build:styles": "sass src/themes:dist/styles --style=compressed --no-source-map",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "check:package": "node ./node_modules/publint/src/cli.js && node ./scripts/verify-package.mjs",
     "verify": "bun run type-check && bun run test && bun run build && bun run check:package",
     "prepublishOnly": "bun run verify"
@@ -73,6 +104,12 @@
     "naive-ui": "^2.38.0"
   },
   "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    },
+    "pinia": {
+      "optional": true
+    },
     "naive-ui": {
       "optional": true
     }

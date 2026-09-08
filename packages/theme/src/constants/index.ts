@@ -9,6 +9,7 @@ export const DEFAULT_THEME_OPTIONS = Object.freeze({
   storageKey: "theme-mode",
   designStyleStorageKey: "robot-admin-design-style",
   enableTransition: true,
+  syncAcrossTabs: true,
 });
 
 /**

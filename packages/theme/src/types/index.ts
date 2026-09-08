@@ -28,6 +28,32 @@ export interface ThemeConfig {
   designStyle: DesignStyle;
 }
 
+/** 可替换的主题偏好存储协议。 */
+export interface ThemeStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+/** 主题运行时可观测的降级操作。 */
+export type ThemeErrorOperation =
+  | "storage-read"
+  | "storage-write"
+  | "storage-remove"
+  | "system-preference";
+
+/** 主题运行时错误上下文。 */
+export interface ThemeErrorContext {
+  readonly operation: ThemeErrorOperation;
+  readonly key?: string;
+}
+
+/** 可选的主题运行时错误处理器。 */
+export type ThemeErrorHandler = (
+  error: unknown,
+  context: ThemeErrorContext,
+) => void;
+
 /**
  * 设计风格配置接口
  */
@@ -56,6 +82,12 @@ export interface ThemeStoreOptions {
   designStyleStorageKey?: string;
   /** 是否启用 View Transition API */
   enableTransition?: boolean;
+  /** 可替换存储；传入 null 可显式禁用持久化 */
+  storage?: ThemeStorage | null;
+  /** 是否同步同源页面的 storage 变化（仅内置 localStorage 生效） */
+  syncAcrossTabs?: boolean;
+  /** 存储或系统偏好读取失败时的可选诊断回调 */
+  onError?: ThemeErrorHandler;
   /** Pinia Store 唯一标识（默认 "theme"） */
   id?: string;
 }

@@ -132,6 +132,10 @@ describe("theme store lifecycle", () => {
     expect(store.mode).toBe("dark");
     expect(attributes.get("data-design-style")).toBe("dark-tech");
     expect(setItem).toHaveBeenCalledWith("theme-mode", "dark");
+
+    await store.setMode("light");
+    expect(store.mode).toBe("dark");
+    expect(attributes.get("data-theme")).toBe("dark");
   });
 
   it("supports legacy media listeners and removes them on destroy", () => {
@@ -160,5 +164,84 @@ describe("theme store lifecycle", () => {
 
     expect(addListener).toHaveBeenCalledOnce();
     expect(removeListener).toHaveBeenCalledOnce();
+  });
+
+  it("supports injected storage and observable runtime degradation", async () => {
+    const errors: string[] = [];
+    const storage = {
+      getItem: vi.fn(() => {
+        throw new Error("read failed");
+      }),
+      setItem: vi.fn(() => {
+        throw new Error("write failed");
+      }),
+      removeItem: vi.fn(),
+    };
+
+    setActivePinia(createPinia());
+    const store = createThemeStore({
+      id: "theme-injected-storage-test",
+      enableTransition: false,
+      storage,
+      onError: (_error, context) => errors.push(context.operation),
+    })();
+
+    await expect(store.setMode("dark")).resolves.toBeUndefined();
+    expect(store.mode).toBe("dark");
+    expect(errors).toEqual([
+      "storage-read",
+      "storage-read",
+      "storage-write",
+    ]);
+  });
+
+  it("synchronizes valid preferences across tabs and releases the listener", () => {
+    let storageHandler: ((event: StorageEvent) => void) | undefined;
+    const addEventListener = vi.fn(
+      (type: string, handler: (event: StorageEvent) => void) => {
+        if (type === "storage") storageHandler = handler;
+      },
+    );
+    const removeEventListener = vi.fn();
+    const attributes = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+      matchMedia: vi.fn(() => ({ matches: false })),
+      addEventListener,
+      removeEventListener,
+    });
+    vi.stubGlobal("document", {
+      documentElement: {
+        setAttribute: (name: string, value: string) =>
+          attributes.set(name, value),
+      },
+    });
+
+    setActivePinia(createPinia());
+    const store = createThemeStore({ id: "theme-storage-sync-test" })();
+    store.init();
+    storageHandler?.({ key: "theme-mode", newValue: "dark" } as StorageEvent);
+    storageHandler?.({
+      key: "robot-admin-design-style",
+      newValue: "corporate-minimal",
+    } as StorageEvent);
+    storageHandler?.({ key: "theme-mode", newValue: "invalid" } as StorageEvent);
+
+    expect(store.mode).toBe("dark");
+    expect(store.designStyle).toBe("corporate-minimal");
+    expect(attributes.get("data-theme")).toBe("dark");
+
+    storageHandler?.({ key: null, newValue: null } as StorageEvent);
+    expect(store.mode).toBe("system");
+    expect(store.designStyle).toBe("glass-morphism");
+    store.destroy();
+    expect(removeEventListener).toHaveBeenCalledWith(
+      "storage",
+      expect.any(Function),
+    );
   });
 });

@@ -1,5 +1,16 @@
 # @robot-admin/theme
 
+## 0.5.0
+
+### Minor Changes
+
+- Add framework-free `/core`, UI-independent `/vue`, and Naive UI `/naive` entrypoints while keeping the root API compatible.
+- Add `useNaiveTheme()` and `mergeNaiveThemeOverrides()` so applications can bind NConfigProvider without duplicating merge logic.
+- Add a single `/naive/styles` entry while preserving every existing design-style CSS path and selector.
+- Support injected storage, observable degradation and same-origin tab synchronization with complete lifecycle cleanup.
+- Enforce design-style compatibility on every mode change, including persisted state and system-preference changes.
+- Add public type, adapter, entrypoint identity and framework-boundary verification.
+
 ## 0.4.1
 
 ### Patch Changes

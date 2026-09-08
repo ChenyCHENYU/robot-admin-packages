@@ -1,4 +1,9 @@
-import type { DesignStyle, ResolvedThemeMode, ThemeMode } from "../types";
+import type {
+  DesignStyle,
+  DesignStyleConfig,
+  ResolvedThemeMode,
+  ThemeMode,
+} from "../types";
 
 /** 支持的主题模式，按切换顺序排列。 */
 export const THEME_MODES = Object.freeze([
@@ -33,4 +38,23 @@ export function resolveThemeMode(
   systemIsDark: boolean,
 ): ResolvedThemeMode {
   return mode === "system" ? (systemIsDark ? "dark" : "light") : mode;
+}
+
+/**
+ * 根据设计风格约束解析可用的用户模式。
+ * 兼容时保留用户原始偏好；不兼容时回退到该风格声明的第一个视觉模式。
+ */
+export function resolveCompatibleThemeMode(
+  mode: ThemeMode,
+  systemIsDark: boolean,
+  config: Pick<DesignStyleConfig, "supportedThemeModes">,
+): ThemeMode {
+  const supportedModes = config.supportedThemeModes;
+  if (
+    supportedModes.length === 0 ||
+    supportedModes.includes(resolveThemeMode(mode, systemIsDark))
+  ) {
+    return mode;
+  }
+  return supportedModes[0];
 }

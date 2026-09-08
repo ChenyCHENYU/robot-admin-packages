@@ -1,22 +1,25 @@
 # @robot-admin/theme
 
-> 主题切换和管理系统 — 为 Robot Admin 提供完整的主题管理能力
+> 分层主题基础设施：框架无关解析、Vue/Pinia 状态管理与 Naive UI 适配。
 
 [![npm version](https://img.shields.io/npm/v/@robot-admin/theme.svg)](https://www.npmjs.com/package/@robot-admin/theme)
-[![license](https://img.shields.io/npm/l/@robot-admin/theme.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/@robot-admin/theme.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/packages/theme/LICENSE)
 
-当前版本：`0.4.1`。
+当前版本：`0.5.0`。
 
-## 特性
+## 能力边界
 
-- 🌓 **多模式支持** — Light / Dark / System 三种主题模式
-- 🎨 **View Transition API** — 丝滑流畅的主题切换动画
-- 🔮 **设计风格系统** — Glass Morphism / Corporate Minimal / Dark Tech 三套风格
-- 💾 **安全持久化** — 自动保存偏好，并容忍隐私模式、配额耗尽和历史脏值
-- 🛡️ **职责分层** — 本包管理明暗和设计风格，菜单风格由消费方独立管理
-- ⚙️ **高度可配置** — 支持独立 Store id、存储键、默认值与过渡开关
-- ♿ **无障碍与 SSR** — 尊重 reduced-motion，服务端和不支持 View Transition 时安全降级
-- 🚀 **TypeScript** — 完整的类型支持
+- Light / Dark / System 模式及系统偏好监听。
+- Glass Morphism / Corporate Minimal / Dark Tech 三套设计风格。
+- 安全持久化、历史脏值清理和同源标签页同步。
+- View Transition 渐进增强、并发切换和 reduced-motion 降级。
+- `/core` 不依赖 Vue、Pinia 或任何 UI 框架。
+- `/vue` 提供 Pinia Store，不依赖 Naive UI。
+- `/naive` 提供 NConfigProvider 所需的响应式主题适配。
+- 现有根入口和三个独立 CSS 路径保持兼容。
+
+设计风格 CSS 当前面向 Naive UI 与 Robot `C_*` 体系。Element Plus 项目可以复用
+`/core` 的主题语义；等有真实业务项目时再增加独立适配层，不需要复制或改写 Store。
 
 ## 安装
 
@@ -24,318 +27,206 @@
 bun add @robot-admin/theme
 ```
 
-**Peer Dependencies**：`vue ^3.4` · `pinia ^2 || ^3`。当前设计风格 CSS 面向
-Naive UI 与 Robot `C_*` 组件；`naive-ui ^2.38` 为可选 peer，纯 Store 使用无需安装。
+Peer dependencies：
 
-## 快速开始
+- `/vue`、根入口：`vue ^3.4`、`pinia ^2 || ^3`
+- `/naive`：额外需要可选 peer `naive-ui ^2.38`
+- `/core`：无框架 peer
 
-### 1. 初始化 Store
+## 分层入口
+
+| 入口 | 适用场景 | UI 依赖 |
+|---|---|---|
+| `@robot-admin/theme/core` | 校验、模式解析、非 Vue 应用或未来 UI 适配 | 无 |
+| `@robot-admin/theme/vue` | Vue/Pinia 应用的主题 Store | 无 UI 框架依赖 |
+| `@robot-admin/theme/naive` | Naive UI 的 theme/overrides 绑定 | Naive UI |
+| `@robot-admin/theme` | 兼容入口，API 与 `/vue` 一致 | 无 UI 框架依赖 |
+| `@robot-admin/theme/naive/styles` | 一次引入三套现有设计风格 | Naive UI / Robot C 体系 |
+
+## Vue/Pinia 快速开始
 
 ```typescript
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { useThemeStore } from '@robot-admin/theme'
+import { useThemeStore } from '@robot-admin/theme/vue'
 import App from './App.vue'
 
 const app = createApp(App)
-const pinia = createPinia()
-app.use(pinia)
+app.use(createPinia())
 
-// 初始化主题系统
 const themeStore = useThemeStore()
 themeStore.init()
 
 app.mount('#app')
 ```
 
-### 2. 引入设计风格 CSS
+`init()` 幂等，会同步 `data-theme`、`data-design-style`，并注册系统偏好和同源
+标签页监听。应用卸载、测试或 HMR 清理时调用 `destroy()`。
+
+同一个 document 默认只应存在一个主题所有者。`id` 只是 Pinia Store id，并不代表
+DOM 属性和存储空间已经自动隔离。
+
+## Naive UI 接入
 
 ```typescript
-// 方式一：全部引入（推荐，通过 data-design-style 属性自动切换，互不冲突）
-import '@robot-admin/theme/styles/glass-morphism.css'
-import '@robot-admin/theme/styles/corporate-minimal.css'
-import '@robot-admin/theme/styles/dark-tech.css'
-
-// 方式二：按需引入（仅使用单一风格时）
-import '@robot-admin/theme/styles/glass-morphism.css'
-```
-
-### 3. 在组件中使用
-
-```vue
-<template>
-  <NSpace>
-    <NButton @click="themeStore.toggleMode()">
-      {{ themeStore.isDark ? '🌙 深色' : '☀️ 浅色' }}
-    </NButton>
-    <NButton @click="themeStore.toggleDesignStyle()">
-      {{ themeStore.currentDesignStyleConfig.name }}
-    </NButton>
-  </NSpace>
-</template>
-
-<script setup lang="ts">
-import { useThemeStore } from '@robot-admin/theme'
+import { computed } from 'vue'
+import {
+  useNaiveTheme,
+  useThemeStore,
+} from '@robot-admin/theme/naive'
+import '@robot-admin/theme/naive/styles'
 
 const themeStore = useThemeStore()
-</script>
-```
+const settingsOverrides = computed(() => ({
+  common: {
+    primaryColor: '#409eff',
+    borderRadius: '6px',
+  },
+}))
 
-## 三层架构
-
-```
-Layer 1: 基础主题 (ThemeMode)     → 全局明暗        → data-theme         （本包管理）
-Layer 2: 菜单风格 (MenuTheme)     → 仅侧边栏菜单   → data-menu-theme    （消费方管理）
-Layer 3: 设计风格 (DesignStyle)   → 主内容区组件    → data-design-style  （本包管理）
-```
-
-三层通过不同的 HTML 属性分区，职责边界如下：
-
-- **菜单风格** — 由消费方的扩展 Store 独立管理（`data-menu-theme`），控制 `.n-menu` / `.n-menu-item` 样式
-- **设计风格** — 作用于属性范围内的 Naive UI 与 Robot `C_*` 组件，不覆盖 `.n-menu` 相关选择器
-- **基础主题** — 为两者提供全局 `dark` / `light` CSS 变量基础
-
-## 设计风格
-
-| 风格 | 标识 | 支持主题 | 推荐菜单风格 | 特征 |
-|------|------|---------|-------------|------|
-| 拟态玻璃 | `glass-morphism` | Light / Dark | `signature` | 毛玻璃、半透明、内发光、物理感动画 |
-| 企业简约 | `corporate-minimal` | Light / Dark | `standard` | 极简、克制装饰、清晰层级、商务色彩 |
-| 深邃科技 | `dark-tech` | Dark only | `signature` | 深色渐变、霓虹点缀、发光效果、锐利线条 |
-
-> 选择 `dark-tech` 时，Store 会**自动**将主题切换为暗色模式。
-
-## API 文档
-
-### Store
-
-#### `createThemeStore(options?)`
-
-创建自定义配置的主题 Store：
-
-```typescript
-import { createThemeStore } from '@robot-admin/theme'
-
-const useMyThemeStore = createThemeStore({
-  defaultMode: 'system',                          // 默认主题模式
-  defaultDesignStyle: 'glass-morphism',            // 默认设计风格
-  storageKey: 'theme-mode',                        // localStorage 键名（主题）
-  designStyleStorageKey: 'robot-admin-design-style', // localStorage 键名（设计风格）
-  enableTransition: true,                          // 启用 View Transition 过渡动画
-  id: 'my-theme',                                  // Pinia Store id
+const { currentTheme, themeOverrides } = useNaiveTheme({
+  isDark: () => themeStore.isDark,
+  lightOverrides,
+  darkOverrides,
+  overrides: settingsOverrides,
 })
 ```
 
-Store 的 `init()` 可重复调用且只注册一次系统主题监听；测试、HMR 或显式卸载时
-调用 `destroy()` 释放监听器。同一 document 默认只应存在一个主题所有者；自定义
-`id` 用于 Pinia 命名，不代表 DOM 和存储已经自动隔离。
+```vue
+<NConfigProvider
+  :theme="currentTheme"
+  :theme-overrides="themeOverrides"
+>
+  <RouterView />
+</NConfigProvider>
+```
 
-#### `useThemeStore()`
+`overrides` 必须是增量补丁，默认应为 `{}`。不要把完整亮色配置作为自定义补丁，
+否则它会覆盖暗色基础配置。设置 Store 已经持久化的颜色、圆角等值，直接通过
+computed 派生即可，不要再次写入另一份主题缓存。
 
-获取默认配置的 Store 实例（开箱即用）。
-
-### Store 属性
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `mode` | `ThemeMode` | 当前主题模式 (`'light'` / `'dark'` / `'system'`) |
-| `systemIsDark` | `boolean` | 系统是否为暗色模式 |
-| `isDark` | `boolean`（只读 getter） | 当前是否为暗色模式（已解析 system） |
-| `designStyle` | `DesignStyle` | 当前设计风格标识 |
-| `currentDesignStyleConfig` | `DesignStyleConfig`（只读 getter） | 当前设计风格的完整配置对象 |
-
-> Pinia 会自动解包 Store 中的 ref/computed。请通过 `setMode()`、`setDesignStyle()`
-> 等 action 修改状态，避免直接赋值绕过持久化和 DOM 同步。
-
-### Store 方法
-
-| 方法 | 说明 |
-|------|------|
-| `init()` | 初始化主题系统（必须调用，同步 DOM 属性 + 监听系统偏好） |
-| `destroy()` | 移除系统主题监听；适用于应用卸载、测试和 HMR 清理 |
-| `setMode(mode)` | 设置主题模式（带过渡动画） |
-| `toggleMode()` | 循环切换 light → dark → system |
-| `toggleDark()` | 仅在 light / dark 之间切换 |
-| `setDesignStyle(style)` | 设置设计风格（自动适配不兼容的主题模式） |
-| `toggleDesignStyle()` | 循环切换 glass-morphism → corporate-minimal → dark-tech |
-
-### Composables
-
-#### `useViewTransition(callback, options?)`
-
-使用 View Transition API 执行 DOM 更新（自动降级）：
+如果只使用单一设计风格，也可继续按需引入：
 
 ```typescript
-import { useViewTransition } from '@robot-admin/theme'
+import '@robot-admin/theme/styles/glass-morphism.css'
+```
 
-await useViewTransition(
-  async () => {
-    await persistPreference()
-    document.documentElement.setAttribute('data-theme', 'dark')
-  },
-  { transitioningClass: 'theme-transitioning' },
+以下兼容路径继续有效：
+
+- `@robot-admin/theme/styles/glass-morphism.css`
+- `@robot-admin/theme/styles/corporate-minimal.css`
+- `@robot-admin/theme/styles/dark-tech.css`
+
+## Store API
+
+### `createThemeStore(options?)`
+
+```typescript
+import { createThemeStore } from '@robot-admin/theme/vue'
+
+const useAppThemeStore = createThemeStore({
+  id: 'app-theme',
+  defaultMode: 'system',
+  defaultDesignStyle: 'glass-morphism',
+  storageKey: 'theme-mode',
+  designStyleStorageKey: 'app-design-style',
+  enableTransition: true,
+  syncAcrossTabs: true,
+  onError: (error, context) => reportThemeDegradation(error, context),
+})
+```
+
+| 选项 | 默认值 | 说明 |
+|---|---|---|
+| `id` | `theme` | Pinia Store id，不能为空 |
+| `defaultMode` | `system` | 默认用户主题偏好 |
+| `defaultDesignStyle` | `glass-morphism` | 默认设计风格 |
+| `storageKey` | `theme-mode` | 模式存储键 |
+| `designStyleStorageKey` | `robot-admin-design-style` | 设计风格存储键，不得与模式键相同 |
+| `enableTransition` | `true` | 是否使用 View Transition 渐进增强 |
+| `storage` | 浏览器 localStorage | 可注入兼容 `getItem/setItem/removeItem` 的存储；`null` 禁用持久化 |
+| `syncAcrossTabs` | `true` | 使用内置 localStorage 时同步同源标签页 |
+| `onError` | — | 存储或系统偏好读取失败时的可选诊断回调 |
+
+### 状态和 getter
+
+Pinia 会自动解包 Store 中的 ref/computed：
+
+| 属性 | 消费侧类型 | 说明 |
+|---|---|---|
+| `mode` | `ThemeMode` | 用户模式；不兼容当前风格时会安全归一化 |
+| `systemIsDark` | `boolean` | 当前系统颜色偏好 |
+| `isDark` | `boolean` | 实际是否呈现暗色 |
+| `designStyle` | `DesignStyle` | 当前设计风格 |
+| `currentDesignStyleConfig` | `DesignStyleConfig` | 只读风格元数据 |
+
+请通过 action 修改状态，避免直接赋值绕过校验、持久化和 DOM 同步。
+
+### Actions
+
+| 方法 | 说明 |
+|---|---|
+| `init()` | 初始化并同步 DOM，重复调用安全 |
+| `destroy()` | 移除系统偏好和 storage 监听 |
+| `setMode(mode)` | 设置模式并保持设计风格兼容 |
+| `toggleMode()` | 循环 light → dark → system |
+| `toggleDark()` | 在 light/dark 间切换 |
+| `setDesignStyle(style)` | 设置风格；例如 dark-tech 会归一化到暗色 |
+| `toggleDesignStyle()` | 循环三套设计风格 |
+
+## Core API
+
+```typescript
+import {
+  isThemeMode,
+  resolveCompatibleThemeMode,
+  resolveThemeMode,
+} from '@robot-admin/theme/core'
+
+const mode = isThemeMode(savedMode) ? savedMode : 'system'
+const visualMode = resolveThemeMode(mode, prefersDark)
+const compatibleMode = resolveCompatibleThemeMode(
+  mode,
+  prefersDark,
+  designStyleConfig,
 )
 ```
 
-回调支持同步或异步执行。SSR、浏览器不支持该 API 或用户启用“减少动态效果”时，
-函数会直接执行回调；业务回调抛出的错误不会被过渡中断逻辑吞掉。动画时长请通过
-`::view-transition-*` CSS 控制。
+`/core` 同时导出主题类型、只读元数据、`THEME_MODES` 和 `DESIGN_STYLES`。
 
-#### `isViewTransitionSupported()`
-
-检查浏览器是否支持 View Transition API，返回 `boolean`。
-
-### 常量
-
-| 常量 | 说明 |
-|------|------|
-| `DEFAULT_THEME_OPTIONS` | 默认配置选项 |
-| `THEME_MODE_LABELS` | 主题模式显示文本（`{ light: '浅色', dark: '深色', system: '自动' }`） |
-| `THEME_MODE_ICONS` | 主题模式图标类名 |
-| `DESIGN_STYLE_CONFIGS` | 设计风格配置映射（名称、描述、支持的主题模式、推荐菜单） |
-| `DESIGN_STYLE_LABELS` | 设计风格显示文本 |
-| `DESIGN_STYLE_ICONS` | 设计风格图标类名 |
-
-### TypeScript 类型
+## View Transition
 
 ```typescript
-import type {
-  ThemeMode,           // 'light' | 'dark' | 'system'
-  DesignStyle,         // 'glass-morphism' | 'corporate-minimal' | 'dark-tech'
-  ThemeConfig,         // 主题完整配置
-  ThemeStoreOptions,   // createThemeStore 选项
-  DesignStyleConfig,   // 单个设计风格的配置对象
-} from '@robot-admin/theme'
-```
+import { useViewTransition } from '@robot-admin/theme/vue'
 
-## CSS 变量命名空间
-
-设计风格使用 `--dt-*` 前缀，与项目中各层变量**完全隔离**：
-
-| 前缀 | 来源 | 说明 |
-|------|------|------|
-| `--app-*` | 项目 `theme-variables.scss` | 全局主题变量（背景、文本、边框） |
-| `--c-*` | `@robot-admin/naive-ui-components` | 组件库内部变量 |
-| `--n-*` | Naive UI 内部 | Naive UI 组件变量（NCard / NButton 等） |
-| `--menu-*` | 菜单风格系统 | 菜单装饰效果变量（玻璃、渐变、模糊） |
-| `--dt-*` | **本包设计风格** | 设计风格变量（卡片背景、边框、阴影、动画） |
-
-## 在 Robot Admin 中集成
-
-Robot Admin 可通过扩展 Store 组合基础主题、Naive UI overrides 和菜单风格。扩展层
-应将本包 Store 作为明暗与设计风格的唯一来源，并只保存增量 overrides。
-
-### Step 1：引入 CSS（在 main.ts 或全局入口）
-
-```typescript
-// 全部引入，CSS 通过 data-design-style 属性选择器自动隔离
-import '@robot-admin/theme/styles/glass-morphism.css'
-import '@robot-admin/theme/styles/corporate-minimal.css'
-import '@robot-admin/theme/styles/dark-tech.css'
-```
-
-### Step 2：在扩展 Store 中透传设计风格（可选）
-
-```typescript
-// src/stores/theme/index.ts — 仅需在 return 中透传
-import {
-  useThemeStore as useBaseThemeStore,
-  type ThemeMode,
-  type DesignStyle,          // 新增
-} from '@robot-admin/theme'
-
-export const s_themeStore = defineStore('theme-extended', () => {
-  const baseThemeStore = useBaseThemeStore()
-  const { mode, systemIsDark, isDark, designStyle } = storeToRefs(baseThemeStore)
-  //                                    ^^^^^^^^^^^^ 新增解构
-
-  // ... 现有菜单风格逻辑完全不变 ...
-
-  return {
-    // 现有
-    mode, systemIsDark, isDark,
-    menuTheme, isMenuLight,
-    currentTheme, themeOverrides, customOverrides,
-    init, setMode, setMenuTheme, updateThemeOverrides, resetThemeOverrides,
-
-    // 新增（从基础 Store 透传）
-    designStyle,
-    currentDesignStyleConfig: baseThemeStore.currentDesignStyleConfig,
-    setDesignStyle: baseThemeStore.setDesignStyle,
-    toggleDesignStyle: baseThemeStore.toggleDesignStyle,
-  }
+await useViewTransition(() => {
+  document.documentElement.dataset.theme = 'dark'
 })
 ```
 
-### Step 3：在设置面板中提供切换入口
+不支持 API、用户启用 reduced-motion 或浏览器主动中止动画时，会直接执行 DOM
+更新；并发调用不会提前移除 `.theme-transitioning`。业务 callback 的错误仍会原样传播。
 
-```vue
-<template>
-  <NSelect
-    :value="themeStore.designStyle"
-    :options="styleOptions"
-    @update:value="themeStore.setDesignStyle($event)"
-  />
-</template>
+## CSS 职责
 
-<script setup lang="ts">
-import { DESIGN_STYLE_CONFIGS } from '@robot-admin/theme'
-
-const styleOptions = Object.entries(DESIGN_STYLE_CONFIGS).map(([value, config]) => ({
-  label: config.name,
-  value,
-}))
-</script>
+```text
+data-theme         -> 实际明暗模式，本包 Store 管理
+data-design-style  -> 设计风格，本包 Store 管理
+data-menu-theme    -> 菜单呈现，由 layout/消费方管理
 ```
 
-## 升级到 v0.4.1
+三套 CSS 均以 `data-design-style` 作为作用域，不控制 `.n-menu`。现有 `C_*` 选择器
+继续保留，以维持 Robot 组件体系的呈现和兼容性。
 
-v0.4.1 保持现有 Store、CSS 路径和视觉表现兼容，并强化运行时边界：
+## 从 0.4.x 升级
 
-| 变更点 | 升级说明 |
-|--------|----------|
-| `ThemeStoreOptions.id` | 仅作为 Pinia Store id；同一 document 仍建议只有一个主题所有者 |
-| `destroy()` | 应用卸载、测试或 HMR 清理时建议调用，普通单页应用可不调用 |
-| `useViewTransition` | 浏览器过渡失败时保证 DOM 回调恰好执行一次，并支持并发调用 |
-| 存储值校验 | 非法主题/风格值会回退并清理；空键和冲突键会立即报错 |
-| 系统主题 | 在 `init()` 前调用 system 相关 action 也会安全解析系统偏好 |
+0.5.0 不删除原 API 或 CSS 路径：
 
-从 v0.4.0 升级无需修改调用代码。
-
-```bash
-bun add @robot-admin/theme@latest
-```
-
-## CSS 配置
-
-在全局样式中添加（Robot Admin 已有 `theme-variables.scss` 覆盖此部分）：
-
-```css
-[data-theme="light"] {
-  --bg-color: #ffffff;
-  --text-color: #333333;
-}
-
-[data-theme="dark"] {
-  --bg-color: #1a1a1a;
-  --text-color: #ffffff;
-}
-
-/* View Transition API 动画 */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.5s;
-}
-
-/* 禁用冲突的 CSS transitions */
-.theme-transitioning * {
-  transition: none !important;
-}
-```
-
-## 完整示例
-
-查看 [Robot Admin](https://github.com/ChenyCHENYU/Robot_Admin) 项目以获取完整的使用示例。
+1. 通用 Vue 项目建议从 `/vue` 导入。
+2. Naive UI 项目建议从 `/naive` 导入，并用 `/naive/styles` 替代三条样式导入。
+3. 原来的根入口仍等价于 `/vue`。
+4. `syncAcrossTabs` 默认开启；传入自定义 `storage` 时不会隐式监听 window storage。
+5. dark-tech 等受限风格下，后续 `setMode()` 也会继续保持兼容，不会形成非法组合。
 
 ## License
 
