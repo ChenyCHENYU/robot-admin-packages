@@ -2,11 +2,29 @@ import { ref } from "vue";
 import { darkTheme, lightTheme } from "naive-ui";
 import { describe, expect, it } from "vitest";
 import {
+  createNaiveThemeOverrides,
   mergeNaiveThemeOverrides,
   useNaiveTheme,
 } from "../src/entries/naive";
+import { createThemeTokens } from "../src/entries/core";
 
 describe("Naive UI theme adapter", () => {
+  it("maps semantic tokens without leaking framework names into core", () => {
+    const tokens = createThemeTokens({
+      light: { color: { primary: "#6750a4" } },
+    });
+    const overrides = createNaiveThemeOverrides(tokens, "light");
+
+    expect(overrides.common?.primaryColor).toBe("#6750a4");
+    expect(overrides.DataTable?.thColor).toBe(tokens.light.component.tableHeaderBg);
+    expect(overrides.Tabs?.barColor).toBe(tokens.light.component.tabIndicator);
+    expect(overrides.Tabs).toMatchObject({
+      colorSegment: tokens.light.color.surfaceMuted,
+      tabColorSegment: tokens.light.color.surface,
+      tabBorderColor: tokens.light.color.border,
+    });
+  });
+
   it("merges component overrides without replacing sibling properties", () => {
     expect(
       mergeNaiveThemeOverrides(
@@ -21,16 +39,18 @@ describe("Naive UI theme adapter", () => {
 
   it("exposes reactive NConfigProvider bindings", () => {
     const isDark = ref(false);
+    const tokens = createThemeTokens();
     const overrides = ref({ common: { borderRadius: "8px" } });
     const binding = useNaiveTheme({
       isDark,
       lightOverrides: { common: { primaryColor: "#2080f0" } },
       darkOverrides: { common: { primaryColor: "#409eff" } },
       overrides,
+      tokens,
     });
 
     expect(binding.currentTheme.value).toBe(lightTheme);
-    expect(binding.themeOverrides.value.common).toEqual({
+    expect(binding.themeOverrides.value.common).toMatchObject({
       primaryColor: "#2080f0",
       borderRadius: "8px",
     });

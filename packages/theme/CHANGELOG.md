@@ -1,5 +1,11 @@
 # @robot-admin/theme
 
+## 0.6.0
+
+### Minor Changes
+
+- Add a framework-neutral semantic Token system with validated project overrides, generated CSS Variables, reversible runtime application, Naive UI mapping, and complete customization guidance.
+
 ## 0.5.1
 
 ### Patch Changes

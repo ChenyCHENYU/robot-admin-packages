@@ -18,6 +18,11 @@ import {
   resolveCompatibleThemeMode,
   resolveThemeMode,
 } from "../core/theme";
+import {
+  applyThemeTokens,
+  createThemeTokens,
+  setThemeCssVariables,
+} from "../tokens";
 
 /** 安全通知宿主运行时降级信息，避免诊断回调反向阻断主题。 */
 function reportRuntimeError(
@@ -129,7 +134,9 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
     syncAcrossTabs = DEFAULT_THEME_OPTIONS.syncAcrossTabs,
     onError,
     id = "theme",
+    tokens: tokenOverrides,
   } = options;
+  const tokens = createThemeTokens(tokenOverrides);
 
   if (!isThemeMode(defaultMode)) {
     throw new RangeError(`未知的默认主题模式: ${String(defaultMode)}`);
@@ -207,6 +214,7 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
     /**
      * 同步主题属性到 HTML 元素
      */
+    let restoreThemeTokens: (() => void) | null = null;
     const syncThemeAttr = () => {
       if (typeof document !== "undefined") {
         const themeValue = isDark.value ? "dark" : "light";
@@ -215,6 +223,17 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
           "data-design-style",
           designStyle.value,
         );
+        if (tokenOverrides) {
+          if (restoreThemeTokens) {
+            setThemeCssVariables(document.documentElement.style, tokens, themeValue);
+          } else {
+            restoreThemeTokens = applyThemeTokens(
+              document.documentElement.style,
+              tokens,
+              themeValue,
+            );
+          }
+        }
       }
     };
 
@@ -337,6 +356,8 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       mediaQueryCleanup = null;
       storageCleanup?.();
       storageCleanup = null;
+      restoreThemeTokens?.();
+      restoreThemeTokens = null;
       initialized = false;
     };
 
@@ -448,6 +469,7 @@ export function createThemeStore(options: ThemeStoreOptions = {}) {
       // Getters
       isDark,
       currentDesignStyleConfig,
+      tokens,
 
       // Actions
       init,

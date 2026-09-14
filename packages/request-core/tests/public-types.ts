@@ -1,8 +1,10 @@
+import { createRequestClient, type RequestConfig } from "../src/entries/axios";
 import {
-  createRequestClient,
-  type RequestConfig,
-} from "../src/entries/axios";
-import { createTableCrud, useTableCrud } from "../src/entries/vue";
+  createMemoryTableSource,
+  createTableCrud,
+  defineDetailConfig,
+  useTableCrud,
+} from "../src/entries/vue";
 
 interface User {
   id: number;
@@ -30,6 +32,15 @@ async function verifyClientTypes(): Promise<void> {
 }
 
 function verifyTableTypes(): void {
+  const detail = defineDetailConfig({
+    sections: [
+      {
+        title: "User",
+        columns: 1,
+        items: [{ label: "Name", key: "name", formatter: (value) => String(value) }],
+      },
+    ],
+  });
   const table = useTableCrud<User, { keyword: string }>({
     client,
     autoLoad: false,
@@ -38,6 +49,7 @@ function verifyTableTypes(): void {
       items: [{ id: 1, name: filters.keyword }],
       total: 1,
     }),
+    detail,
   });
   table.rows.value[0]?.name.toUpperCase();
   void table.search({ keyword: "Robot" });
@@ -56,6 +68,11 @@ function verifyTableTypes(): void {
     }),
   });
   configured.rows.value[0]?.id.toFixed();
+
+  const local = useAppTable({
+    source: createMemoryTableSource([{ id: 1, name: "Robot" }]),
+  });
+  local.rows.value[0]?.name.toUpperCase();
 }
 
 void verifyClientTypes;

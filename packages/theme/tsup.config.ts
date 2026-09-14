@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     core: "src/entries/core.ts",
+    tokens: "src/entries/tokens.ts",
     vue: "src/entries/vue.ts",
     naive: "src/entries/naive.ts",
   },

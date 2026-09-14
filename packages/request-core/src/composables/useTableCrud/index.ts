@@ -10,7 +10,10 @@
 
 // ==================== 主函数 ====================
 export { createTableCrud } from "./createTableCrud";
+export { createMemoryTableSource } from "./createMemoryTableSource";
+export { defineDetailConfig } from "./configuration";
 export { useTableCrud } from "./useTableCrud";
+export type { MemoryTableSourceOptions } from "./createMemoryTableSource";
 
 // ==================== 类型 ====================
 export type {
@@ -25,11 +28,17 @@ export type {
   DetailSection,
   DetailConfig,
   DetailModal,
+  CrudEditor,
+  CrudEditorConfig,
+  CrudEditorContext,
+  CrudEditorMode,
   // 主配置
   UseTableCrudConfig,
   UseTableCrudReturn,
   TableCrudDefaults,
   TableCrudFactory,
+  TableCrudDataSource,
+  TableCrudSource,
   TableListParamKeys,
   TableListParams,
 } from "./types";

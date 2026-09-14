@@ -13,7 +13,11 @@ const entrypoints = [
   },
   {
     name: "core",
-    exports: ["isThemeMode", "isDesignStyle", "resolveThemeMode"],
+    exports: ["isThemeMode", "isDesignStyle", "resolveThemeMode", "createThemeTokens"],
+  },
+  {
+    name: "tokens",
+    exports: ["createThemeTokens", "getThemeCssVariables", "applyThemeTokens"],
   },
   {
     name: "vue",
@@ -21,7 +25,11 @@ const entrypoints = [
   },
   {
     name: "naive",
-    exports: ["mergeNaiveThemeOverrides", "useNaiveTheme"],
+    exports: [
+      "createNaiveThemeOverrides",
+      "mergeNaiveThemeOverrides",
+      "useNaiveTheme",
+    ],
   },
 ];
 
@@ -66,7 +74,12 @@ async function dependencySources(relativeFile, visited = new Set()) {
   return [source, ...children];
 }
 
-for (const file of ["dist/core.js", "dist/core.cjs"]) {
+for (const file of [
+  "dist/core.js",
+  "dist/core.cjs",
+  "dist/tokens.js",
+  "dist/tokens.cjs",
+]) {
   const source = (await dependencySources(file)).join("\n");
   if (/\b(?:vue|pinia|naive-ui|element-plus)\b/.test(source)) {
     throw new TypeError(`${file} contains a framework dependency`);
@@ -80,7 +93,7 @@ for (const file of ["dist/vue.js", "dist/vue.cjs"]) {
   }
 }
 
-for (const entrypoint of ["index", "core", "vue", "naive"]) {
+for (const entrypoint of ["index", "core", "tokens", "vue", "naive"]) {
   for (const extension of ["d.ts", "d.cts"]) {
     const source = await readFile(
       resolve(packageRoot, `dist/${entrypoint}.${extension}`),
@@ -117,6 +130,21 @@ const aggregateStyle = await readFile(
   new URL("../dist/styles/naive.css", import.meta.url),
   "utf8",
 );
+const tokenStyle = await readFile(
+  new URL("../dist/styles/tokens.css", import.meta.url),
+  "utf8",
+);
+for (const variable of [
+  "--ra-color-primary",
+  "--ra-color-text-primary",
+  "--ra-table-header-bg",
+  "--ra-tab-indicator",
+  "--ra-control-height-mini",
+]) {
+  if (!tokenStyle.includes(variable) || !aggregateStyle.includes(variable)) {
+    throw new TypeError(`published styles are missing ${variable}`);
+  }
+}
 for (const style of ["glass-morphism", "corporate-minimal", "dark-tech"]) {
   if (!aggregateStyle.includes(`data-design-style=${style}`) &&
       !aggregateStyle.includes(`data-design-style="${style}"`)) {
@@ -127,7 +155,7 @@ for (const style of ["glass-morphism", "corporate-minimal", "dark-tech"]) {
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
-for (const file of ["README.md", "CHANGELOG.md", "LICENSE", "SECURITY.md"]) {
+for (const file of ["README.md", "CHANGELOG.md", "LICENSE", "SECURITY.md", "docs"]) {
   if (!packageJson.files.includes(file)) {
     throw new TypeError(`published files are missing ${file}`);
   }

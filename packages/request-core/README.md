@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/@robot-admin/request-core.svg)](./LICENSE)
 
 面向生产环境的实例化请求编排与 Vue 3 Headless CRUD 工具。当前版本：
-`0.5.0`。
+`0.6.0`。
 
 它保留 Axios 的完整能力，只收拢应用中最容易重复出错的部分：并发请求、缓存、
 取消、重试、Token 刷新、错误标准化以及列表 CRUD 生命周期。
@@ -19,6 +19,7 @@
 - Token 主动刷新、并发 401 恢复和重新登录均使用 single-flight。
 - `RequestError` 统一业务、HTTP、网络、超时、取消和配置错误。
 - `createTableCrud()` 以函数式应用预配置消除类继承和页面级分页映射重复。
+- `source` 统一真实端点与自定义数据源，业务侧无需拼装 `api/query/mutations`。
 - Vue 层不依赖具体 UI；Naive UI 仅作为可选兼容适配层。
 - ESM、CJS 和 TypeScript 类型入口均经过发布前验证。
 
@@ -28,13 +29,13 @@
 bun add @robot-admin/request-core axios
 ```
 
-| 入口 | 依赖边界 | 用途 |
-| --- | --- | --- |
-| `@robot-admin/request-core/axios` | Axios | 推荐的请求 Client、策略及兼容 API |
-| `@robot-admin/request-core/vue` | Axios + Vue | `useRequest`、Headless `useTableCrud/createTableCrud`、Client 注入 |
-| `@robot-admin/request-core/naive` | Axios + Vue + Naive UI | `useNaiveTableCrud` 兼容适配 |
-| `@robot-admin/request-core` | 完整兼容入口 | 旧项目平滑迁移，当前仍会引用 Naive UI |
-| `@robot-admin/request-core/crud` | 兼容入口 | 已废弃，迁移到 `/vue` 或 `/naive` |
+| 入口                              | 依赖边界               | 用途                                                               |
+| --------------------------------- | ---------------------- | ------------------------------------------------------------------ |
+| `@robot-admin/request-core/axios` | Axios                  | 推荐的请求 Client、策略及兼容 API                                  |
+| `@robot-admin/request-core/vue`   | Axios + Vue            | `useRequest`、Headless `useTableCrud/createTableCrud`、Client 注入 |
+| `@robot-admin/request-core/naive` | Axios + Vue + Naive UI | `useNaiveTableCrud` 兼容适配                                       |
+| `@robot-admin/request-core`       | 完整兼容入口           | 旧项目平滑迁移，当前仍会引用 Naive UI                              |
+| `@robot-admin/request-core/crud`  | 兼容入口               | 已废弃，迁移到 `/vue` 或 `/naive`                                  |
 
 纯请求项目应使用 `/axios`，这样不会引入 Vue 或任何 UI 框架。
 
@@ -47,17 +48,17 @@ bun add @robot-admin/request-core axios
 import {
   createRequestClient,
   type ResponseAdapter,
-} from '@robot-admin/request-core/axios'
+} from "@robot-admin/request-core/axios";
 
 const responseAdapter: ResponseAdapter = {
-  isSuccess: data => [0, 200].includes((data as { code: number }).code),
-  getData: data => (data as { data: unknown }).data,
-  getError: data => ({
+  isSuccess: (data) => [0, 200].includes((data as { code: number }).code),
+  getData: (data) => (data as { data: unknown }).data,
+  getError: (data) => ({
     code: (data as { code?: number }).code,
-    message: (data as { message?: string }).message ?? '请求失败',
+    message: (data as { message?: string }).message ?? "请求失败",
     data,
   }),
-}
+};
 
 export const request = createRequestClient({
   request: {
@@ -66,16 +67,16 @@ export const request = createRequestClient({
   },
   response: responseAdapter,
   defaults: {
-    concurrency: 'join',
+    concurrency: "join",
     retry: { enabled: false },
     cache: { enabled: false },
   },
   hooks: {
-    onError: error => {
-      if (error.kind !== 'canceled') window.$message?.error(error.message)
+    onError: (error) => {
+      if (error.kind !== "canceled") window.$message?.error(error.message);
     },
   },
-})
+});
 ```
 
 所有能力均可省略。默认缓存和重试关闭；新 Client 的相同安全读取请求默认共享结果，
@@ -85,26 +86,26 @@ export const request = createRequestClient({
 
 ```ts
 interface User {
-  id: number
-  name: string
+  id: number;
+  name: string;
 }
 
 interface CreateUser {
-  name: string
+  name: string;
 }
 
-const users = await request.get<User[]>('/users', {
-  params: { keyword: 'robot' },
-})
+const users = await request.get<User[]>("/users", {
+  params: { keyword: "robot" },
+});
 
-const user = await request.post<User, CreateUser>('/users', {
-  name: 'Robot',
-})
+const user = await request.post<User, CreateUser>("/users", {
+  name: "Robot",
+});
 
 const response = await request.raw<User>({
-  method: 'GET',
-  url: '/users/1',
-})
+  method: "GET",
+  url: "/users/1",
+});
 ```
 
 支持 `request/get/post/put/patch/delete/head/options/raw`。`raw()` 返回完整
@@ -115,15 +116,15 @@ const response = await request.raw<User>({
 策略可以在 Client 层配置默认值，也可以被单次请求覆盖：
 
 ```ts
-await request.get('/dashboard', {
-  cache: { enabled: true, ttl: 60_000, tags: ['dashboard'] },
+await request.get("/dashboard", {
+  cache: { enabled: true, ttl: 60_000, tags: ["dashboard"] },
   retry: { enabled: true, count: 2, maxElapsedMs: 8_000 },
-  concurrency: 'takeLatest',
-  scope: 'dashboard-page',
-})
+  concurrency: "takeLatest",
+  scope: "dashboard-page",
+});
 
-request.cache.invalidateTag('dashboard')
-request.requests.cancelScope('dashboard-page')
+request.cache.invalidateTag("dashboard");
+request.requests.cancelScope("dashboard-page");
 ```
 
 并发策略：
@@ -141,20 +142,20 @@ request.requests.cancelScope('dashboard-page')
 ```ts
 const client = createRequestClient({
   cache: { maxSize: 500, clone: true },
-})
+});
 
-await client.get('/users', {
+await client.get("/users", {
   cache: {
     enabled: true,
     ttl: 5 * 60_000,
-    tags: ['users'],
-    varyHeaders: ['accept-language'],
+    tags: ["users"],
+    varyHeaders: ["accept-language"],
   },
-})
+});
 
-client.cache.clear()
-client.cache.invalidateTag('users')
-client.cache.invalidatePrefix('GET|')
+client.cache.clear();
+client.cache.invalidateTag("users");
+client.cache.invalidatePrefix("GET|");
 ```
 
 缓存按 Client 隔离，键包含 `baseURL`、URL、方法、参数、请求体、响应类型和身份
@@ -163,7 +164,7 @@ client.cache.invalidatePrefix('GET|')
 ### 重试
 
 ```ts
-await request.get('/reports', {
+await request.get("/reports", {
   retry: {
     enabled: true,
     count: 3,
@@ -173,7 +174,7 @@ await request.get('/reports', {
     respectRetryAfter: true,
     onRetry: ({ attempt, delay }) => reportRetry(attempt, delay),
   },
-})
+});
 ```
 
 默认只允许 GET、HEAD、OPTIONS、PUT、DELETE 重试。POST 不会自动重试；流式或
@@ -183,28 +184,28 @@ await request.get('/reports', {
 
 ```ts
 const request = createRequestClient({
-  request: { baseURL: '/api' },
+  request: { baseURL: "/api" },
   auth: {
     getToken: () => userStore.token,
     shouldRefresh: () => userStore.isTokenExpiringSoon(),
     refresh: async ({ raw, signal }) => {
       const response = await raw<{ data: { token: string } }>({
-        method: 'POST',
-        url: '/auth/refresh-token',
+        method: "POST",
+        url: "/auth/refresh-token",
         data: { refreshToken: userStore.refreshToken },
         signal,
-      })
-      const token = response.data.data.token
-      userStore.setToken(token)
-      return token
+      });
+      const token = response.data.data.token;
+      userStore.setToken(token);
+      return token;
     },
     reauthenticate: async () => {
-      await reLoginDialog.open()
-      return userStore.token
+      await reLoginDialog.open();
+      return userStore.token;
     },
-    isAuthRequest: config => config.url?.startsWith('/auth/') === true,
+    isAuthRequest: (config) => config.url?.startsWith("/auth/") === true,
   },
-})
+});
 ```
 
 并发请求共享同一次刷新或重新登录。401 请求最多自动重放一次；`raw` 会自动
@@ -216,10 +217,10 @@ const request = createRequestClient({
 
 ```ts
 // main.ts
-import { createRequestPlugin } from '@robot-admin/request-core/vue'
-import { request } from '@/services/request'
+import { createRequestPlugin } from "@robot-admin/request-core/vue";
+import { request } from "@/services/request";
 
-app.use(createRequestPlugin(request))
+app.use(createRequestPlugin(request));
 ```
 
 这只通过 Vue InjectionKey 提供 Client，不写入 `window`，也不修改 Vue 全局类型。
@@ -228,15 +229,15 @@ app.use(createRequestPlugin(request))
 ### useRequest
 
 ```ts
-import { useRequest } from '@robot-admin/request-core/vue'
-import { request } from '@/services/request'
+import { useRequest } from "@robot-admin/request-core/vue";
+import { request } from "@/services/request";
 
 const user = useRequest(
   ({ signal }, id: number) => request.get<User>(`/users/${id}`, { signal }),
-  { concurrency: 'takeLatest', keepPreviousData: true },
-)
+  { concurrency: "takeLatest", keepPreviousData: true },
+);
 
-await user.run(1)
+await user.run(1);
 ```
 
 提供 `data/error/loading/run/cancel/reset`，并在 Vue 作用域销毁时自动取消。
@@ -245,33 +246,97 @@ await user.run(1)
 
 ## Headless useTableCrud
 
+标准页面优先传一个 `source`：它既可以是端点配置，也可以是自定义数据源。原有
+`api/query/mutations` 继续兼容，只有需要逐项覆盖底层行为时才使用。
+
 ```ts
-import { useTableCrud } from '@robot-admin/request-core/vue'
-import { request } from '@/services/request'
+import {
+  createMemoryTableSource,
+  defineDetailConfig,
+  useTableCrud,
+} from "@robot-admin/request-core/vue";
+
+const table = useTableCrud({
+  source: import.meta.env.DEV
+    ? createMemoryTableSource(seedUsers)
+    : {
+        list: "/users",
+        get: "/users/:id",
+        create: "/users",
+        update: "/users/:id",
+        remove: "/users/:id",
+      },
+  createNewRow: () => ({ id: 0, name: "" }),
+});
+```
+
+行类型会从 `seedUsers` 和 `createNewRow` 自动推断；内存数据源为每次创建保留隔离
+快照并内置查询、详情、新增、更新和删除，适合演示、测试与离线数据。业务代码不需要
+声明 `UseTableCrudConfig`、`Pick<>` 或重复实现五个异步方法。
+
+详情字段使用 `defineDetailConfig()` 获得 formatter 参数检查，无需在配置变量上追加
+类型标注：
+
+```ts
+const userDetail = defineDetailConfig({
+  sections: [
+    {
+      title: "用户信息",
+      columns: 2,
+      items: [{ label: "姓名", key: "name" }],
+    },
+  ],
+});
+```
+
+复杂后端仍可直接接管查询和变更：
+
+```ts
+import { useTableCrud } from "@robot-admin/request-core/vue";
+import { request } from "@/services/request";
 
 const table = useTableCrud<User, UserFilters, UserSort>({
   client: request,
-  autoLoad: 'mounted',
-  initialFilters: { keyword: '' },
+  autoLoad: "mounted",
+  initialFilters: { keyword: "" },
   query: ({ page, pageSize, filters, sort, signal }) =>
-    request.get('/users', {
+    request.get("/users", {
       params: { page, pageSize, ...filters, sort },
       signal,
-      concurrency: 'takeLatest',
+      concurrency: "takeLatest",
     }),
   mutations: {
-    create: (row, { signal }) => request.post('/users', row, { signal }),
+    create: (row, { signal }) => request.post("/users", row, { signal }),
     update: (row, { signal }) =>
       request.put(`/users/${row.id}`, row, { signal }),
-    remove: (row, { signal }) =>
-      request.delete(`/users/${row.id}`, { signal }),
+    remove: (row, { signal }) => request.delete(`/users/${row.id}`, { signal }),
   },
-  createNewRow: () => ({ id: 0, name: '' }),
-})
+  createNewRow: () => ({ id: 0, name: "" }),
+});
 
-await table.search({ keyword: 'robot' })
-await table.resetSearch()
+await table.search({ keyword: "robot" });
+await table.resetSearch();
 ```
+
+新增/编辑弹窗不需要在页面重复维护 `visible/mode/model/loading`。配置一次草稿、标题和提交前转换，任意 UI 组件都可以直接消费结构化的 `table.editor`：
+
+```ts
+const table = useTableCrud<Order>({
+  source: orderApi,
+  createNewRow: () => ({ id: "", orderNo: "", status: "pending" }),
+  editor: {
+    createTitle: "新增订单",
+    editTitle: (row) => `编辑订单 · ${row.orderNo}`,
+    prepareSubmit: (row) => ({ ...row, orderNo: row.orderNo.trim() }),
+  },
+});
+
+table.editor.openCreate();
+table.editor.openEdit(order);
+await table.editor.submit();
+```
+
+编辑草稿与原始行隔离；提交成功后自动关闭，校验、预处理或请求失败时保持打开。`editor` 是无 UI 依赖的结构契约，可交给 Naive UI、Element Plus 或项目自己的表单弹窗呈现。
 
 ### 函数式单表预配置
 
@@ -280,28 +345,27 @@ await table.resetSearch()
 
 ```ts
 // src/composables/useAppTable.ts
-import { createTableCrud } from '@robot-admin/request-core/vue'
-import { request } from '@/services/request'
+import { createTableCrud } from "@robot-admin/request-core/vue";
+import { request } from "@/services/request";
 
 export const useAppTable = createTableCrud({
   client: request,
-  autoLoad: 'mounted',
+  autoLoad: "mounted",
   defaultPageSize: 20,
-  listParams: { page: 'current', pageSize: 'size' },
-})
+  listParams: { page: "current", pageSize: "size" },
+});
 
 // user-page.ts
 const table = useAppTable<User, UserFilters>({
-  api: { list: '/users' },
-  initialFilters: { keyword: '' },
+  source: { list: "/users" },
+  initialFilters: { keyword: "" },
   mutations: {
-    create: (row, { signal }) => request.post('/users', row, { signal }),
+    create: (row, { signal }) => request.post("/users", row, { signal }),
     update: (row, { signal }) =>
       request.put(`/users/${row.id}`, row, { signal }),
-    remove: (row, { signal }) =>
-      request.delete(`/users/${row.id}`, { signal }),
+    remove: (row, { signal }) => request.delete(`/users/${row.id}`, { signal }),
   },
-})
+});
 ```
 
 工厂只保存配置快照，每次调用仍创建完全隔离的响应式状态。页面配置可以覆盖任意
@@ -313,15 +377,16 @@ const table = useAppTable<User, UserFilters>({
 
 主要返回值：
 
-| 状态/方法 | 说明 |
-| --- | --- |
-| `rows`, `total`, `error`, `lastUpdated` | 数据与错误状态 |
-| `loading`, `isInitialLoading`, `isRefreshing` | 查询状态 |
-| `creating`, `updating`, `removing` | 独立变更状态 |
-| `filters`, `sort`, `page`, `pagination` | 查询条件与分页 |
-| `refresh/reload/search/resetSearch/setSort` | 查询操作 |
-| `create/save/remove/batchRemove/getDetail` | CRUD 操作 |
-| `createDraft/cancel/dispose` | 草稿和生命周期 |
+| 状态/方法                                     | 说明                                |
+| --------------------------------------------- | ----------------------------------- |
+| `rows`, `total`, `error`, `lastUpdated`       | 数据与错误状态                      |
+| `loading`, `isInitialLoading`, `isRefreshing` | 查询状态                            |
+| `creating`, `updating`, `removing`            | 独立变更状态                        |
+| `filters`, `sort`, `page`, `pagination`       | 查询条件与分页                      |
+| `refresh/reload/search/resetSearch/setSort`   | 查询操作                            |
+| `create/save/remove/batchRemove/getDetail`    | CRUD 操作                           |
+| `editor`                                      | 隔离的新增/编辑弹窗状态与提交工作流 |
+| `createDraft/cancel/dispose`                  | 草稿和生命周期                      |
 
 刷新采用 latest-wins，旧响应不会覆盖新数据；批量删除默认最多并发 4 个请求；
 关闭删除后刷新时会同步维护本地行和总数；组件作用域销毁会终止未完成任务。
@@ -330,13 +395,13 @@ Message 适配器属于呈现观察层，其异常不会改变 CRUD 请求结果
 ### Naive UI 兼容层
 
 ```ts
-import { useNaiveTableCrud } from '@robot-admin/request-core/naive'
+import { useNaiveTableCrud } from "@robot-admin/request-core/naive";
 
 const table = useNaiveTableCrud({
   client: request,
-  query: context => userApi.list(context),
+  query: (context) => userApi.list(context),
   columns,
-})
+});
 ```
 
 `useNaiveTableCrud` 只注入 Naive UI 的 Message/Dialog，数据能力与 `/vue` 完全
@@ -349,7 +414,7 @@ const table = useNaiveTableCrud({
 `deleteData()` 继续可用。需要让这些全局兼容函数指向新 Client 时：
 
 ```ts
-const request = createRequestClient({ setAsDefault: true })
+const request = createRequestClient({ setAsDefault: true });
 ```
 
 或者调用 `setDefaultRequestClient(request)`。全局兼容入口只保存“默认 Client”引用；

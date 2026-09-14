@@ -1,3 +1,5 @@
+import type { ThemeTokenOverrides } from "../tokens/types";
+
 /**
  * 主题模式类型
  */
@@ -90,4 +92,6 @@ export interface ThemeStoreOptions {
   onError?: ThemeErrorHandler;
   /** Pinia Store 唯一标识（默认 "theme"） */
   id?: string;
+  /** 项目级 Token 增量覆盖；配置后由 Store 管理 CSS Variables 的应用与清理。 */
+  tokens?: ThemeTokenOverrides;
 }

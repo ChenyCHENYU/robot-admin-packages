@@ -91,6 +91,25 @@ export interface CrudMutations<T> {
   get?: (row: T, context: TableMutationContext) => Promise<T>;
 }
 
+/** A complete custom data source for local data, tests and non-HTTP backends. */
+export interface TableCrudDataSource<
+  T extends DataRecord,
+  Filters extends object = Record<string, unknown>,
+  Sort extends object = Record<string, unknown>,
+> {
+  query: (
+    context: TableQueryContext<Filters, Sort>,
+  ) => Promise<TableQueryResult<T> | unknown>;
+  mutations?: CrudMutations<T>;
+}
+
+/** One explicit source replaces page-side api/query/mutations object assembly. */
+export type TableCrudSource<
+  T extends DataRecord,
+  Filters extends object = Record<string, unknown>,
+  Sort extends object = Record<string, unknown>,
+> = ApiEndpoints | TableCrudDataSource<T, Filters, Sort>;
+
 export interface ActionContext<T> {
   data: T[];
   index: number;
@@ -129,12 +148,29 @@ export interface DetailConfig {
   sections: DetailSection[];
 }
 
+export type CrudEditorMode = "create" | "edit";
+
+export interface CrudEditorContext<T> {
+  mode: CrudEditorMode;
+  original: T | null;
+}
+
+/** Optional business hooks and copy for the headless create/edit workflow. */
+export interface CrudEditorConfig<T> {
+  createTitle?: string;
+  editTitle?: string | ((row: T) => string);
+  /** Normalizes timestamps, audit fields, etc. immediately before persistence. */
+  prepareSubmit?: (row: T, context: CrudEditorContext<T>) => T | Promise<T>;
+}
+
 export interface UseTableCrudConfig<
   T extends DataRecord,
   Filters extends object = Record<string, unknown>,
   Sort extends object = Record<string, unknown>,
 > {
-  /** Legacy string endpoints. Prefer query/mutations for typed applications. */
+  /** Preferred flat boundary: pass endpoint configuration or a custom source. */
+  source?: TableCrudSource<T, Filters, Sort>;
+  /** Backward-compatible split endpoint field. New code should prefer source. */
   api?: ApiEndpoints;
   /**
    * Maps list state to query parameters when api.list is used. A function fully
@@ -149,6 +185,7 @@ export interface UseTableCrudConfig<
   columns?: TableColumn<T>[];
   customActions?: CustomAction<T>[];
   detail?: DetailConfig;
+  editor?: CrudEditorConfig<T>;
   idKey?: keyof T;
   defaultPageSize?: number;
   defaultPaginationEnabled?: boolean;
@@ -193,6 +230,20 @@ export interface DetailModal<T> {
   title: Ref<string>;
   show: (row: T) => void;
   close: () => void;
+}
+
+/** Framework-agnostic state consumed by form modal adapters. */
+export interface CrudEditor<T> {
+  visible: Ref<boolean>;
+  mode: Ref<CrudEditorMode>;
+  model: Ref<T | null>;
+  title: Ref<string>;
+  loading: ComputedRef<boolean>;
+  openCreate: () => void;
+  openEdit: (row: T) => void;
+  setModel: (row: T) => void;
+  close: () => void;
+  submit: (row?: T) => Promise<boolean>;
 }
 
 export interface TableActionResult<T = unknown> {
@@ -258,4 +309,5 @@ export interface UseTableCrudReturn<
   handleRowDelete: (row: T, index?: number) => void;
   detail: DetailModal<T>;
   detailConfig?: DetailConfig;
+  editor: CrudEditor<T>;
 }

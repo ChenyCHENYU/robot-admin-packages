@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/theme.svg)](https://www.npmjs.com/package/@robot-admin/theme)
 [![license](https://img.shields.io/npm/l/@robot-admin/theme.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/packages/theme/LICENSE)
 
-当前版本：`0.5.1`。
+当前版本：`0.6.0`。
 
 ## 能力边界
 
@@ -14,6 +14,7 @@
 - 安全持久化、历史脏值清理和同源标签页同步。
 - View Transition 渐进增强、并发切换和 reduced-motion 降级。
 - `/core` 不依赖 Vue、Pinia 或任何 UI 框架。
+- `/tokens` 提供框架无关的默认 Token、增量合并、CSS Variables 与可恢复运行时应用。
 - `/vue` 提供 Pinia Store，不依赖 Naive UI。
 - `/naive` 提供 NConfigProvider 所需的响应式主题适配。
 - 现有根入口和三个独立 CSS 路径保持兼容。
@@ -38,10 +39,37 @@ Peer dependencies：
 | 入口 | 适用场景 | UI 依赖 |
 |---|---|---|
 | `@robot-admin/theme/core` | 校验、模式解析、非 Vue 应用或未来 UI 适配 | 无 |
+| `@robot-admin/theme/tokens` | 默认 Token、项目增量主题、CSS Variables 工具 | 无 |
 | `@robot-admin/theme/vue` | Vue/Pinia 应用的主题 Store | 无 UI 框架依赖 |
 | `@robot-admin/theme/naive` | Naive UI 的 theme/overrides 绑定 | Naive UI |
 | `@robot-admin/theme` | 兼容入口，API 与 `/vue` 一致 | 无 UI 框架依赖 |
 | `@robot-admin/theme/naive/styles` | 一次引入三套现有设计风格 | Naive UI / Robot C 体系 |
+| `@robot-admin/theme/tokens.css` | 只引入默认明暗 Token Variables | 无 |
+
+## Token 体系与项目换肤
+
+Token 按“基础色板 → 明暗语义 → 少量组件语义 → 结构/排版/动效”分层。默认主题只有
+一份 TypeScript 数据源，并由它生成 CSS Variables 和 Naive UI 配置，避免多事实源。
+
+```typescript
+import { createThemeStore } from '@robot-admin/theme/vue'
+import type { ThemeTokenOverrides } from '@robot-admin/theme/tokens'
+
+export const APP_THEME = {
+  light: { color: { primary: '#5946e8' } },
+  dark: { color: { primary: '#a89cff' } },
+  radius: { md: '10px' },
+} satisfies ThemeTokenOverrides
+
+export const useAppThemeStore = createThemeStore({
+  id: 'app-theme',
+  tokens: APP_THEME,
+})
+```
+
+只提交项目需要变化的字段；未知字段和空值会在初始化时直接失败。组件优先消费
+`--ra-color-*` 等语义变量，不读取某个 UI 框架的内部变量。完整分层、变量清单、Naive UI
+接入、微应用清理和未来 Element Plus 适配边界见 [Token 设计文档](./docs/tokens.md)。
 
 ## Vue/Pinia 快速开始
 
@@ -71,13 +99,12 @@ DOM 属性和存储空间已经自动隔离。
 ```typescript
 import { computed } from 'vue'
 import {
-  type GlobalThemeOverrides,
   useNaiveTheme,
-  useThemeStore,
 } from '@robot-admin/theme/naive'
+import { useAppThemeStore } from './theme'
 import '@robot-admin/theme/naive/styles'
 
-const themeStore = useThemeStore()
+const themeStore = useAppThemeStore()
 const settingsOverrides = computed(() => ({
   common: {
     primaryColor: '#409eff',
@@ -87,8 +114,7 @@ const settingsOverrides = computed(() => ({
 
 const { currentTheme, themeOverrides } = useNaiveTheme({
   isDark: () => themeStore.isDark,
-  lightOverrides,
-  darkOverrides,
+  tokens: themeStore.tokens,
   overrides: settingsOverrides,
 })
 ```
@@ -148,6 +174,7 @@ const useAppThemeStore = createThemeStore({
 | `storage` | 浏览器 localStorage | 可注入兼容 `getItem/setItem/removeItem` 的存储；`null` 禁用持久化 |
 | `syncAcrossTabs` | `true` | 使用内置 localStorage 时同步同源标签页 |
 | `onError` | — | 存储或系统偏好读取失败时的可选诊断回调 |
+| `tokens` | 未配置 | 项目级 Token 增量覆盖；配置后随明暗模式写入 CSS Variables，并在 `destroy()` 恢复宿主原值 |
 
 ### 状态和 getter
 
@@ -218,6 +245,10 @@ data-menu-theme    -> 菜单呈现，由 layout/消费方管理
 
 三套 CSS 均以 `data-design-style` 作为作用域，不控制 `.n-menu`。现有 `C_*` 选择器
 继续保留，以维持 Robot 组件体系的呈现和兼容性。
+
+`@robot-admin/theme/naive/styles` 已包含默认 `tokens.css`。非 Naive 项目可单独引入
+`@robot-admin/theme/tokens.css`；项目级自定义通过 `createThemeStore({ tokens })` 应用，
+不需要复制或改写包内 CSS。
 
 ## 从 0.4.x 升级
 

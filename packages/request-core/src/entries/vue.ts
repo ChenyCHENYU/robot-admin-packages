@@ -11,7 +11,10 @@ export type {
   UseRequestReturn,
 } from "../vue/useRequest";
 export { createTableCrud } from "../composables/useTableCrud/createTableCrud";
+export { createMemoryTableSource } from "../composables/useTableCrud/createMemoryTableSource";
+export { defineDetailConfig } from "../composables/useTableCrud/configuration";
 export { useTableCrud } from "../composables/useTableCrud/useTableCrud";
+export type { MemoryTableSourceOptions } from "../composables/useTableCrud/createMemoryTableSource";
 export type {
   DataRecord,
   UseTableCrudConfig,
@@ -24,6 +27,8 @@ export type {
   TableListParams,
   TableCrudDefaults,
   TableCrudFactory,
+  TableCrudDataSource,
+  TableCrudSource,
   CrudMutations,
   CrudUiAdapter,
   CrudMessageApi,
@@ -34,4 +39,8 @@ export type {
   DetailItem,
   DetailSection,
   DetailConfig,
+  CrudEditor,
+  CrudEditorConfig,
+  CrudEditorContext,
+  CrudEditorMode,
 } from "../composables/useTableCrud/types";

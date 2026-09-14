@@ -9,12 +9,7 @@ import {
   shallowRef,
   type Ref,
 } from "vue";
-import {
-  deleteData,
-  getData,
-  postData,
-  putData,
-} from "../../axios/service";
+import { deleteData, getData, postData, putData } from "../../axios/service";
 import {
   isCanceledError,
   normalizeRequestError,
@@ -109,9 +104,7 @@ function buildListParams<Filters extends object, Sort extends object>(
   return {
     ...paginationParams,
     ...(context.filters as Record<string, unknown>),
-    ...(context.sort && sortKey !== false
-      ? { [sortKey]: context.sort }
-      : {}),
+    ...(context.sort && sortKey !== false ? { [sortKey]: context.sort } : {}),
   };
 }
 
@@ -122,14 +115,18 @@ export function useTableCrud<
 >(
   config: UseTableCrudConfig<T, Filters, Sort>,
 ): UseTableCrudReturn<T, Filters, Sort> {
+  const customSource =
+    config.source && "query" in config.source ? config.source : undefined;
+  const endpointSource =
+    config.source && "list" in config.source ? config.source : undefined;
   const {
-    api,
+    api = endpointSource,
     listParams,
-    query,
-    mutations = {},
+    query = customSource?.query,
     columns = [],
     customActions = [],
     detail: detailConfig,
+    editor: editorConfig,
     idKey = DEFAULT_CONFIG.idKey as keyof T,
     defaultPageSize = DEFAULT_CONFIG.pageSize,
     defaultPaginationEnabled = DEFAULT_CONFIG.paginationEnabled,
@@ -142,6 +139,10 @@ export function useTableCrud<
     batchConcurrency = 4,
     detailTitle,
   } = config;
+  const mutations = {
+    ...customSource?.mutations,
+    ...config.mutations,
+  };
 
   if (!query && !api?.list) {
     throw new Error("useTableCrud requires either query or api.list.");
@@ -150,7 +151,9 @@ export function useTableCrud<
     throw new RangeError("batchConcurrency must be an integer greater than 0.");
   }
 
-  const injectedClient = getCurrentInstance() ? useRequestClient(true) : undefined;
+  const injectedClient = getCurrentInstance()
+    ? useRequestClient(true)
+    : undefined;
   const client = config.client ?? injectedClient;
   const message = config.ui?.message ?? noopMessage;
   const dialog: CrudDialogApi = config.ui?.dialog ?? noopDialog;
@@ -189,7 +192,9 @@ export function useTableCrud<
   let refreshSequence = 0;
   let disposed = false;
 
-  const loading = computed(() => Object.values(counts).some((count) => count > 0));
+  const loading = computed(() =>
+    Object.values(counts).some((count) => count > 0),
+  );
   const isInitialLoading = computed(
     () => counts.refresh > 0 && lastUpdated.value === null,
   );
@@ -199,6 +204,11 @@ export function useTableCrud<
   const creating = computed(() => counts.create > 0);
   const updating = computed(() => counts.update > 0);
   const removing = computed(() => counts.remove > 0);
+  const editorVisible = ref(false);
+  const editorMode = ref<"create" | "edit">("create");
+  const editorModel = ref<T | null>(null) as Ref<T | null>;
+  const editorOriginal = ref<T | null>(null) as Ref<T | null>;
+  const editorTitle = ref("");
 
   const startOperation = (operation: Operation): AbortController => {
     counts[operation] += 1;
@@ -245,7 +255,9 @@ export function useTableCrud<
       detailTitleState.value =
         detailTitle?.(row) ??
         `详情 - ${String(
-          (row as Record<string, unknown>).name ?? recordValue(row, idKey) ?? "",
+          (row as Record<string, unknown>).name ??
+            recordValue(row, idKey) ??
+            "",
         )}`;
       detailVisible.value = true;
     },
@@ -430,7 +442,12 @@ export function useTableCrud<
       notify("warning", "请选择要删除的数据");
       return;
     }
-    if (!mutations.batchRemove && !mutations.remove && !api?.batchRemove && !api?.remove) {
+    if (
+      !mutations.batchRemove &&
+      !mutations.remove &&
+      !api?.batchRemove &&
+      !api?.remove
+    ) {
       notify("warning", DEFAULT_MESSAGES.noDeleteApi);
       return;
     }
@@ -441,9 +458,17 @@ export function useTableCrud<
       } else if (api?.batchRemove) {
         const ids = rows.map((row) => recordValue(row, idKey));
         if (client) {
-          await client.post(api.batchRemove, { ids }, { signal: controller.signal });
+          await client.post(
+            api.batchRemove,
+            { ids },
+            { signal: controller.signal },
+          );
         } else {
-          await postData(api.batchRemove, { ids }, { signal: controller.signal });
+          await postData(
+            api.batchRemove,
+            { ids },
+            { signal: controller.signal },
+          );
         }
       } else {
         let cursor = 0;
@@ -459,7 +484,10 @@ export function useTableCrud<
           }
         };
         await Promise.all(
-          Array.from({ length: Math.min(batchConcurrency, rows.length) }, worker),
+          Array.from(
+            { length: Math.min(batchConcurrency, rows.length) },
+            worker,
+          ),
         );
         if (controller.signal.aborted) {
           throw Object.assign(new Error("canceled"), {
@@ -503,7 +531,10 @@ export function useTableCrud<
     await refresh();
   };
 
-  const handlePaginationChange = (pageNumber: number, pageSize: number): void => {
+  const handlePaginationChange = (
+    pageNumber: number,
+    pageSize: number,
+  ): void => {
     page.current = pageNumber;
     page.size = pageSize;
     void refresh();
@@ -557,7 +588,8 @@ export function useTableCrud<
         label: action.label,
         icon: action.icon,
         type: action.type ?? "default",
-        onClick: (row, index) => action.handler(row, createActionContext(index)),
+        onClick: (row, index) =>
+          action.handler(row, createActionContext(index)),
       }));
     }
     return result;
@@ -575,6 +607,85 @@ export function useTableCrud<
   );
 
   const createDraft = (): T => createNewRow?.() ?? ({} as T);
+  const closeEditor = (): void => {
+    editorVisible.value = false;
+    editorModel.value = null;
+    editorOriginal.value = null;
+    editorTitle.value = "";
+  };
+  const editor = {
+    visible: editorVisible,
+    mode: editorMode,
+    model: editorModel,
+    title: editorTitle,
+    loading: computed(() =>
+      editorMode.value === "create" ? creating.value : updating.value,
+    ),
+    openCreate: (): void => {
+      editorMode.value = "create";
+      editorModel.value = cloneValue(createDraft());
+      editorOriginal.value = null;
+      editorTitle.value = editorConfig?.createTitle ?? "新增";
+      editorVisible.value = true;
+    },
+    openEdit: (row: T): void => {
+      const original = cloneValue(row);
+      editorMode.value = "edit";
+      editorModel.value = cloneValue(original);
+      editorOriginal.value = original;
+      editorTitle.value =
+        typeof editorConfig?.editTitle === "function"
+          ? editorConfig.editTitle(row)
+          : (editorConfig?.editTitle ?? "编辑");
+      editorVisible.value = true;
+    },
+    setModel: (row: T): void => {
+      editorModel.value = cloneValue(row);
+    },
+    close: closeEditor,
+    submit: async (row?: T): Promise<boolean> => {
+      const current = row ?? editorModel.value;
+      if (!current) return false;
+      if (editorMode.value === "create" && !mutations.create && !api?.create) {
+        notify("warning", "未配置新增操作");
+        return false;
+      }
+      if (editorMode.value === "edit" && !mutations.update && !api?.update) {
+        notify("warning", "未配置更新操作");
+        return false;
+      }
+
+      let prepared: T;
+      try {
+        prepared = editorConfig?.prepareSubmit
+          ? await editorConfig.prepareSubmit(cloneValue(current), {
+              mode: editorMode.value,
+              original: editorOriginal.value
+                ? cloneValue(editorOriginal.value)
+                : null,
+            })
+          : cloneValue(current);
+      } catch (cause) {
+        await reportError(
+          cause,
+          editorMode.value === "create" ? "create" : "update",
+          "提交数据处理失败",
+        );
+        return false;
+      }
+
+      editorModel.value = cloneValue(prepared);
+      try {
+        if (editorMode.value === "create") await create(prepared);
+        else await save(prepared);
+        closeEditor();
+        return true;
+      } catch {
+        // create/save already normalize and report request errors; keep the editor open.
+        return false;
+      }
+    },
+  } satisfies import("./types").CrudEditor<T>;
   const cancel = (): void => {
     refreshSequence += 1;
     refreshController?.abort();
@@ -585,6 +696,8 @@ export function useTableCrud<
     if (disposed) return;
     disposed = true;
     cancel();
+    closeEditor();
+    detail.close();
   };
 
   if (getCurrentScope()) onScopeDispose(dispose);
@@ -592,8 +705,7 @@ export function useTableCrud<
     onMounted(() => void refresh());
   } else if (autoLoad === "mounted") {
     void refresh();
-  }
-  else if (autoLoad) void refresh();
+  } else if (autoLoad) void refresh();
 
   return {
     data,
@@ -633,5 +745,6 @@ export function useTableCrud<
     handleRowDelete,
     detail,
     detailConfig,
+    editor,
   };
 }

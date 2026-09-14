@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { createRequestClient } from "../src/client/client";
 import { createTableCrud } from "../src/composables/useTableCrud/createTableCrud";
+import { createMemoryTableSource } from "../src/composables/useTableCrud/createMemoryTableSource";
 import { useTableCrud } from "../src/composables/useTableCrud/useTableCrud";
 
 interface Row {
@@ -26,6 +27,57 @@ function response(
 }
 
 describe("headless useTableCrud", () => {
+  it("uses one isolated memory source without page-side CRUD assembly", async () => {
+    const sourceRows = [{ id: 1, name: "first" }];
+    const table = useTableCrud({
+      autoLoad: false,
+      source: createMemoryTableSource(sourceRows),
+    });
+
+    await table.refresh();
+    table.rows.value[0]!.name = "local mutation";
+    await table.refresh();
+    expect(table.rows.value).toEqual([{ id: 1, name: "first" }]);
+
+    await table.create({ id: 2, name: "second" });
+    expect(table.rows.value).toEqual([
+      { id: 2, name: "second" },
+      { id: 1, name: "first" },
+    ]);
+
+    await table.save({ id: 2, name: "updated" });
+    expect(table.rows.value[0]).toEqual({ id: 2, name: "updated" });
+    expect(await table.getDetail({ id: 2, name: "stale" })).toEqual({
+      id: 2,
+      name: "updated",
+    });
+
+    await table.remove({ id: 1, name: "first" });
+    expect(table.rows.value).toEqual([{ id: 2, name: "updated" }]);
+    expect(sourceRows).toEqual([{ id: 1, name: "first" }]);
+  });
+
+  it("accepts endpoint configuration through the same source boundary", async () => {
+    let requestedUrl: string | undefined;
+    const client = createRequestClient({
+      request: {
+        adapter: async (config) => {
+          requestedUrl = config.url;
+          return response(config, { items: [], total: 0 });
+        },
+      },
+    });
+    const table = useTableCrud<Row>({
+      autoLoad: false,
+      client,
+      source: { list: "/rows" },
+    });
+
+    await table.refresh();
+    expect(requestedUrl).toBe("/rows");
+    client.dispose();
+  });
+
   it("keeps the latest list response and supports search/reset", async () => {
     const first = deferred<{ items: Row[]; total: number }>();
     const second = deferred<{ items: Row[]; total: number }>();
@@ -85,6 +137,72 @@ describe("headless useTableCrud", () => {
     expect(table.creating.value).toBe(false);
     expect(table.loading.value).toBe(false);
     scope.stop();
+  });
+
+  it("drives create and edit form modals without page-owned state", async () => {
+    const created: Row[] = [];
+    const updated: Row[] = [];
+    const table = useTableCrud<Row>({
+      autoLoad: false,
+      refreshAfterMutation: false,
+      query: async () => ({ items: [], total: 0 }),
+      createNewRow: () => ({ id: 0, name: "draft" }),
+      editor: {
+        createTitle: "Create row",
+        editTitle: (row) => `Edit ${row.name}`,
+        prepareSubmit: (row) => ({ ...row, name: row.name.trim() }),
+      },
+      mutations: {
+        create: async (row) => {
+          created.push(row);
+        },
+        update: async (row) => {
+          updated.push(row);
+        },
+      },
+    });
+
+    table.editor.openCreate();
+    expect(table.editor.visible.value).toBe(true);
+    expect(table.editor.title.value).toBe("Create row");
+    expect(table.editor.model.value).toEqual({ id: 0, name: "draft" });
+    expect(await table.editor.submit({ id: 1, name: " created " })).toBe(true);
+    expect(created).toEqual([{ id: 1, name: "created" }]);
+    expect(table.editor.visible.value).toBe(false);
+
+    const source = { id: 2, name: "source" };
+    table.editor.openEdit(source);
+    table.editor.setModel({ id: 2, name: " changed " });
+    expect(source.name).toBe("source");
+    expect(table.editor.title.value).toBe("Edit source");
+    expect(await table.editor.submit()).toBe(true);
+    expect(updated).toEqual([{ id: 2, name: "changed" }]);
+    expect(table.editor.visible.value).toBe(false);
+  });
+
+  it("keeps the editor open when submit preparation fails", async () => {
+    const errors: string[] = [];
+    const table = useTableCrud<Row>({
+      autoLoad: false,
+      refreshAfterMutation: false,
+      query: async () => ({ items: [], total: 0 }),
+      createNewRow: () => ({ id: 0, name: "draft" }),
+      editor: {
+        prepareSubmit: async () => {
+          throw new Error("normalize failed");
+        },
+      },
+      mutations: { create: async () => undefined },
+      onError: (error) => {
+        errors.push(error.message);
+      },
+    });
+
+    table.editor.openCreate();
+    expect(await table.editor.submit()).toBe(false);
+    expect(table.editor.visible.value).toBe(true);
+    expect(table.editor.model.value).toEqual({ id: 0, name: "draft" });
+    expect(errors).toEqual(["normalize failed"]);
   });
 
   it("updates local rows and totals when delete refresh is disabled", async () => {

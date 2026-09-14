@@ -1,5 +1,11 @@
 # @robot-admin/request-core
 
+## 0.6.0
+
+### Minor Changes
+
+- Add a framework-agnostic create/edit workflow to `useTableCrud`, including isolated drafts, configurable titles, submit preparation, loading state, failure retention, and automatic lifecycle cleanup. Add a unified `source` boundary, `createMemoryTableSource()` and `defineDetailConfig()` so applications can switch between HTTP endpoints and isolated local data without assembling `api/query/mutations` objects or writing explicit generic contracts.
+
 > `0.4.0` is the cumulative feature release. The `0.2.1` and `0.3.0` sections
 > below record the internal implementation milestones folded into it; they were
 > not published as separate package versions.

@@ -27,3 +27,5 @@ export {
   resolveCompatibleThemeMode,
   resolveThemeMode,
 } from "../core/theme";
+
+export * from "../tokens";

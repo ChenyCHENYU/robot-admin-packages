@@ -244,4 +244,41 @@ describe("theme store lifecycle", () => {
       expect.any(Function),
     );
   });
+
+  it("applies configured tokens across modes and restores host variables on destroy", async () => {
+    const values = new Map<string, string>([["--ra-color-primary", "#123456"]]);
+    const style = {
+      getPropertyPriority: vi.fn(() => ""),
+      getPropertyValue: vi.fn((name: string) => values.get(name) ?? ""),
+      removeProperty: vi.fn((name: string) => {
+        const previous = values.get(name) ?? "";
+        values.delete(name);
+        return previous;
+      }),
+      setProperty: vi.fn((name: string, value: string) => values.set(name, value)),
+    };
+    vi.stubGlobal("document", {
+      documentElement: { setAttribute: vi.fn(), style },
+    });
+
+    setActivePinia(createPinia());
+    const store = createThemeStore({
+      id: "theme-token-lifecycle-test",
+      defaultMode: "light",
+      enableTransition: false,
+      storage: null,
+      tokens: {
+        light: { color: { primary: "#6750a4" } },
+        dark: { color: { primary: "#d0bcff" } },
+      },
+    })();
+
+    store.init();
+    expect(values.get("--ra-color-primary")).toBe("#6750a4");
+    await store.setMode("dark");
+    expect(values.get("--ra-color-primary")).toBe("#d0bcff");
+    store.destroy();
+    expect(values.get("--ra-color-primary")).toBe("#123456");
+    expect(values.has("--ra-color-canvas")).toBe(false);
+  });
 });

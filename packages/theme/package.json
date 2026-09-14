@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/theme",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Layered theme primitives, Pinia store and Naive UI adapter for Robot Admin",
   "type": "module",
   "keywords": [
@@ -46,6 +46,16 @@
         "default": "./dist/core.cjs"
       }
     },
+    "./tokens": {
+      "import": {
+        "types": "./dist/tokens.d.ts",
+        "default": "./dist/tokens.js"
+      },
+      "require": {
+        "types": "./dist/tokens.d.cts",
+        "default": "./dist/tokens.cjs"
+      }
+    },
     "./vue": {
       "import": {
         "types": "./dist/vue.d.ts",
@@ -67,6 +77,7 @@
       }
     },
     "./naive/styles": "./dist/styles/naive.css",
+    "./tokens.css": "./dist/styles/tokens.css",
     "./styles/glass-morphism.css": "./dist/styles/glass-morphism.css",
     "./styles/corporate-minimal.css": "./dist/styles/corporate-minimal.css",
     "./styles/dark-tech.css": "./dist/styles/dark-tech.css"
@@ -76,7 +87,8 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "SECURITY.md"
+    "SECURITY.md",
+    "docs"
   ],
   "sideEffects": [
     "**/*.css",
@@ -90,7 +102,7 @@
     "dev": "tsup --watch",
     "build": "tsup && bun run build:styles",
     "build:ts": "tsup",
-    "build:styles": "sass src/themes:dist/styles --style=compressed --no-source-map",
+    "build:styles": "sass src/themes:dist/styles --style=compressed --no-source-map && bun run scripts/build-token-css.ts",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
     "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
