@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@robot-admin/theme.svg)](https://www.npmjs.com/package/@robot-admin/theme)
 [![license](https://img.shields.io/npm/l/@robot-admin/theme.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/packages/theme/LICENSE)
 
-当前版本：`0.6.0`。
+当前版本：`0.6.1`。
 
 ## 能力边界
 
