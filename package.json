@@ -2,7 +2,7 @@
   "name": "robot-admin-packages",
   "version": "0.0.0",
   "private": true,
-  "description": "Robot Admin 可复用插拔式公共依赖包 Monorepo",
+  "description": "Robot Admin 可复用、可插拔的公共能力 Monorepo",
   "author": "ChenYu <ycyplus@gmail.com>",
   "license": "MIT",
   "repository": {
@@ -14,13 +14,17 @@
   ],
   "scripts": {
     "dev": "bun run --filter './packages/*' dev",
-    "build": "bun run --cwd packages/theme build && bun run --cwd packages/directives build && bun run --cwd packages/file-utils build && bun run --cwd packages/form-validate build && bun run --cwd packages/request-core build && bun run --cwd packages/git-standards build && bun run --cwd packages/layout build",
+    "build": "node scripts/run-workspaces.mjs build",
     "test": "vitest run packages",
+    "type-check": "node scripts/run-workspaces.mjs type-check",
+    "check:workspace": "node scripts/check-workspace.mjs",
+    "check:packages": "node scripts/run-workspaces.mjs check:package",
+    "verify": "bun run check:workspace && bun run type-check && bun run test && bun run build && bun run check:packages",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "bun run build && changeset publish",
-    "clean": "bun run --filter './packages/*' clean",
-    "type-check": "tsc --noEmit -p packages/theme/tsconfig.json && tsc --noEmit -p packages/directives/tsconfig.json && tsc --noEmit -p packages/file-utils/tsconfig.json && tsc --noEmit -p packages/form-validate/tsconfig.json && tsc --noEmit -p packages/request-core/tsconfig.json && tsc --noEmit -p packages/git-standards/tsconfig.json && bun run --cwd packages/layout type-check"
+    "release:check": "bun run verify && changeset status",
+    "release": "bun run release:check && changeset publish",
+    "clean": "node scripts/run-workspaces.mjs clean"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
@@ -30,5 +34,5 @@
     "typescript": "^5.8.0",
     "vitest": "^4.1.11"
   },
-  "packageManager": "bun@1.3.8"
+  "packageManager": "bun@1.3.14"
 }

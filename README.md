@@ -1,179 +1,73 @@
 # robot-admin-packages
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Quality Gate](https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-> Robot Admin 项目可复用、可插拔的企业级公共包，由 Monorepo 统一管理
->
-> **本仓库是容器项目**（`private: true`），不会发布到 npm，只发布内部的各个包。
+Robot Admin 的公共能力 Monorepo。仓库负责统一开发、验证和发布可复用包；根项目保持 `private: true` 和 `0.0.0`，永远不发布到 npm。
 
----
+## 包清单
 
-## 📦 包列表
+| 包 | 当前版本 | 定位 |
+| --- | ---: | --- |
+| [@robot-admin/directives](./packages/directives) | `2.0.1` | Vue 3 指令、应用级适配器及严格生命周期清理 |
+| [@robot-admin/file-utils](./packages/file-utils) | `3.0.1` | Excel、ZIP、CSV、图片、下载与分片文件能力 |
+| [@robot-admin/form-validate](./packages/form-validate) | `3.4.2` | 框架无关规则核心与 Naive UI、Element Plus 适配 |
+| [@robot-admin/git-standards](./packages/git-standards) | `1.0.5` | 幂等 Git 工程化初始化、诊断和团队预设 |
+| [@robot-admin/layout](./packages/layout) | `3.2.1` | 布局核心、Vue 桥接与 Naive UI 呈现层 |
+| [@robot-admin/request-core](./packages/request-core) | `0.6.1` | 请求编排、认证恢复、生命周期和 Headless CRUD |
+| [@robot-admin/theme](./packages/theme) | `0.6.1` | 分层设计 Token、主题状态和 UI 框架适配 |
 
-| 包名                                                   | 本仓库版本 | npm 最新版                                                                                                                  | 描述                                                     |
-| ------------------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| [@robot-admin/layout](./packages/layout)               | `3.2.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/layout)](https://www.npmjs.com/package/@robot-admin/layout)               | 6 种布局、Vue Headless/Naive 分层入口与作用域副作用      |
-| [@robot-admin/theme](./packages/theme)                 | `0.6.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/theme)](https://www.npmjs.com/package/@robot-admin/theme)                 | 语义 Token、Vue/Pinia Store 与 Naive UI 分层适配         |
-| [@robot-admin/directives](./packages/directives)       | `2.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/directives)](https://www.npmjs.com/package/@robot-admin/directives)       | 11 个 Vue 3 指令、应用级适配器、无障碍与严格生命周期清理 |
-| [@robot-admin/file-utils](./packages/file-utils)       | `3.0.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/file-utils)](https://www.npmjs.com/package/@robot-admin/file-utils)       | 安全 Excel/ZIP/CSV、隔离配置及可取消的真流式大文件传输   |
-| [@robot-admin/request-core](./packages/request-core)   | `0.6.1`    | [![npm](https://img.shields.io/npm/v/@robot-admin/request-core)](https://www.npmjs.com/package/@robot-admin/request-core)   | 实例化 Axios 编排、认证恢复与函数式 Headless CRUD         |
-| [@robot-admin/form-validate](./packages/form-validate) | `3.4.2`    | [![npm](https://img.shields.io/npm/v/@robot-admin/form-validate)](https://www.npmjs.com/package/@robot-admin/form-validate) | Naive UI / Element Plus 双框架类型安全表单验证规则库     |
-| [@robot-admin/git-standards](./packages/git-standards) | `1.0.4`    | [![npm](https://img.shields.io/npm/v/@robot-admin/git-standards)](https://www.npmjs.com/package/@robot-admin/git-standards) | 幂等初始化、配置备份与 4 种 Git 工程化预设               |
+各包 README 是公开 API、安装与迁移说明的事实源；根 README 只维护仓库级入口和当前版本，npm 线上状态以各包页面为准。
 
-> “本仓库版本”随版本提交更新；“npm 最新版”徽章反映注册表状态，发布传播期间可能短暂滞后。
+## 架构边界
 
----
-
-## 🏗️ 项目架构
-
-```
-robot-admin-packages/           # 容器项目，不发布
-├── .changeset/                 # Changesets 配置与待发布变更
-├── packages/
-│   ├── directives/             # 11 个 Vue 3 自定义指令
-│   ├── file-utils/             # Excel/ZIP/CSV/图片/文件分片
-│   ├── form-validate/          # 表单与表格验证规则
-│   ├── git-standards/          # Git 工程化 CLI 与配置生成器
-│   ├── layout/                 # 布局组件、设置 Store 与样式
-│   ├── request-core/           # Axios 请求编排与 CRUD Composables
-│   └── theme/                  # 主题 Store、过渡与设计风格 CSS
-├── package.json                # 根脚本（private: true）
-└── bun.lock                    # 统一依赖锁文件
+```text
+robot-admin-packages/
+├── .changeset/          # 待发布的用户可见变更
+├── .github/workflows/   # 与本地 verify 一致的质量门禁
+├── docs/                # 仓库维护与发布规范
+├── packages/            # 七个独立发布、独立版本的公共包
+├── scripts/             # 跨平台工作区执行与契约检查
+├── package.json         # 私有容器和统一命令
+└── bun.lock             # 唯一依赖锁文件
 ```
 
----
+- 子包独立版本、独立入口、独立 README 和 CHANGELOG，不通过根包聚合导出。
+- 框架无关核心与 Vue/Naive UI 等适配层保持分层，使用侧只引入所需入口。
+- 根脚本自动发现拥有相应命令的工作区；新增包不再需要同步维护一长串构建命令。
+- `check:workspace` 防止版本文档漂移、发布元数据缺失、`workspace:` 依赖泄漏和 npm 凭证入库。
 
-## 🚀 完整工作流程
-
-### 1️⃣ 初始化（首次使用）
+## 快速开始
 
 ```bash
 git clone https://github.com/ChenyCHENYU/robot-admin-packages.git
 cd robot-admin-packages
-bun install
+bun install --frozen-lockfile
+bun run verify
 ```
 
-### 2️⃣ 日常开发
+当前统一使用 Bun `1.3.14`。常用根命令：
 
-#### 监听模式
+| 命令 | 作用 |
+| --- | --- |
+| `bun run check:workspace` | 校验仓库、包清单、版本、发布元数据和安全边界 |
+| `bun run type-check` | 顺序执行所有声明了类型检查的工作区 |
+| `bun run test` | 运行整个 Monorepo 的测试 |
+| `bun run build` | 顺序构建所有声明了构建脚本的工作区 |
+| `bun run check:packages` | 检查支持发布产物校验的工作区 |
+| `bun run verify` | 执行提交和发布前的完整质量门禁 |
+| `bun run clean` | 清理所有声明了清理脚本的工作区产物 |
+
+开发单个包时直接进入对应目录，反馈更聚焦：
 
 ```bash
-cd packages/layout
+cd packages/request-core
 bun run dev
 ```
 
-#### 手动构建
+## 与 Robot_Admin 联调
 
-```bash
-cd packages/layout
-bun run build
-```
-
-### 3️⃣ 发布新版本
-
-#### 步骤 1: 创建变更集
-
-**方式 A - 交互式创建**：
-
-```bash
-bun run changeset
-# 按空格选择包 → 选择版本类型 → 输入变更描述
-```
-
-也可以按 `.changeset/*.md` 的格式手动创建变更集；文件名需唯一，摘要应准确描述对应包的用户可见变化。
-
-#### 步骤 2: 更新版本和 CHANGELOG
-
-```bash
-bun run version-packages
-```
-
-#### 步骤 3: 发布前质量门禁
-
-```bash
-bun run test
-bun run type-check
-bun run build
-```
-
-#### 步骤 4: 提交并推送版本变更
-
-```bash
-git add .
-git commit -m "chore(release): publish package updates"
-git push origin main
-```
-
-#### 步骤 5: 发布到 npm 并推送标签
-
-```bash
-bun run release
-git push origin --tags
-```
-
-> 发布前必须确认 npm 登录身份与目标 registry。若发布中断，应先逐包查询 npm
-> 线上版本，确认哪些包已经成功，避免在未知状态下重复发布。
-
----
-
-## 📚 扩展维护
-
-### ➕ 添加新包
-
-```bash
-cd packages
-mkdir new-package && cd new-package
-mkdir src
-
-# 复制配置
-cp ../request-core/tsconfig.json .
-cp ../request-core/tsup.config.ts .
-
-# 创建 package.json
-cat > package.json << 'EOF'
-{
-  "name": "@robot-admin/new-package",
-  "version": "0.1.0",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "scripts": { "dev": "tsup --watch", "build": "tsup" },
-  "peerDependencies": { "vue": "^3.4.0" }
-}
-EOF
-
-# 创建入口
-echo 'export const hello = () => "Hello!"' > src/index.ts
-
-# 安装 + 构建
-bun install && bun run build
-```
-
-### 🔄 版本策略
-
-遵循 [语义化版本](https://semver.org/lang/zh-CN/)：
-
-| 类型      | 示例    | 场景                 |
-| --------- | ------- | -------------------- |
-| **patch** | `0.1.x` | Bug 修复，不影响 API |
-| **minor** | `0.x.0` | 新增功能，向下兼容   |
-| **major** | `x.0.0` | 破坏性更新           |
-
----
-
-## 🔗 本地调试
-
-### 在 Robot_Admin 中调试源码
-
-```bash
-cd ../Robot_Admin
-bun run dev:local
-```
-
-Robot_Admin 的 `dev:local` 会设置 `USE_LOCAL_PACKAGES=true`，由 Vite 将全部
-`@robot-admin/*` 包直接别名到相邻 `robot-admin-packages/packages` 源码，无需创建
-全局 `bun link`，也不会改写主项目依赖锁文件。两仓库默认应保持同级目录：
+两个仓库默认保持同级目录：
 
 ```text
 robot/
@@ -181,17 +75,29 @@ robot/
 └── robot-admin-packages/
 ```
 
-### 使用场景
+在 `Robot_Admin` 中执行：
 
-| 场景               | 在 Robot_Admin 中执行                                       | 说明                           |
-| ------------------ | ----------------------------------------------------------- | ------------------------------ |
-| 本地开发调试包源码 | `bun run dev:local`                                         | 使用相邻 Monorepo 源码与 HMR   |
-| 本地生产构建验证   | PowerShell: `$env:USE_LOCAL_PACKAGES='true'; bun run build` | 验证包源码与主项目生产构建集成 |
-| 日常开发（npm 包） | `bun run dev`                                               | 使用已安装的 npm 稳定版        |
-| CI/CD 自动构建     | `bun install && bun run build`                              | 从 npm 安装，无需本地链接      |
+```bash
+bun run dev:local
+```
 
----
+该模式通过 Vite 将 `@robot-admin/*` 映射到当前仓库源码，支持 HMR，不创建全局 link，也不改写业务项目依赖和锁文件。发布后必须切回普通模式并安装精确 npm 版本，再执行 `bun run type-build:installed`、测试和生产构建，防止本地源码正常但发布产物不可用。
 
-## 📄 License
+## 版本与发布
 
-MIT © ChenYu
+只有子包公开能力发生用户可见变化时才创建 Changeset；纯根仓库脚本、CI 或文档治理不需要发版。
+
+```bash
+bun run changeset
+bun run version-packages
+bun run release:check
+bun run release
+```
+
+`release` 会先执行完整质量门禁和 Changesets 状态检查。发布凭证只能通过 CI Secret 或当前进程的临时配置注入，不得写入仓库、脚本、命令示例或长期用户配置。
+
+完整的新增包清单、本地联调、发布核验和部分失败恢复流程见 [维护指南](./docs/maintenance.md)。
+
+## License
+
+[MIT](./LICENSE) © ChenYu
