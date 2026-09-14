@@ -106,7 +106,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
     "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "check:package": "node ./node_modules/publint/src/cli.js && node ./scripts/verify-package.mjs",
+    "check:package": "node ./node_modules/publint/src/cli.js --pack npm && node ./scripts/verify-package.mjs",
     "verify": "bun run type-check && bun run test && bun run build && bun run check:package",
     "prepublishOnly": "bun run verify"
   },

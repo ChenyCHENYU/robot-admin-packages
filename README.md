@@ -46,7 +46,7 @@ bun install --frozen-lockfile
 bun run verify
 ```
 
-当前统一使用 Bun `1.3.14`。常用根命令：
+当前统一使用 Bun `1.4.2`。常用根命令：
 
 | 命令 | 作用 |
 | --- | --- |

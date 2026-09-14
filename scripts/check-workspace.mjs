@@ -5,11 +5,47 @@ import { fileURLToPath } from 'node:url'
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..')
 const packagesDir = join(rootDir, 'packages')
 const rootManifest = readJson(join(rootDir, 'package.json'))
+const lockfile = readBunLock(join(rootDir, 'bun.lock'))
 const rootReadme = readFileSync(join(rootDir, 'README.md'), 'utf8')
 const errors = []
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'))
+}
+
+function readBunLock(path) {
+  const input = readFileSync(path, 'utf8')
+  let output = ''
+  let inString = false
+  let escaped = false
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index]
+
+    if (inString) {
+      output += character
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === '"') inString = false
+      continue
+    }
+
+    if (character === '"') {
+      inString = true
+      output += character
+      continue
+    }
+
+    if (character === ',') {
+      let next = index + 1
+      while (/\s/.test(input[next] ?? '')) next += 1
+      if (input[next] === '}' || input[next] === ']') continue
+    }
+
+    output += character
+  }
+
+  return JSON.parse(output)
 }
 
 function assert(condition, message) {
@@ -41,6 +77,7 @@ for (const directory of packageDirectories) {
   assert(manifest.repository?.directory === `packages/${directory}`, `${label}: repository.directory 不正确`)
   assert(manifest.publishConfig?.access === 'public', `${label}: publishConfig.access 必须为 public`)
   assert(manifest.publishConfig?.registry === 'https://registry.npmjs.org/', `${label}: npm registry 不正确`)
+  assert(lockfile.workspaces?.[`packages/${directory}`]?.version === manifest.version, `${label}: bun.lock 工作区版本未同步为 ${manifest.version}`)
 
   for (const file of ['README.md', 'CHANGELOG.md', 'LICENSE']) {
     assert(existsSync(join(packageDir, file)), `${label}: 缺少 ${file}`)

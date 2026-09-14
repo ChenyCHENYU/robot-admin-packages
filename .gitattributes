@@ -13,3 +13,4 @@
 *.vue text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
+bun.lock text eol=lf

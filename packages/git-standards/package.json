@@ -61,7 +61,7 @@
     "type-check": "tsc --noEmit",
     "lint": "oxlint src tests --deny-warnings",
     "test": "vitest run tests",
-    "check:package": "node ./node_modules/publint/src/cli.js && node ./scripts/verify-package.mjs",
+    "check:package": "node ./node_modules/publint/src/cli.js --pack npm && node ./scripts/verify-package.mjs",
     "verify": "bun run lint && bun run type-check && bun run test && bun run build && bun run check:package",
     "prepublishOnly": "bun run verify"
   },
