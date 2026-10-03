@@ -376,7 +376,11 @@ const workTimeRules = computed(() => {
 ### 自定义规则
 
 ```ts
-import { createSpec, toElementRule } from "@robot-admin/form-validate";
+import {
+  createSpec,
+  createAsyncSpec,
+  toElementRule,
+} from "@robot-admin/form-validate";
 
 // 同步
 const mySpec = createSpec("blur", v => v?.length === 6, "必须6位");

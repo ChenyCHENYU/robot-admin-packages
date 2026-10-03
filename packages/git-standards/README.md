@@ -175,6 +175,18 @@ robot-standards init --ci --preset full --framework react --typescript --no-jsdo
 
 所有生成的文件都是**完整独立的配置**，不依赖本包的任何运行时导入。直接修改文件即可：
 
+配置中的 `module.exports` 使用 CommonJS 语法，文件扩展名随目标项目的
+`package.json#type` 自动选择：
+
+| 配置 | CommonJS 项目或未声明 `type` | `type: "module"` 的 ESM 项目 |
+| --- | --- | --- |
+| Commitizen | `.cz-config.js` | `.cz-config.cjs` |
+| Commitlint | `commitlint.config.js` | `commitlint.config.cjs` |
+| Prettier | `.prettierrc.js` | `.prettierrc.cjs` |
+
+ESLint 始终使用 `eslint.config.mjs`。以下配置内容在两种项目中相同，修改时以
+实际生成的文件名为准；不要将 ESM 项目中的 `.cjs` 改回 `.js`。
+
 ### ESLint — eslint.config.mjs
 
 ```ts
@@ -200,7 +212,7 @@ export default defineConfigWithVueTs(
 );
 ```
 
-### Commitizen — .cz-config.js
+### Commitizen — .cz-config.js / .cz-config.cjs
 
 ```js
 // 直接改 types / scopes / messages
@@ -212,7 +224,7 @@ module.exports = {
 };
 ```
 
-### Prettier — .prettierrc.js
+### Prettier — .prettierrc.js / .prettierrc.cjs
 
 ```js
 // 直接改任意选项
@@ -222,7 +234,7 @@ module.exports = {
 };
 ```
 
-### Commitlint — commitlint.config.js
+### Commitlint — commitlint.config.js / commitlint.config.cjs
 
 ```js
 // 增加自定义 type 或调整规则
@@ -245,17 +257,17 @@ module.exports = {
 
 | 文件                   | 极简 | 标准 | 完整 | 说明                    |
 | ---------------------- | :--: | :--: | :--: | ----------------------- |
-| `.cz-config.js`        |  ✔   |  ✔   |  ✔   | Commitizen 提交类型配置 |
-| `commitlint.config.js` |  ✔   |  ✔   |  ✔   | 提交信息校验规则        |
+| `.cz-config.js` / `.cz-config.cjs` |  ✔   |  ✔   |  ✔   | Commitizen 提交类型配置 |
+| `commitlint.config.js` / `commitlint.config.cjs` |  ✔   |  ✔   |  ✔   | 提交信息校验规则 |
 | `.husky/commit-msg`    |  ✔   |  ✔   |  ✔   | 提交信息 hook           |
 | `.husky/pre-commit`    |  -   |  ✔   |  ✔   | 代码检查 hook           |
 | `eslint.config.mjs`    |  -   |  ✔   |  ✔   | ESLint Flat Config      |
 | `.editorconfig`        |  -   |  ✔   |  ✔   | 编辑器统一配置          |
-| `.prettierrc.js`       |  -   |  -   |  ✔   | 代码格式化配置          |
+| `.prettierrc.js` / `.prettierrc.cjs` |  -   |  -   |  ✔   | 代码格式化配置 |
 
 ### 各文件内容详解
 
-#### `.cz-config.js` — Commitizen 交互式提交配置
+#### `.cz-config.js` / `.cz-config.cjs` — Commitizen 交互式提交配置
 
 定义了 `git cz` 交互式提交的类型、消息模板和作用域。
 
@@ -300,7 +312,7 @@ module.exports = {
 
 ---
 
-#### `commitlint.config.js` — 提交信息校验规则
+#### `commitlint.config.js` / `commitlint.config.cjs` — 提交信息校验规则
 
 校验 `git commit` 消息是否符合约定式提交规范。
 
@@ -449,7 +461,7 @@ indent_style = tab
 
 ---
 
-#### `.prettierrc.js` — Prettier 格式化配置
+#### `.prettierrc.js` / `.prettierrc.cjs` — Prettier 格式化配置
 
 代码自动格式化规则，仅完整模式生成。
 
@@ -483,6 +495,10 @@ init 同时更新 `package.json` 中的以下字段：
 
 ¹ Yarn 项目使用 `postinstall`。已有同名脚本和配置会保留；仅在安全兼容时追加或合并。
 
+ESM 项目还会在缺少对应配置时补充
+`config["cz-customizable"].config = ".cz-config.cjs"`，让 Commitizen 读取正确的
+CommonJS 配置。已有自定义路径继续保留。
+
 **lint-staged 配置示例**（完整模式）:
 
 ```jsonc
@@ -504,7 +520,7 @@ init 同时更新 `package.json` 中的以下字段：
 bun run cz / git cz
     │
     ▼
-.cz-config.js → 交互式选类型、填 scope、写描述
+.cz-config.js / .cz-config.cjs → 交互式选类型、填 scope、写描述
     │
     ▼
 git commit（由 commitizen 触发）
@@ -561,27 +577,30 @@ bunx --no-install robot-standards doctor
 
 **问题现象**: 提交代码时没有触发 lint 检查，直接提交成功
 
-**可能原因**: Git Bash / WSL 环境下，hook 文件缺少执行权限
+**可能原因**: Husky v9 运行时未初始化、`core.hooksPath` 指向错误，或用户 Hook
+文件缺失。
 
 **解决方案**:
 
 ```bash
-# 检查 hook 文件权限
-ls -la .husky/pre-commit .husky/commit-msg
+# 在 Git 仓库根目录检查实际入口，Husky v9 正常值为 .husky/_
+git config --get core.hooksPath
+ls -la .husky/_/h .husky/_/commit-msg .husky/commit-msg
 
-# 如果没有 x 权限（应该显示 -rwxr-xr-x 而非 -rw-r--r--），执行：
-chmod +x .husky/pre-commit .husky/commit-msg
+# 启用了 ESLint / lint-staged 的项目再检查 pre-commit
+ls -la .husky/_/pre-commit .husky/pre-commit
 
-# 验证修复
-ls -la .husky/
+# 重建运行时；这里以 Bun 项目为例
+bun run prepare
 ```
 
-**预防措施**: 初始化后立即检查权限
+Husky v9 的执行链是 `.husky/_/<hook>` → `.husky/_/h` → `.husky/<hook>`。
+`.husky/_/` 由 Husky 创建，不应手工删除；用户脚本由 `sh` 调用，仅给
+`.husky/pre-commit` 增加执行权限不能修复运行时缺失。极简模式没有用户
+`pre-commit` 文件是正常情况。
 
-```bash
-# 在 init 完成后执行
-chmod +x .husky/*
-```
+上述 `prepare` 用于 npm、pnpm 或 Bun 初始化的项目；Yarn 项目生成的是
+`postinstall`，应执行 `yarn run postinstall`。随后运行 Doctor 检查依赖和用户 Hook。
 
 ### Commitizen 提示 "git-cz command not found"
 
@@ -632,10 +651,13 @@ rm .eslintrc.js .eslintrc.json .eslintrc.yml
 # 检查 Git 配置
 git config core.hooksPath
 
-# 如果不是 .husky，重置它
-git config --unset core.hooksPath
-npm run prepare  # 重新初始化 husky
+# Husky v9 正常值为 .husky/_；异常时在仓库根目录重新初始化
+npm run prepare
+git config --get core.hooksPath
 ```
+
+按项目包管理器选择 `npm run prepare`、`pnpm run prepare`、`bun run prepare`
+或 `yarn run postinstall`。保留已有的用户 Hook，并检查 `.husky/_/h` 是否存在。
 
 ## License
 
