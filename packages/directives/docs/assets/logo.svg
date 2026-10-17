@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title description"><title id="title">Robot Directives logo</title><desc id="description">Robot R monogram with a interaction symbol.</desc><defs><linearGradient id="tile" x1="5" y1="0" x2="120" y2="128" gradientUnits="userSpaceOnUse"><stop stop-color="#58C3E8" stop-opacity=".8"/><stop offset="1" stop-color="#0E2B3B"/></linearGradient></defs><rect x="2" y="2" width="124" height="124" rx="30" fill="url(#tile)"/>
+<rect x="2.5" y="2.5" width="123" height="123" rx="29.5" fill="none" stroke="#FFF" stroke-opacity=".2"/>
+<path d="M35 99V35H69C86 35 96 44 96 60C96 72 90 80 81 83L99 99H78L61 85H51V99H35ZM51 51V69H68C75 69 79 66 79 60C79 54 75 51 68 51H51Z" fill="#F9FAFF"/>
+<path d="M66 34V28" stroke="#F9FAFF" stroke-width="4" stroke-linecap="round"/>
+<circle cx="66" cy="23" r="4" fill="#58C3E8"/>
+<rect x="55" y="56" width="5" height="7" rx="2.5" fill="#58C3E8"/>
+<rect x="67" y="56" width="5" height="7" rx="2.5" fill="#58C3E8"/>
+<rect x="91" y="91" width="35" height="35" rx="10" fill="#58C3E8" stroke="#0E2B3B" stroke-width="3"/>
+<g transform="translate(97 97) scale(.86)" fill="none" stroke="#0E2B3B" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" color="#0E2B3B"><path d="M7 3v18l5-5 4 7 4-2-4-7h7L7 3Z"/></g></svg>

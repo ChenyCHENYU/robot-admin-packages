@@ -1,463 +1,118 @@
-# @robot-admin/form-validate
+<!-- 品牌源文件与导出方式：../../docs/assets/README.md -->
 
-<p align="center">
-  <b>企业级表单验证规则库</b><br>
-  单包同时支持 Naive UI 与 Element Plus，一套规则逻辑两套适配输出
-</p>
+![Robot Form Validate](./docs/assets/banner.png)
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/@robot-admin/form-validate"><img src="https://img.shields.io/npm/v/@robot-admin/form-validate.svg" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/@robot-admin/form-validate"><img src="https://img.shields.io/npm/dm/@robot-admin/form-validate.svg" alt="npm downloads"></a>
-  <a href="https://www.npmjs.com/package/@robot-admin/form-validate"><img src="https://img.shields.io/bundlephobia/minzip/@robot-admin/form-validate" alt="bundle size"></a>
-  <a href="https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@robot-admin/form-validate.svg" alt="license"></a>
-</p>
+<div align="center">
+  <p><strong>一份规则定义，贯通界面校验与数据提交。</strong></p>
+  <p>RuleSpec · Naive UI · Element Plus · 批量校验 · 零运行时依赖</p>
+  <p>
+    <a href="https://www.npmjs.com/package/@robot-admin/form-validate"><img src="https://img.shields.io/npm/v/@robot-admin/form-validate?style=flat-square&amp;color=67D7AB&amp;labelColor=202A3B" alt="npm version"></a>
+    <a href="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml"><img src="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml/badge.svg" alt="Workspace quality gate"></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-64748B?style=flat-square&amp;labelColor=202A3B" alt="MIT License"></a>
+  </p>
+  <p>
+    <a href="#快速开始">快速开始</a> ·
+    <a href="#能力地图">能力地图</a> ·
+    <a href="./docs/guide.md">完整指南</a> ·
+    <a href="https://github.com/ChenyCHENYU/robot-admin-packages">包总览</a>
+  </p>
+</div>
 
----
+## 项目定位
 
-## 设计理念
+**Robot Form Validate** 以框架无关的 `RuleSpec` 为规则源，通过适配器输出 Naive UI 与 Element Plus 规则，也支持对纯数据执行校验。包名为 `@robot-admin/form-validate`，无需安装 Vue 或 UI 框架即可使用规则核心。
 
-所有校验逻辑产出**框架无关的 `RuleSpec`**(一份源真相),再通过适配器输出为各框架规则。**同一套规则定义,既能喂给表单实时校验,也能在提交时批量校验,零逻辑重复。**
+当前仓库版本 **3.4.2**。适用于表单实时反馈、导入数据检查、表格多行提交，以及 SQL 数值契约等场景。
 
+## 能力地图
+
+| 领域       | 提供能力                                                       |
+| ---------- | -------------------------------------------------------------- |
+| 基础与格式 | 必填、长度、数值、日期、邮箱、URL 与正则                       |
+| 业务规则   | 手机号、身份证、银行卡、车牌、统一社会信用代码                 |
+| 数值契约   | `numeric` 对齐整数及 SQL `DECIMAL(p,s)` 的精度、范围与边界     |
+| 规则组合   | 条件、跨字段比较、OR / AND、自定义与防抖异步校验               |
+| 数据提交   | `validateValue`、`validateRecord`、`validateRows` 返回首条失败 |
+| 框架适配   | 同一套 `RuleSpec` 输出 Naive UI、Element Plus 或自定义规则     |
+
+```mermaid
+flowchart LR
+  Spec["RuleSpec · 规则源"] --> Naive["Naive UI 规则"]
+  Spec --> Element["Element Plus 规则"]
+  Spec --> Data["纯数据 / 记录 / 多行校验"]
 ```
-                  ┌── toNaiveRule  → PRESET_RULES / RULE_COMBOS / when ...   (Naive UI)
-RuleSpec(源真相) ──┼── toElementRule → ELEMENT_RULES / ELEMENT_COMBOS / whenElement  (Element Plus)
-                  ├── 原样           → SPEC_RULES / whenSpec ...               (框架无关)
-                  └── validateValue  → 提交前批量校验                           (任意场景)
-```
 
-## ✨ 特性
-
-- 🎯 **开箱即用** — 40+ 预设规则，覆盖企业常见场景
-- 🧩 **单包双框架** — 内置 naive / element 双适配，零额外依赖
-- 🔢 **数据库契约** — `numeric` 对标 SQL `DECIMAL(p,s)` 精度范围校验
-- 📊 **批量校验** — `validateValue/validateRecord/validateRows`，表格提交一行搞定
-- 🚀 **高级组合** — 条件验证、跨字段比较、OR/AND 组合、防抖异步
-- 🇨🇳 **中国本地化** — 身份证、银行卡、车牌、统一社会信用代码
-- 💪 **TypeScript** — 完整类型推导，Tree-shaking 友好
-- ✅ **核心边界测试覆盖** — 行为、类型、异步异常与产物均可验证
-
----
-
-## 📦 安装
+## 快速开始
 
 ```bash
-pnpm add @robot-admin/form-validate
-# 或
-npm i @robot-admin/form-validate
+bun add @robot-admin/form-validate
 ```
 
-> 零 UI 框架依赖。你用 Naive UI 还是 Element Plus 都装同一个包。
-
----
-
-## 🚀 30 秒上手
-
-### Naive UI 用户（推荐入口为 naive 格式）
+### 先校验一条数据
 
 ```ts
-import { PRESET_RULES, RULE_COMBOS } from "@robot-admin/form-validate";
+import { SPEC_RULES, validateRecord } from "@robot-admin/form-validate";
 
 const rules = {
-  username: RULE_COMBOS.username("用户名"),   // [必填 + 格式]
-  phone: RULE_COMBOS.mobile("手机号"),        // [必填 + 格式]
-  email: [PRESET_RULES.email("邮箱")],        // 非必填，填了校验格式
+  name: [SPEC_RULES.required("姓名")],
+  email: [SPEC_RULES.email("邮箱")],
 };
-// 直接用于 <n-form-item :rule>
+
+const error = await validateRecord(
+  { name: "Robot", email: "robot@example.com" },
+  rules,
+);
+// 全部通过为 null；失败时返回 { field, message }
 ```
 
-### Element Plus 用户
+### 在表单中使用
 
 ```ts
-import { ELEMENT_RULES, ELEMENT_COMBOS } from "@robot-admin/form-validate";
+import {
+  NAIVE_COMBOS,
+  PRESET_RULES,
+  ELEMENT_COMBOS,
+  ELEMENT_RULES,
+} from "@robot-admin/form-validate";
 
-const rules = {
-  username: ELEMENT_COMBOS.username("用户名"),
-  phone: ELEMENT_COMBOS.mobile("手机号"),
+const naiveRules = {
+  name: NAIVE_COMBOS.username("用户名"),
+  email: [PRESET_RULES.email("邮箱")],
+};
+
+const elementRules = {
+  name: ELEMENT_COMBOS.username("用户名"),
   email: [ELEMENT_RULES.email("邮箱")],
 };
-// 直接用于 <el-form-item :rules>
 ```
 
-> 两边写法完全对称，只是 `PRESET_RULES` ↔ `ELEMENT_RULES`。
+`naiveRules` 传给 Naive UI 的表单规则，`elementRules` 传给 Element Plus。业务规则只需维护一次；需要跨界面与批量提交复用时，直接维护 `RuleSpec` 并调用 `toNaiveRules` / `toElementRules`。
 
----
+## 入口选择与规则语义
 
-## 📖 按场景速查
+所有公开 API 都从包根入口导入：
 
-### 场景 1：必填 + 格式（最常用）
+| 使用环境     | 推荐 API                                                               |
+| ------------ | ---------------------------------------------------------------------- |
+| 框架无关规则 | `SPEC_RULES`、`numeric`、`whenSpec`、`someSpec` / `everySpec`          |
+| Naive UI     | `PRESET_RULES`、`NAIVE_COMBOS`；`RULE_COMBOS` 为兼容名称               |
+| Element Plus | `ELEMENT_RULES`、`ELEMENT_COMBOS`、`whenElement`                       |
+| 提交前校验   | `validateValue`、`validateRecord`、`validateRows`                      |
+| 自定义适配   | `toNaiveRule(s)`、`toElementRule(s)`、`createSpec` / `createAsyncSpec` |
 
-```ts
-import { RULE_COMBOS } from "@robot-admin/form-validate"; // naive
-// 或 ELEMENT_COMBOS（element）
+纯数据校验顺序执行，遇到首条失败即返回。可选字段使用相应命名空间的 `optional` 或核心 `optional()` 包装；跨字段规则通过 getter 读取最新模型。UI 触发与展示仍由使用侧表单控制，服务端也应执行业务校验。
 
-RULE_COMBOS.username("用户名")     // 必填 + 字母数字下划线 3-20 位
-RULE_COMBOS.password("密码")       // 必填 + 强密码（大小写+数字）
-RULE_COMBOS.email("邮箱")          // 必填 + 邮箱格式
-RULE_COMBOS.mobile("手机号")       // 必填 + 手机号格式
-RULE_COMBOS.idCard("身份证号")     // 必填 + 身份证格式
-RULE_COMBOS.bankCard("银行卡号")   // 必填 + 银行卡格式
-RULE_COMBOS.url("链接")            // 必填 + URL 格式
-RULE_COMBOS.confirmPassword("确认密码", () => form.password)
-```
+## 文档与维护
 
-### 场景 2：多规则链式校验（数组即链式）
+| 文档                                   | 内容                                     |
+| -------------------------------------- | ---------------------------------------- |
+| [完整指南](./docs/guide.md)            | 按场景查找规则、数值契约、组合与适配示例 |
+| [批量校验](./docs/guide.md#批量校验)   | 单值、记录与多行校验                     |
+| [迁移说明](./docs/guide.md#从旧版迁移) | 旧分包与规则 API 的迁移                  |
+| [变更记录](./CHANGELOG.md)             | 版本变化与兼容性                         |
 
-规则数组本身就是**顺序执行**的链 —— 前一条通过才跑下一条，失败立即停止返回错误。
-不需要额外的 `.chain()` 语法，数组就是最直观的链。
+在本包目录运行 `bun run verify`，覆盖类型、测试与构建；工作区完整门禁使用根目录的 `bun run verify`。
 
-```ts
-import { ELEMENT_RULES } from "@robot-admin/form-validate";
+## 许可证
 
-// 密码：先校验非空，通过后再校验长度，再校验强度
-password: [
-  ELEMENT_RULES.required("密码"),
-  ELEMENT_RULES.minLength("密码", 8),
-  ELEMENT_RULES.strongPassword("密码"),
-]
-
-// 工号：先校验非空，再校验长度
-userNo: [
-  ELEMENT_RULES.required("工号"),
-  ELEMENT_RULES.length("工号", 8),
-]
-```
-
-> **与手写对比**：Element 原生写法要重复写 `{ required: true, message: "密码不能为空", trigger: "blur" }`，
-> 这里一行一个语义，且消息自动带字段名。
-
-### 场景 3：非必填，填了才校验格式
-
-```ts
-import {
-  PRESET_RULES,
-  ELEMENT_RULES,
-  optional,
-  SPEC_RULES,
-} from "@robot-admin/form-validate";
-
-// Naive UI：同一命名空间内完成，无需手工适配
-PRESET_RULES.optional(PRESET_RULES.boolean("启用状态"))
-
-// Element Plus：写法完全对称
-ELEMENT_RULES.optional(ELEMENT_RULES.boolean("启用状态"))
-
-// 框架无关场景仍使用核心包装器
-optional(SPEC_RULES.boolean("启用状态"))
-```
-
-> `optional` 不修改传入规则；空值直接放行，有值时继续执行原规则。
-
-### 场景 4：数据库数值契约（DECIMAL）
-
-```ts
-import { SPEC_RULES, PRESET_RULES, ELEMENT_RULES } from "@robot-admin/form-validate";
-
-const contract = { kind: "decimal", totalDigits: 11, fractionDigits: 3, min: 0 } as const;
-
-// 按使用环境选择同名入口，无需手工适配
-PRESET_RULES.numeric(contract, "温度") // Naive UI
-ELEMENT_RULES.numeric(contract, "温度") // Element Plus
-SPEC_RULES.numeric(contract, "温度") // 框架无关 / 批量校验
-
-// 整数 + 范围
-ELEMENT_RULES.numeric({ kind: "integer", totalDigits: 11, min: 1 }, "处理次数")
-
-// 开区间（必须严格大于 min）
-SPEC_RULES.numeric({ kind: "decimal", min: 0, max: 100, minExclusive: true }, "百分比")
-```
-
-### 场景 5：跨字段比较（结束日期不早于开始）
-
-```ts
-import { compareWith } from "@robot-admin/form-validate";        // naive
-import { compareWithElement } from "@robot-admin/form-validate"; // element
-
-compareWith("结束日期", () => form.startDate, "gte", "结束日期不能早于开始日期")
-// 操作符：gt | gte | lt | lte | eq | ne
-```
-
-### 场景 6：条件验证（类型为公司时才校验公司名称）
-
-```ts
-import { when } from "@robot-admin/form-validate";        // naive
-import { whenElement } from "@robot-admin/form-validate"; // element
-
-when(
-  () => form.userType,
-  val => val === "company",
-  [PRESET_RULES.required("公司名称")],   // 条件为真
-  [],                                     // 条件为假
-)
-```
-
-### 场景 7：表格提交前批量校验（含嵌套路径）
-
-```ts
-import { validateRows, validateRecord, numeric, SPEC_RULES } from "@robot-admin/form-validate";
-
-const ruleMap = {
-  steel_code: [SPEC_RULES.required("钢种")],
-  work_time:  [numeric({ kind: "integer", min: 1 }, "作业时间")],
-};
-
-// 表格多行：校验整张表，返回第一行错误
-const err = await validateRows(detailRows, ruleMap, { startIndex: 1 });
-if (err) {
-  ElMessage.error(`第 ${err.rowIndex} 行：${err.message}`);
-  return;
-}
-
-// 主从结构：字段名支持点路径嵌套
-const nestedErr = await validateRecord(
-  record,
-  {
-    "address.city":    [SPEC_RULES.required("城市")],
-    "items[0].qty":    [numeric({ kind: "integer", min: 1 }, "数量")],
-    "items[1].amount": [numeric({ kind: "decimal", min: 0 }, "金额")],
-  },
-);
-```
-
-> 点路径支持 `'a.b.c'`（对象嵌套）、`'items[0].qty'`（数组索引）、深层组合。
-> 路径只读取对象自身属性，不会沿原型链取值，避免污染数据影响校验结果。
-
-### 场景 8：OR 组合（手机号或邮箱任一）
-
-```ts
-import { some, PRESET_RULES } from "@robot-admin/form-validate";
-
-some(
-  [PRESET_RULES.mobile("联系方式"), PRESET_RULES.email("联系方式")],
-  "请填写手机号或邮箱",
-)
-```
-
----
-
-## 🧰 API 全景
-
-### 三套预设（共享同一份规则工厂）
-
-| 预设 | 返回类型 | 适用 |
-|------|---------|------|
-| `PRESET_RULES` | NaiveRule | Naive UI（向后兼容） |
-| `ELEMENT_RULES` | ElementRule | Element Plus |
-| `SPEC_RULES` | RuleSpec | 框架无关，需手动适配 |
-
-**预设成员（三者一致）：**
-
-| 类别 | 成员 |
-|------|------|
-| 基础 | `required` `integer` `positiveInteger` `number` `positiveNumber` `boolean` `enumValue` `pattern` `optional` |
-| 字符串 | `length` `minLength` `maxLength` `startsWith` `endsWith` `includes` |
-| 数字 | `range` `min` `max` `between` |
-| 数组 | `array` `arrayMinLength` `arrayMaxLength` `arrayUnique` |
-| 日期 | `date` `dateAfter` `dateBefore` `dateRange` |
-| 格式 | `mobile` `email` `url` `ip` `ipv6` `mac` `domain` `hexColor` `username` `strongPassword` `confirmPassword` `asyncCheck` |
-| 中国 | `idCard` `postalCode` `bankCard` `creditCode` `licensePlate` `qq` `wechat` |
-| 数值契约 | `numeric(contract, field)` |
-
-### 高级功能
-
-| 功能 | naive | element | 框架无关 |
-|------|-------|---------|---------|
-| 条件验证 | `when` | `whenElement` | `whenSpec` |
-| 跨字段比较 | `compareWith` | `compareWithElement` | `compareWithSpec` |
-| 防抖异步 | `debouncedAsyncCheck` | `debouncedAsyncCheckElement` | `debouncedAsyncCheckSpec` |
-| OR 组合 | `some` | `someElement` | `someSpec` |
-| AND 组合 | `every` | `everyElement` | `everySpec` |
-
-组合器可直接接收同框架预设：Naive 版本使用 `PRESET_RULES`，Element 版本使用 `ELEMENT_RULES`，框架无关版本使用 `SPEC_RULES`。
-
-### 适配器
-
-| 函数 | 作用 |
-|------|------|
-| `toNaiveRule(spec)` / `toNaiveRules(specs)` | RuleSpec → NaiveRule |
-| `toElementRule(spec)` / `toElementRules(specs)` | RuleSpec → ElementRule |
-
-### 规则创建
-
-| 函数 | 返回 | 说明 |
-|------|------|------|
-| `createSpec(trigger, fn, msg)` | RuleSpec | 创建框架无关规则 |
-| `createAsyncSpec(trigger, fn, msg)` | RuleSpec | 异步版本 |
-| `createRule(trigger, fn, msg)` | NaiveRule | 向后兼容（= createSpec + toNaiveRule） |
-
-### 批量校验
-
-| 函数 | 入参 | 返回 | 场景 |
-|------|------|------|------|
-| `validateValue(value, rules)` | 单值 | `string \| null` | 单字段 |
-| `validateRecord(record, ruleMap)` | 一条记录 | `{field, message} \| null` | 表单提交 |
-| `validateRows(rows, ruleMap, opts?)` | 多行 | `{rowIndex, field, message} \| null` | 表格提交 |
-
-### 工具
-
-| 函数 | 说明 |
-|------|------|
-| `optional(rule)` | 包装为非必填（空值放行） |
-| `transform(fn, rule)` | 校验前转换值（如 trim） |
-| `mergeSpecs(specs)` | 串行校验，返回第一条失败 |
-| `isBlank(v)` | 空值判断（null/undefined/纯空格） |
-| `REGEX_PATTERNS` | 正则常量库（40+） |
-
-### 运行时语义
-
-- 空值统一指 `null`、`undefined`、空字符串或纯空白字符串；`0` 与 `false` 都是已填写值。
-- `required` 元数据会同步传给 Naive UI 与 Element Plus，用于框架展示必填状态。
-- 防抖校验在同一等待窗口内只执行最后一次调用，但每个调用方返回的 Promise 都会结算。
-- 规则函数抛出的异常会继续向上传递；Element Plus 适配器会将异常规范化为 `Error` 交给 callback。
-- `numeric` 会在创建规则时拒绝非法精度、非有限边界和反向区间，尽早暴露配置错误。
-- 规则工厂会快照 trigger、枚举值、静态日期边界等配置；调用方后续修改原始配置不会改变既有规则。
-- 预设、组合和正则命名空间均为只读对象，防止某个业务模块误改后影响其他表单。
-
-### 接入隔离保证
-
-- 零运行时依赖，不要求安装 Naive UI 或 Element Plus，也不会自动注册组件。
-- 不修改全局对象、原型链、传入数据或传入规则；每次工厂调用均返回独立规则。
-- 不使用全局可变配置，多应用、多租户及微前端场景之间不会共享校验状态。
-- 规则对象本身保持可扩展，业务侧仍可安全追加框架支持的局部字段。
-
----
-
-## 🎓 进阶
-
-### 多规则组合：AND / OR / 条件
-
-当数组链式不够用时（需要把多条规则**合并成一条**塞进单个 form-item，或做 OR 逻辑），用组合函数：
-
-```ts
-import { every, some, when, PRESET_RULES } from "@robot-admin/form-validate";
-
-// AND：全部满足（合并成单条规则，失败返回第一个错误）
-every([
-  PRESET_RULES.required("密码"),
-  PRESET_RULES.minLength("密码", 8),
-  PRESET_RULES.strongPassword("密码"),
-])
-
-// OR：满足其一即可
-some(
-  [PRESET_RULES.mobile("联系方式"), PRESET_RULES.email("联系方式")],
-  "请填写手机号或邮箱",
-)
-
-// 条件：只有企业用户才校验统一信用代码
-when(
-  () => form.userType,
-  val => val === "enterprise",
-  [PRESET_RULES.required("统一信用代码"), PRESET_RULES.creditCode("统一信用代码")],
-  [],
-)
-```
-
-> **数组 vs every 的区别**：数组是 form-item 级链式（多条独立规则）；`every` 是把多条合成一条规则。
-> 一般场景用数组即可，需要"合成单条"时（如塞进 `some`/`when` 内部）用 `every`。
-
-### 动态规则（响应式）
-
-规则工厂返回的是普通对象，天然支持在 `computed` / `watch` 中按业务状态动态生成：
-
-```ts
-import { computed } from "vue";
-import { ELEMENT_RULES } from "@robot-admin/form-validate";
-
-// 根据表单类型动态返回不同规则
-const workTimeRules = computed(() => {
-  if (form.value.type === "overtime") {
-    return [ELEMENT_RULES.numeric({ kind: "integer", min: 1, max: 10080 }, "加班时长")];
-  }
-  return [ELEMENT_RULES.numeric({ kind: "integer", min: 0, max: 480 }, "工时")];
-});
-// :rules="workTimeRules"
-```
-
-### 自定义规则
-
-```ts
-import {
-  createSpec,
-  createAsyncSpec,
-  toElementRule,
-} from "@robot-admin/form-validate";
-
-// 同步
-const mySpec = createSpec("blur", v => v?.length === 6, "必须6位");
-
-// element 使用
-const myRule = toElementRule(mySpec);
-
-// 异步（如查重）
-const asyncSpec = createAsyncSpec("blur", async (v) => {
-  const res = await checkExists(v);
-  return !res.exists;
-}, "已存在");
-```
-
-### 手动适配任意框架
-
-```ts
-import type { RuleSpec } from "@robot-admin/form-validate";
-
-function toMyRule(spec: RuleSpec) {
-  return {
-    trigger: spec.trigger,
-    check: (value) => spec.validate(value),
-    message: spec.message,
-  };
-}
-```
-
-### 正则常量库
-
-```ts
-import { REGEX_PATTERNS } from "@robot-admin/form-validate";
-
-REGEX_PATTERNS.MOBILE       // 手机号
-REGEX_PATTERNS.ID_CARD      // 身份证
-REGEX_PATTERNS.BANK_CARD    // 银行卡
-REGEX_PATTERNS.LICENSE_PLATE // 车牌
-REGEX_PATTERNS.IP / IPV6    // IP 地址
-// ... 完整列表见源码 regex.ts
-```
-
----
-
-## 📂 项目结构
-
-```
-@robot-admin/form-validate/
-├── src/
-│   ├── index.ts       # 主入口
-│   ├── types.ts       # RuleSpec / NaiveRule / ElementRule
-│   ├── adapter.ts     # toNaiveRule / toElementRule
-│   ├── utils.ts       # createSpec / optional / transform ...
-│   ├── numeric.ts     # 数据库数值契约
-│   ├── advanced.ts    # when / compareWith / some / every（三套）
-│   ├── validate.ts    # validateValue / validateRecord / validateRows
-│   ├── combos.ts      # NAIVE_COMBOS / ELEMENT_COMBOS
-│   ├── presets.ts     # PRESET_RULES / ELEMENT_RULES / SPEC_RULES
-│   ├── regex.ts       # 正则常量库
-│   └── rules/         # basic / value / format / china（产 RuleSpec）
-└── test/              # 单元、边界与公共类型契约
-```
-
----
-
-## 🔄 从旧版迁移
-
-| 旧（v2 / 三包） | 新（v3.2+ 单包） |
-|-----------------|------------------|
-| `@robot-admin/form-validate-core` | 已废弃，逻辑内联进单包 |
-| `@robot-admin/form-validate-element` | 已废弃，改用 `ELEMENT_RULES` |
-| `PRESET_RULES.mobile()` | **不变**（向后兼容） |
-| `RULE_COMBOS.mobile()` | **不变** |
-| `createRule()` | **不变** |
-| element 规则 | `toElementRule(spec)` 或 `ELEMENT_RULES.mobile()` |
-
----
-
-## 📄 License
-
-MIT
+[MIT License](./LICENSE) · Robot Packages

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="390" viewBox="0 0 1280 390" role="img" aria-labelledby="title description">
+<title id="title">Robot Directives</title><desc id="description">Small directives. Predictable interactions. 11 VUE DIRECTIVES / LIFECYCLE CLEANUP / UI FRAMEWORK INDEPENDENT.</desc>
+<defs><linearGradient id="tile" x1="5" y1="0" x2="120" y2="128" gradientUnits="userSpaceOnUse"><stop stop-color="#58C3E8" stop-opacity=".8"/><stop offset="1" stop-color="#0E2B3B"/></linearGradient><linearGradient id="bg" x1="0" y1="0" x2="1280" y2="390" gradientUnits="userSpaceOnUse"><stop stop-color="#101721"/><stop offset="1" stop-color="#0E2B3B"/></linearGradient><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#58C3E8" stroke-opacity=".045"/></pattern><clipPath id="edge"><rect width="1280" height="390" rx="24"/></clipPath></defs>
+<g clip-path="url(#edge)"><rect width="1280" height="390" fill="url(#bg)"/><rect width="1280" height="390" fill="url(#grid)"/>
+<svg x="60" y="104" width="130" height="130" viewBox="0 0 128 128"><rect x="2" y="2" width="124" height="124" rx="30" fill="url(#tile)"/>
+<rect x="2.5" y="2.5" width="123" height="123" rx="29.5" fill="none" stroke="#FFF" stroke-opacity=".2"/>
+<path d="M35 99V35H69C86 35 96 44 96 60C96 72 90 80 81 83L99 99H78L61 85H51V99H35ZM51 51V69H68C75 69 79 66 79 60C79 54 75 51 68 51H51Z" fill="#F9FAFF"/>
+<path d="M66 34V28" stroke="#F9FAFF" stroke-width="4" stroke-linecap="round"/>
+<circle cx="66" cy="23" r="4" fill="#58C3E8"/>
+<rect x="55" y="56" width="5" height="7" rx="2.5" fill="#58C3E8"/>
+<rect x="67" y="56" width="5" height="7" rx="2.5" fill="#58C3E8"/>
+<rect x="91" y="91" width="35" height="35" rx="10" fill="#58C3E8" stroke="#0E2B3B" stroke-width="3"/>
+<g transform="translate(97 97) scale(.86)" fill="none" stroke="#0E2B3B" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" color="#0E2B3B"><path d="M7 3v18l5-5 4 7 4-2-4-7h7L7 3Z"/></g></svg>
+<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
+<text x="64" y="58" fill="#58C3E8" font-size="12" font-weight="600" letter-spacing="2.2">ROBOT ECOSYSTEM / INTERACTION</text>
+<text x="224" y="146" fill="#F5F8FF" font-size="51" font-weight="750" letter-spacing="-1.5">Robot Directives</text>
+<text x="227" y="189" fill="#BFC8DC" font-size="17">Small directives. Predictable interactions.</text>
+<text x="227" y="230" fill="#58C3E8" font-family="SFMono-Regular,Consolas,monospace" font-size="15">@robot-admin/directives</text>
+<text x="227" y="270" fill="#8393AE" font-size="12" letter-spacing=".8">TYPED APIs · COMPOSABLE BY DESIGN · OPEN SOURCE / MIT</text>
+<path d="M64 306H1216" stroke="#BFC8DC" stroke-opacity=".17"/><text x="64" y="342" fill="#58C3E8" font-size="12" font-weight="600" letter-spacing="1.1">11 VUE DIRECTIVES</text><text x="425" y="342" fill="#BFC8DC" font-size="12" font-weight="600" letter-spacing="1.1">LIFECYCLE CLEANUP</text><text x="810" y="342" fill="#BFC8DC" font-size="12" font-weight="600" letter-spacing="1.1">UI FRAMEWORK INDEPENDENT</text>
+<g transform="translate(952 89)" fill="none" stroke="#58C3E8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" color="#58C3E8"><rect x="10" y="12" width="238" height="140" rx="12"/><path d="M10 42H248"/><rect x="31" y="63" width="104" height="23" rx="5"/><rect x="31" y="103" width="74" height="22" rx="5" fill="currentColor" fill-opacity=".25"/><path d="m150 69 10 87 21-28 34 16 9-18-35-16 24-16-63-25Z" fill="currentColor" fill-opacity=".3"/><path d="m137 58-12-14m14 3 2-19m-19 37-20-3"/></g>
+</g></g></svg>

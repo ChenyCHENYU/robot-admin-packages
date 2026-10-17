@@ -159,7 +159,8 @@
     "dist",
     "README.md",
     "SECURITY.md",
-    "LICENSE"
+    "LICENSE",
+    "docs"
   ],
   "sideEffects": false,
   "scripts": {

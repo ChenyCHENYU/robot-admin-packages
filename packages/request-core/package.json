@@ -80,7 +80,8 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "SECURITY.md"
+    "SECURITY.md",
+    "docs"
   ],
   "sideEffects": false,
   "publishConfig": {

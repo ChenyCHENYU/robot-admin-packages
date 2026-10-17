@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="390" viewBox="0 0 1280 390" role="img" aria-labelledby="title description">
+<title id="title">Robot File Utils</title><desc id="description">From business data to files, with control. 8 MODULE ENTRIES / ISOLATED CONTEXTS / CANCEL / PROGRESS / LIMITS.</desc>
+<defs><linearGradient id="tile" x1="5" y1="0" x2="120" y2="128" gradientUnits="userSpaceOnUse"><stop stop-color="#EABB65" stop-opacity=".8"/><stop offset="1" stop-color="#302619"/></linearGradient><linearGradient id="bg" x1="0" y1="0" x2="1280" y2="390" gradientUnits="userSpaceOnUse"><stop stop-color="#101721"/><stop offset="1" stop-color="#302619"/></linearGradient><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#EABB65" stroke-opacity=".045"/></pattern><clipPath id="edge"><rect width="1280" height="390" rx="24"/></clipPath></defs>
+<g clip-path="url(#edge)"><rect width="1280" height="390" fill="url(#bg)"/><rect width="1280" height="390" fill="url(#grid)"/>
+<svg x="60" y="104" width="130" height="130" viewBox="0 0 128 128"><rect x="2" y="2" width="124" height="124" rx="30" fill="url(#tile)"/>
+<rect x="2.5" y="2.5" width="123" height="123" rx="29.5" fill="none" stroke="#FFF" stroke-opacity=".2"/>
+<path d="M35 99V35H69C86 35 96 44 96 60C96 72 90 80 81 83L99 99H78L61 85H51V99H35ZM51 51V69H68C75 69 79 66 79 60C79 54 75 51 68 51H51Z" fill="#F9FAFF"/>
+<path d="M66 34V28" stroke="#F9FAFF" stroke-width="4" stroke-linecap="round"/>
+<circle cx="66" cy="23" r="4" fill="#EABB65"/>
+<rect x="55" y="56" width="5" height="7" rx="2.5" fill="#EABB65"/>
+<rect x="67" y="56" width="5" height="7" rx="2.5" fill="#EABB65"/>
+<rect x="91" y="91" width="35" height="35" rx="10" fill="#EABB65" stroke="#302619" stroke-width="3"/>
+<g transform="translate(97 97) scale(.86)" fill="none" stroke="#302619" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" color="#302619"><path d="M6 2h10l6 6v16H6Z"/><path d="M16 2v7h6M10 14h8M10 19h6"/></g></svg>
+<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
+<text x="64" y="58" fill="#EABB65" font-size="12" font-weight="600" letter-spacing="2.2">ROBOT ECOSYSTEM / FILES</text>
+<text x="224" y="146" fill="#F5F8FF" font-size="51" font-weight="750" letter-spacing="-1.5">Robot File Utils</text>
+<text x="227" y="189" fill="#BFC8DC" font-size="17">From business data to files, with control.</text>
+<text x="227" y="230" fill="#EABB65" font-family="SFMono-Regular,Consolas,monospace" font-size="15">@robot-admin/file-utils</text>
+<text x="227" y="270" fill="#8393AE" font-size="12" letter-spacing=".8">TYPED APIs · COMPOSABLE BY DESIGN · OPEN SOURCE / MIT</text>
+<path d="M64 306H1216" stroke="#BFC8DC" stroke-opacity=".17"/><text x="64" y="342" fill="#EABB65" font-size="12" font-weight="600" letter-spacing="1.1">8 MODULE ENTRIES</text><text x="425" y="342" fill="#BFC8DC" font-size="12" font-weight="600" letter-spacing="1.1">ISOLATED CONTEXTS</text><text x="810" y="342" fill="#BFC8DC" font-size="12" font-weight="600" letter-spacing="1.1">CANCEL / PROGRESS / LIMITS</text>
+<g transform="translate(952 89)" fill="none" stroke="#EABB65" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" color="#EABB65"><rect x="8" y="20" width="118" height="134" rx="10"/><path d="M8 51H126M8 82H126M8 113H126M48 51V154M88 51V154"/><path d="M126 85h40m-10-9 10 9-10 9"/><path d="M182 16h40l27 27v115h-67Z" fill="currentColor" fill-opacity=".08"/><path d="M222 16v27h27M197 71h36M197 91h36M197 111h22"/></g>
+</g></g></svg>

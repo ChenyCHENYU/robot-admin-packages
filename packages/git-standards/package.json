@@ -48,7 +48,8 @@
     "bin",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "docs"
   ],
   "sideEffects": false,
   "publishConfig": {

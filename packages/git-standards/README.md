@@ -1,664 +1,100 @@
-# @robot-admin/git-standards
+<!-- 品牌源文件与导出方式：../../docs/assets/README.md -->
 
-> **v1.0.5** · 零配置 · 模块化 · Git 工程化标准工具包
+![Robot Git Standards](./docs/assets/banner.png)
 
-集成 Commitizen + Commitlint + Husky + ESLint + Prettier + Oxlint + lint-staged，支持按需选配。
+<div align="center">
+  <p><strong>从第一次提交开始，让团队使用同一套工程约定。</strong></p>
+  <p>CLI · Init / Doctor · Vue / React / Vanilla · 本地配置生成</p>
+  <p>
+    <a href="https://www.npmjs.com/package/@robot-admin/git-standards"><img src="https://img.shields.io/npm/v/@robot-admin/git-standards?style=flat-square&amp;color=B79AF7&amp;labelColor=202A3B" alt="npm version"></a>
+    <a href="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml"><img src="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml/badge.svg" alt="Workspace quality gate"></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-64748B?style=flat-square&amp;labelColor=202A3B" alt="MIT License"></a>
+  </p>
+  <p>
+    <a href="#快速开始">快速开始</a> ·
+    <a href="#能力地图">能力地图</a> ·
+    <a href="./docs/guide.md">完整指南</a> ·
+    <a href="https://github.com/ChenyCHENYU/robot-admin-packages">包总览</a>
+  </p>
+</div>
+
+## 项目定位
+
+**Robot Git Standards** 是 Git 工程工具包，以 `@robot-admin/git-standards` 发布，CLI 名称为 `robot-standards`。它将 Commitizen、Commitlint、Husky 与可选的 Lint / 格式化工具组合为可重复执行的项目初始化流程。
+
+当前仓库版本 **1.0.5**，运行需要 **Node.js ≥18.18.0**。生成的配置是项目自己的完整文件，可直接调整；应用运行时无需导入本包。
+
+## 能力地图
+
+| 能力       | 当前行为                                                    |
+| ---------- | ----------------------------------------------------------- |
+| `init`     | 检测 Git 根目录、识别包管理器、选择预设、安装依赖并生成配置 |
+| `doctor`   | 检查配置、Hook 和本地依赖的真实可解析状态                   |
+| 预设组合   | minimal、standard、full，以及交互式自定义                   |
+| 框架选项   | Vue、React、Vanilla，TypeScript 与 JSDoc 可配置             |
+| 重复初始化 | 覆盖生成文件前备份，保留已有 Hook，合并缺失脚本与工具配置   |
+| 本地执行   | 生成 Hook 使用当前项目的工具，避免执行时隐式下载依赖        |
 
 ## 快速开始
 
-```bash
-# 安装（workspace 项目）
-bun add --dev @robot-admin/git-standards
+在目标 **Git 仓库根目录** 安装并运行：
 
-# 初始化（交互式引导）
+```bash
+bun add -d @robot-admin/git-standards
 bunx --no-install robot-standards init
-```
-
-运行后进入交互式引导，选择预设方案即可完成全部配置。
-
-> **注意**：所有配置文件生成后即为完整独立文件，不依赖本包的运行时导入，直接修改即可自定义。
-> 初始化可重复执行：覆盖生成的配置文件前会创建 `.bak` 备份；已有 Husky Hook
-> 会原样保留；更新 `package.json` 时只补充缺失脚本，并合并工具配置与
-> `lint-staged`，不会静默覆盖项目已有约定。
-
-CLI 会按项目实际包管理器使用 `npx --no-install` 或 `pnpm exec` 等本地二进制执行
-方式，避免把含参数的整条命令误当作可执行文件。`--version` 始终从当前安装包的
-`package.json` 读取，和 npm 发布版本保持一致。
-
-运行环境要求 Node.js `>=18.18.0`。
-
-> Husky Hook 属于整个 Git 仓库，因此 `--cwd` 必须指向仓库根目录；在 monorepo
-> 子包中执行时请显式传入根目录。CLI 会拒绝在已有仓库子目录中生成另一套 Hook，
-> 防止 `core.hooksPath` 与配置目录错位。
-
-## 提交代码
-
-初始化完成后，有两种方式唤醒规范化提交：
-
-```bash
-# 方式一：通过 package.json scripts（无需全局安装）
-bun run cz
-npm run cz
-
-# 方式二：通过 git 子命令（需全局安装 commitizen）
-npm install -g commitizen
-git cz
-```
-
-两种方式效果完全一致，都会唤醒交互式提交：
-
-```
-? 请选择提交类型:  fix: 🐛 Bug 修复
-? 请输入修改范围:  登录
-? 请简要描述提交:  修复登录相关逻辑
-→ fix(登录): 修复登录相关逻辑
-```
-
-## 预设模式
-
-| 模式       | 包含功能                              | 依赖数 | 适用场景                                        |
-| ---------- | ------------------------------------- | ------ | ----------------------------------------------- |
-| **极简**   | Commitizen + Commitlint + Husky       | ~5     | 只需规范提交信息                                |
-| **标准**   | + ESLint + lint-staged + EditorConfig | ~10    | 需要代码质量检查                                |
-| **完整**   | + Prettier + Oxlint + JSDoc（全部）   | ~16    | 全面代码质量管控，主项目 Robot_Admin 使用此模式 |
-| **自定义** | checkbox 自由勾选                     | 按需   | 精确控制每个功能模块                            |
-
-### 极简模式
-
-仅安装 Git 提交规范工具链，不涉及任何代码检查/格式化：
-
-- ✔ Commitizen + cz-customizable（规范提交交互）
-- ✔ Commitlint（提交信息校验）
-- ✔ Husky commit-msg hook
-- ✗ 无 pre-commit hook
-- ✗ 无 ESLint / Prettier / lint-staged
-
-### 标准模式
-
-在极简基础上增加代码质量检查：
-
-- ✔ 极简模式全部功能
-- ✔ ESLint（支持 Vue 3 / React / Vanilla）
-- ✔ lint-staged（暂存区增量检查）
-- ✔ Husky pre-commit hook
-- ✔ EditorConfig
-
-### 完整模式
-
-全部工具链，与 Robot_Admin 主项目一致：
-
-- ✔ 标准模式全部功能
-- ✔ Prettier（代码自动格式化）
-- ✔ Oxlint（50x faster Lint 引擎）
-- ✔ JSDoc 强制注释（默认启用）
-
-### 自定义模式
-
-通过 checkbox 逐一勾选需要的功能模块：
-
-```
-ESLint           代码质量检查
-lint-staged      暂存区增量检查
-Prettier         代码自动格式化
-Oxlint           高性能 Lint 引擎
-EditorConfig     编辑器统一配置
-↩ 返回上一步
-```
-
-> Commitizen + Commitlint + Husky 为核心功能，始终包含。
-
-## 交互流程
-
-```mermaid
-flowchart TD
-    A["robot-standards init"] --> B["环境检测<br/>Git 仓库 + 包管理器"]
-    B --> C{"选择预设方案"}
-
-    C -->|极简| D1["仅提交规范<br/>Commitizen + Commitlint"]
-    C -->|标准| D2["提交规范 + ESLint<br/>+ lint-staged"]
-    C -->|完整| D3["全部工具链<br/>+ Prettier + Oxlint + JSDoc"]
-    C -->|自定义| D4["checkbox 勾选<br/>附加功能模块"]
-
-    D1 --> SKIP["跳过 ESLint 配置"]
-    D2 --> ESLINT["ESLint 配置<br/>框架 / TypeScript / JSDoc"]
-    D3 --> ESLINT
-    D4 -->|"选了 ESLint"| ESLINT
-    D4 -->|"未选 ESLint"| SKIP
-    D4 -->|"返回"| C
-
-    ESLINT --> SUMMARY["配置摘要 + 确认"]
-    ESLINT -->|"返回"| C
-    SKIP --> SUMMARY
-
-    SUMMARY -->|确认| EXEC["安装依赖<br/>生成配置文件<br/>更新 package.json<br/>初始化 Husky"]
-    SUMMARY -->|否| C
-
-    EXEC --> DONE["初始化完成"]
-```
-
-## CI / 非交互模式
-
-通过 `--ci` 跳过交互，配合 `--preset` 指定预设：
-
-```bash
-# 极简模式
-robot-standards init --ci --preset minimal
-
-# 标准模式（默认）
-robot-standards init --ci --preset standard
-
-# 完整模式
-robot-standards init --ci --preset full
-
-# 完整模式 + 自定义选项
-robot-standards init --ci --preset full --framework react --typescript --no-jsdoc
-```
-
-### CLI 参数
-
-| 参数               | 说明                                   | 默认值           |
-| ------------------ | -------------------------------------- | ---------------- |
-| `--cwd <path>`     | 目标目录                               | 当前目录         |
-| `--ci`             | 非交互式模式                           | `false`          |
-| `--preset <id>`    | 预设方案 `minimal \| standard \| full` | `standard`       |
-| `--framework <fw>` | 项目框架 `vue \| react \| vanilla`     | `vue`            |
-| `--typescript`     | 启用 TypeScript                        | CI 模式下 `true` |
-| `--no-typescript`  | 禁用 TypeScript                        | -                |
-| `--jsdoc`          | 强制 JSDoc 注释                        | full 时 `true`   |
-| `--no-jsdoc`       | 禁用 JSDoc                             | -                |
-| `--oxlint`         | 启用 Oxlint                            | 跟随预设         |
-| `--no-oxlint`      | 禁用 Oxlint                            | -                |
-| `--prettier`       | 启用 Prettier                          | 跟随预设         |
-| `--no-prettier`    | 禁用 Prettier                          | -                |
-
-## 配置自定义
-
-所有生成的文件都是**完整独立的配置**，不依赖本包的任何运行时导入。直接修改文件即可：
-
-配置中的 `module.exports` 使用 CommonJS 语法，文件扩展名随目标项目的
-`package.json#type` 自动选择：
-
-| 配置 | CommonJS 项目或未声明 `type` | `type: "module"` 的 ESM 项目 |
-| --- | --- | --- |
-| Commitizen | `.cz-config.js` | `.cz-config.cjs` |
-| Commitlint | `commitlint.config.js` | `commitlint.config.cjs` |
-| Prettier | `.prettierrc.js` | `.prettierrc.cjs` |
-
-ESLint 始终使用 `eslint.config.mjs`。以下配置内容在两种项目中相同，修改时以
-实际生成的文件名为准；不要将 ESM 项目中的 `.cjs` 改回 `.js`。
-
-### ESLint — eslint.config.mjs
-
-```ts
-// 生成后直接在规则对象里增删改即可
-export default defineConfigWithVueTs(
-  // ...已有配置
-
-  // 新增项目专属忽略
-  {
-    name: "app/files-to-ignore",
-    ignores: [
-      "**/dist/**",
-      "**/src/api/generated/**", // 按需添加
-    ],
-  },
-
-  // 新增自定义规则
-  {
-    rules: {
-      "no-console": ["error", { allow: ["warn", "error"] }],
-    },
-  },
-);
-```
-
-### Commitizen — .cz-config.js / .cz-config.cjs
-
-```js
-// 直接改 types / scopes / messages
-module.exports = {
-  scopes: [{ name: "core" }, { name: "ui" }],
-  types: [
-    // 增加自定义类型...
-  ],
-};
-```
-
-### Prettier — .prettierrc.js / .prettierrc.cjs
-
-```js
-// 直接改任意选项
-module.exports = {
-  printWidth: 100, // 默认 80，改为 100
-  semi: true, // 默认 false，改为 true
-};
-```
-
-### Commitlint — commitlint.config.js / commitlint.config.cjs
-
-```js
-// 增加自定义 type 或调整规则
-module.exports = {
-  extends: ["@commitlint/config-conventional"],
-  rules: {
-    "type-enum": [
-      2,
-      "always",
-      [
-        // 在这里增删 type...
-      ],
-    ],
-    "header-max-length": [2, "always", 120],
-  },
-};
-```
-
-## 生成的文件清单
-
-| 文件                   | 极简 | 标准 | 完整 | 说明                    |
-| ---------------------- | :--: | :--: | :--: | ----------------------- |
-| `.cz-config.js` / `.cz-config.cjs` |  ✔   |  ✔   |  ✔   | Commitizen 提交类型配置 |
-| `commitlint.config.js` / `commitlint.config.cjs` |  ✔   |  ✔   |  ✔   | 提交信息校验规则 |
-| `.husky/commit-msg`    |  ✔   |  ✔   |  ✔   | 提交信息 hook           |
-| `.husky/pre-commit`    |  -   |  ✔   |  ✔   | 代码检查 hook           |
-| `eslint.config.mjs`    |  -   |  ✔   |  ✔   | ESLint Flat Config      |
-| `.editorconfig`        |  -   |  ✔   |  ✔   | 编辑器统一配置          |
-| `.prettierrc.js` / `.prettierrc.cjs` |  -   |  -   |  ✔   | 代码格式化配置 |
-
-### 各文件内容详解
-
-#### `.cz-config.js` / `.cz-config.cjs` — Commitizen 交互式提交配置
-
-定义了 `git cz` 交互式提交的类型、消息模板和作用域。
-
-**生成内容**:
-
-```js
-module.exports = {
-  scopes: [], // 默认空，可自定义添加预设 scope
-  allowEmptyScopes: false, // 不允许空 scope
-  allowCustomScopes: true, // 允许自由输入 scope
-
-  types: [
-    { value: "wip", name: "wip:      🚧 开发中" },
-    { value: "feat", name: "feat:     🎯 新功能" },
-    { value: "fix", name: "fix:      🐛 Bug 修复" },
-    { value: "perf", name: "perf:     ⚡️ 性能优化" },
-    { value: "deps", name: "deps:     📦 依赖更新" },
-    { value: "refactor", name: "refactor: ♻️  重构" },
-    { value: "docs", name: "docs:     📚 文档变更" },
-    { value: "test", name: "test:     🔎 测试相关" },
-    { value: "style", name: "style:    💄 代码样式" },
-    { value: "build", name: "build:    🧳 构建/打包" },
-    { value: "chore", name: "chore:    🔧 其他杂项" },
-    { value: "revert", name: "revert:   🔙 回退" },
-  ],
-
-  messages: {
-    type: "请选择提交类型:",
-    customScope: "请输入修改范围(必填，格式如：模块/子模块):",
-    subject: "请简要描述提交(必填，不加句号):",
-    body: "请输入更详细的说明(可选):\n",
-    footer: 'Footer(可选): 例如 "Closes #123" 或 "Release-As: 1.3.1"\n',
-    confirmCommit: "确认提交以上内容？(y/n/e/h)",
-  },
-
-  skipQuestions: ["body"],
-  allowBreakingChanges: ["feat", "fix", "refactor"],
-  breakingPrefix: "BREAKING CHANGE:",
-  subjectLimit: 88,
-};
-```
-
----
-
-#### `commitlint.config.js` / `commitlint.config.cjs` — 提交信息校验规则
-
-校验 `git commit` 消息是否符合约定式提交规范。
-
-**生成内容**:
-
-```js
-module.exports = {
-  extends: ["@commitlint/config-conventional"],
-  rules: {
-    "type-enum": [
-      2,
-      "always",
-      [
-        "wip",
-        "feat",
-        "fix",
-        "perf",
-        "deps",
-        "refactor",
-        "docs",
-        "test",
-        "style",
-        "build",
-        "chore",
-        "revert",
-      ],
-    ],
-    "type-case": [2, "always", "lower-case"],
-    "subject-empty": [2, "never"],
-    "type-empty": [2, "never"],
-    "subject-full-stop": [0, "never"],
-    "header-max-length": [2, "always", 88],
-  },
-};
-```
-
----
-
-#### `.husky/commit-msg` — 提交信息校验 Hook
-
-Git commit 时自动触发，校验提交信息格式是否合规。
-
-**生成内容**:
-
-```shell
-bunx --no-install commitlint --edit "$1"
-```
-
-> 执行命令因包管理器不同而异（`bunx --no-install` / `npx --no-install` / `pnpm exec` / `yarn`），均只使用项目本地依赖。
-
----
-
-#### `.husky/pre-commit` — 代码质量检查 Hook
-
-Git commit 前自动触发，根据启用功能动态生成。
-
-**极简模式**: 无此文件
-
-**标准模式**（ESLint + lint-staged）:
-
-```shell
-bunx --no-install lint-staged
-```
-
-**完整模式**（Oxlint + lint-staged）:
-
-```shell
-bunx --no-install lint-staged
-```
-
-完整模式中的 Oxlint、ESLint 与 Prettier 由 lint-staged 对暂存文件统一调度，避免在
-pre-commit 阶段重复执行全量检查。
-
-> 文件会自动设置可执行权限（`chmod 755`），确保在 Git Bash / WSL 环境下正常运行。
-
----
-
-#### `eslint.config.mjs` — ESLint Flat Config
-
-根据框架（Vue/React/Vanilla）、TypeScript、JSDoc 选项动态生成。
-
-**Vue 3 + TypeScript 示例**:
-
-```ts
-import js from "@eslint/js";
-import pluginVue from "eslint-plugin-vue";
-import {
-  defineConfigWithVueTs,
-  vueTsConfigs,
-} from "@vue/eslint-config-typescript";
-import skipFormatting from "@vue/eslint-config-prettier/skip-formatting";
-import oxlint from "eslint-plugin-oxlint"; // 完整模式
-import jsdocPlugin from "eslint-plugin-jsdoc"; // 启用 JSDoc 时
-
-export default defineConfigWithVueTs(
-  { name: "app/files-to-lint", files: ["**/*.{ts,mts,tsx,vue}"] },
-  { name: "app/files-to-ignore", ignores: ["**/dist/**", "**/coverage/**"] },
-
-  js.configs.recommended,
-  ...oxlint.configs["flat/recommended"], // Oxlint 基础规则
-  ...pluginVue.configs["flat/essential"], // Vue 规则
-  vueTsConfigs.recommended, // TS 规则
-
-  {
-    rules: {
-      "no-undef": "off",
-      "@typescript-eslint/no-explicit-any": "off",
-      "vue/multi-word-component-names": ["error", { ignores: ["index"] }],
-      // ... 更多规则
-    },
-  },
-  skipFormatting,
-);
-```
-
-**核心规则覆盖**: 每种框架预设都包含合理的默认规则，支持直接修改。
-
----
-
-#### `.editorconfig` — 编辑器统一配置
-
-统一团队成员的编辑器缩进、换行等基础格式。
-
-**生成内容**:
-
-```ini
-root = true
-
-[*]
-charset = utf-8
-indent_style = space
-indent_size = 2
-end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
-
-[*.md]
-trim_trailing_whitespace = false
-
-[*.{yml,yaml}]
-indent_size = 2
-
-[Makefile]
-indent_style = tab
-```
-
----
-
-#### `.prettierrc.js` / `.prettierrc.cjs` — Prettier 格式化配置
-
-代码自动格式化规则，仅完整模式生成。
-
-**生成内容**:
-
-```js
-module.exports = {
-  singleQuote: true,
-  semi: false,
-  printWidth: 80,
-  trailingComma: "es5",
-  arrowParens: "avoid",
-  endOfLine: "lf",
-};
-```
-
----
-
-### package.json 自动变更
-
-init 同时更新 `package.json` 中的以下字段：
-
-| 字段                | 极简 | 标准 | 完整 | 内容                           |
-| ------------------- | :--: | :--: | :--: | ------------------------------ |
-| `scripts.cz`        |  ✔   |  ✔   |  ✔   | `"git-cz"`                     |
-| `scripts.prepare`¹  |  ✔   |  ✔   |  ✔   | `"husky"` 或追加 `&& husky`    |
-| `scripts.lint`      |  -   |  ✔   |  ✔   | `"eslint . --fix"` 或含 oxlint |
-| `scripts.format`    |  -   |  -   |  ✔   | `"prettier --write src/"`      |
-| `config.commitizen` |  ✔   |  ✔   |  ✔   | cz-customizable 路径           |
-| `lint-staged`       |  -   |  ✔   |  ✔   | 暂存区检查规则                 |
-
-¹ Yarn 项目使用 `postinstall`。已有同名脚本和配置会保留；仅在安全兼容时追加或合并。
-
-ESM 项目还会在缺少对应配置时补充
-`config["cz-customizable"].config = ".cz-config.cjs"`，让 Commitizen 读取正确的
-CommonJS 配置。已有自定义路径继续保留。
-
-**lint-staged 配置示例**（完整模式）:
-
-```jsonc
-{
-  "lint-staged": {
-    "src/**/*.{js,jsx,ts,tsx,vue}": [
-      "oxlint --max-warnings 0 --deny-warnings",
-      "eslint --fix --no-cache",
-      "prettier --write",
-    ],
-    "*.{json,md,yml,yaml}": ["prettier --write"],
-  },
-}
-```
-
-## Git 提交完整流程
-
-```
-bun run cz / git cz
-    │
-    ▼
-.cz-config.js / .cz-config.cjs → 交互式选类型、填 scope、写描述
-    │
-    ▼
-git commit（由 commitizen 触发）
-    │
-    ├─ .husky/pre-commit 触发:
-    │   lint-staged                    ← 增量检查暂存文件
-    │       ├─ oxlint --deny-warnings
-    │       ├─ eslint --fix --no-cache
-    │       └─ prettier --write
-    │
-    ├─ .husky/commit-msg 触发:
-    │   commitlint --edit "$1"         ← 校验提交信息格式
-    │
-    ▼
-提交成功 ✅
-```
-
-## Doctor 诊断
-
-检查当前项目的 Git 标准化配置状态：
-
-```bash
 bunx --no-install robot-standards doctor
 ```
 
-智能检测配置文件、Hook 和依赖的真实可解析状态；未启用的可选功能不会判为失败：
+`init` 会展示交互式配置与确认，并写入所选配置、补充开发依赖和 Hook。Monorepo 不应在子包中生成第二套 Git Hook；从其他目录发起时使用 `--cwd /path/to/repository` 指定根目录。
 
-```
-  核心功能
-
-  ✔ Git 仓库
-  ✔ husky 依赖
-  ✔ Husky 目录
-  ✔ commit-msg hook
-  ✔ Commitlint 配置
-  ✔ Commitizen 配置
-  ✔ cz 脚本
-
-  已启用的功能
-
-  ✔ ESLint 配置
-  ✔ Prettier 配置
-  ✔ lint-staged 配置
-  ✔ pre-commit hook
-
-  未启用的功能
-
-  ○ EditorConfig
-```
-
-## 故障排除 (Troubleshooting)
-
-### Husky Hooks 未执行
-
-**问题现象**: 提交代码时没有触发 lint 检查，直接提交成功
-
-**可能原因**: Husky v9 运行时未初始化、`core.hooksPath` 指向错误，或用户 Hook
-文件缺失。
-
-**解决方案**:
+初始化后，使用项目生成的提交命令：
 
 ```bash
-# 在 Git 仓库根目录检查实际入口，Husky v9 正常值为 .husky/_
-git config --get core.hooksPath
-ls -la .husky/_/h .husky/_/commit-msg .husky/commit-msg
-
-# 启用了 ESLint / lint-staged 的项目再检查 pre-commit
-ls -la .husky/_/pre-commit .husky/pre-commit
-
-# 重建运行时；这里以 Bun 项目为例
-bun run prepare
-```
-
-Husky v9 的执行链是 `.husky/_/<hook>` → `.husky/_/h` → `.husky/<hook>`。
-`.husky/_/` 由 Husky 创建，不应手工删除；用户脚本由 `sh` 调用，仅给
-`.husky/pre-commit` 增加执行权限不能修复运行时缺失。极简模式没有用户
-`pre-commit` 文件是正常情况。
-
-上述 `prepare` 用于 npm、pnpm 或 Bun 初始化的项目；Yarn 项目生成的是
-`postinstall`，应执行 `yarn run postinstall`。随后运行 Doctor 检查依赖和用户 Hook。
-
-### Commitizen 提示 "git-cz command not found"
-
-**解决方案**:
-
-```bash
-# 方式一：使用 npm scripts（推荐）
-npm run cz
 bun run cz
-
-# 方式二：全局安装
-npm install -g commitizen
 ```
 
-### lint-staged 报错 "Cannot find module"
-
-**原因**: 依赖安装不完整
-
-**解决方案**:
+### CI 与非交互场景
 
 ```bash
-# 重新安装依赖
-rm -rf node_modules
-npm install
-
-# 或使用 doctor 检查缺失的依赖
-bunx --no-install robot-standards doctor
+bunx --no-install robot-standards init --ci --preset standard
 ```
 
-### ESLint Flat Config 不生效
+`--ci` 按明确参数执行并写入文件，适合已确定配置的自动化环境。完整参数与生成内容见[使用指南](./docs/guide.md#ci--非交互模式)。
 
-**原因**: 项目中同时存在旧版 `.eslintrc.*` 文件
+## 选择预设
 
-**解决方案**:
+| 预设         | 包含能力                                                | 适用场景                     |
+| ------------ | ------------------------------------------------------- | ---------------------------- |
+| `minimal`    | Commitizen、Commitlint、Husky commit-msg                | 只统一提交信息               |
+| `standard`   | minimal + ESLint、lint-staged、EditorConfig、pre-commit | 常规团队工程                 |
+| `full`       | standard + Prettier、Oxlint、JSDoc                      | 需要完整代码检查与格式化约定 |
+| 交互式自定义 | 核心提交工具 + 自选附加项                               | 已有工程渐进接入             |
 
-```bash
-# 删除旧配置文件（保留 eslint.config.mjs）
-rm .eslintrc.js .eslintrc.json .eslintrc.yml
-```
+Commitizen、Commitlint 与 Husky 属于核心功能；其余按配置启用。安装发生在初始化阶段，提交阶段调用已安装的本地二进制。
 
-### Windows 下 Husky 不工作
+## 配置所有权与诊断
 
-**原因**: Git 配置的 core.hooksPath 可能被覆盖
+| 关注点         | 约定                                               |
+| -------------- | -------------------------------------------------- |
+| 现有文件       | 生成文件覆盖前创建 `.bak`；已有 Hook 保留          |
+| `package.json` | 补充缺失脚本、合并工具配置与 `lint-staged`         |
+| 仓库位置       | Hook 属于整个 Git 仓库，`--cwd` 必须定位仓库根目录 |
+| 问题定位       | 先运行 `doctor`，再检查实际 Hook 路径和本地依赖    |
 
-**解决方案**:
+本包生成团队工具配置，不提供业务权限、后端服务或运行时页面能力。初始化后的规则由目标项目维护。
 
-```bash
-# 检查 Git 配置
-git config core.hooksPath
+## 文档与维护
 
-# Husky v9 正常值为 .husky/_；异常时在仓库根目录重新初始化
-npm run prepare
-git config --get core.hooksPath
-```
+| 文档                                                 | 内容                                        |
+| ---------------------------------------------------- | ------------------------------------------- |
+| [完整指南](./docs/guide.md)                          | 交互流程、CLI 参数、配置文件与提交链路      |
+| [配置自定义](./docs/guide.md#配置自定义)             | ESLint、Commitizen、Prettier 和 Commitlint  |
+| [Doctor 诊断](./docs/guide.md#doctor-诊断)           | 按已启用能力检查环境                        |
+| [故障排除](./docs/guide.md#故障排除-troubleshooting) | Hook、依赖、Flat Config 与 Windows 常见问题 |
+| [变更记录](./CHANGELOG.md)                           | 版本变化                                    |
 
-按项目包管理器选择 `npm run prepare`、`pnpm run prepare`、`bun run prepare`
-或 `yarn run postinstall`。保留已有的用户 Hook，并检查 `.husky/_/h` 是否存在。
+本包的 `bun run verify` 覆盖 Lint、类型、测试、构建与发布产物；工作区提交前再执行根目录的完整门禁。
 
-## License
+## 许可证
 
-MIT
+[MIT License](./LICENSE) · Robot Packages

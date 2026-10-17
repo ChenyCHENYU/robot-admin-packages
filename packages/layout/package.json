@@ -80,7 +80,8 @@
     "src/styles",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "docs"
   ],
   "publishConfig": {
     "access": "public",
