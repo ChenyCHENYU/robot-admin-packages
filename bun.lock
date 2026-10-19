@@ -15,7 +15,7 @@
     },
     "packages/directives": {
       "name": "@robot-admin/directives",
-      "version": "2.0.1",
+      "version": "2.0.2",
       "devDependencies": {
         "happy-dom": "^20.12.2",
         "tsup": "^8.1.0",
@@ -29,7 +29,7 @@
     },
     "packages/file-utils": {
       "name": "@robot-admin/file-utils",
-      "version": "3.0.1",
+      "version": "3.0.2",
       "dependencies": {
         "jszip": "^3.10.1",
         "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
@@ -46,7 +46,7 @@
     },
     "packages/form-validate": {
       "name": "@robot-admin/form-validate",
-      "version": "3.4.2",
+      "version": "3.4.3",
       "devDependencies": {
         "tsup": "^8.1.0",
         "typescript": "^5.8.0",
@@ -55,7 +55,7 @@
     },
     "packages/git-standards": {
       "name": "@robot-admin/git-standards",
-      "version": "1.0.5",
+      "version": "1.0.6",
       "bin": {
         "robot-standards": "./bin/robot-standards.js",
       },
@@ -84,7 +84,7 @@
     },
     "packages/layout": {
       "name": "@robot-admin/layout",
-      "version": "3.2.1",
+      "version": "3.2.2",
       "devDependencies": {
         "@types/node": "^22.13.9",
         "@vitejs/plugin-vue": "^6.0.5",
@@ -115,7 +115,7 @@
     },
     "packages/request-core": {
       "name": "@robot-admin/request-core",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "devDependencies": {
         "@types/node": "^20.14.0",
         "axios": "^1.7.0",
@@ -137,7 +137,7 @@
     },
     "packages/theme": {
       "name": "@robot-admin/theme",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "devDependencies": {
         "@types/node": "^22.13.9",
         "naive-ui": "^2.41.0",

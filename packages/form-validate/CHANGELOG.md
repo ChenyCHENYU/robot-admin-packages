@@ -1,5 +1,11 @@
 # @robot-admin/form-validate
 
+## 3.4.3
+
+### Patch Changes
+
+- docs: 统一包品牌标识与使用指南结构，同步 npm 侧展示的 README
+
 ## 3.4.2
 
 ### Patch Changes

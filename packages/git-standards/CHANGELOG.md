@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6
+
+### Patch Changes
+
+- docs: 统一包品牌标识与使用指南结构，同步 npm 侧展示的 README
+
 ## 1.0.5
 
 ### Patch Changes

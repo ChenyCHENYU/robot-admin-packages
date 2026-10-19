@@ -1,5 +1,11 @@
 # @robot-admin/directives
 
+## 2.0.2
+
+### Patch Changes
+
+- docs: 统一包品牌标识与使用指南结构，同步 npm 侧展示的 README
+
 ## 2.0.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @robot-admin/request-core
 
+## 0.6.2
+
+### Patch Changes
+
+- docs: 统一包品牌标识与使用指南结构，同步 npm 侧展示的 README
+
 ## 0.6.1
 
 ### Minor Changes
