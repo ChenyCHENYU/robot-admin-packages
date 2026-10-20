@@ -8,6 +8,8 @@ export type {
   UseTableCrudReturn,
   ApiEndpoints,
   TableColumn,
+  TableColumnLike,
+  TableColumnInput,
   ActionContext,
   CustomAction,
   DetailModal,

@@ -121,3 +121,8 @@ const table = useTableCrud({
 ## 许可证
 
 [MIT License](./LICENSE) · Robot Packages
+
+
+### UI column contracts
+
+CRUD transparently passes column configuration to the rendering component. From 0.6.3, component-owned columns can be supplied directly, including numeric keys and native multiple-sorter/filter definitions. The minimal structural boundary preserves the business row type in `render` without importing a UI component package or requiring application-level conversion functions. Use the component library's column helper to validate its presentation options and business field names.

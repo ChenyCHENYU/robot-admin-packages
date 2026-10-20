@@ -19,6 +19,8 @@ export type { MemoryTableSourceOptions } from "./createMemoryTableSource";
 export type {
   // 基础类型
   DataRecord,
+  TableColumnLike,
+  TableColumnInput,
   ApiEndpoints,
   // 自定义操作
   CustomAction,

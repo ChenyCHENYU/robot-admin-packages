@@ -1,5 +1,11 @@
 # @robot-admin/request-core
 
+## 0.6.3
+
+### Patch Changes
+
+- Accept structural UI columns directly in CRUD configuration while preserving business row render types. Native numeric keys, multiple sorters and component-owned filter signatures pass through without application adapters or a dependency on any UI component package. Existing inline column configuration remains compatible.
+
 ## 0.6.2
 
 ### Patch Changes

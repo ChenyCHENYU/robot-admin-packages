@@ -4,10 +4,15 @@ import type { RequestClient } from "../../client/types";
 
 export type DataRecord = object;
 
-export interface TableColumn<T = object> {
+/** UI 列由渲染组件解释，CRUD 只保留标识和行渲染上下文并透明传递。 */
+export interface TableColumnLike<T = object> {
   title?: string;
-  key?: string;
+  key?: string | number;
   render?: (row: T, index: number) => unknown;
+}
+
+/** 兼容现有内联列配置；外部组件列可直接满足 TableColumnLike。 */
+export interface TableColumn<T = object> extends TableColumnLike<T> {
   width?: number | string;
   minWidth?: number | string;
   maxWidth?: number | string;
@@ -18,6 +23,9 @@ export interface TableColumn<T = object> {
   filter?: boolean | ((value: string, row: T) => boolean);
   [key: string]: unknown;
 }
+
+/** 两种输入共享业务行类型，无需 UI 包或使用侧强制断言。 */
+export type TableColumnInput<T = object> = TableColumn<T> | TableColumnLike<T>;
 
 export interface ApiEndpoints {
   list: string;
@@ -182,7 +190,7 @@ export interface UseTableCrudConfig<
   ) => Promise<TableQueryResult<T> | unknown>;
   mutations?: CrudMutations<T>;
   client?: RequestClient;
-  columns?: TableColumn<T>[];
+  columns?: TableColumnInput<T>[];
   customActions?: CustomAction<T>[];
   detail?: DetailConfig;
   editor?: CrudEditorConfig<T>;
@@ -281,7 +289,7 @@ export interface UseTableCrudReturn<
   total: Ref<number>;
   error: ShallowRef<RequestError | null>;
   lastUpdated: Ref<number | null>;
-  columns: ComputedRef<TableColumn<T>[]>;
+  columns: ComputedRef<TableColumnInput<T>[]>;
   actions: ComputedRef<TableActions<T>>;
   tableRef: Ref<unknown>;
   page: TablePageState;

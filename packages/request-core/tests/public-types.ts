@@ -77,3 +77,31 @@ function verifyTableTypes(): void {
 
 void verifyClientTypes;
 void verifyTableTypes;
+
+// 外部 UI 的排序、筛选与数字键不应迫使业务重写列或做双重断言。
+interface ExternalColumn {
+  key: string | number;
+  title: string;
+  sorter?: { multiple: number; compare: (a: User, b: User) => number };
+  filter?: (value: string | number, row: User) => boolean;
+  render?: (row: User, index: number) => string;
+}
+function verifyExternalColumns(): void {
+  const columns: ExternalColumn[] = [{ key: 'name', title: '姓名' }];
+  const table = useTableCrud<User>({
+    autoLoad: false,
+    source: createMemoryTableSource([{ id: 1, name: 'Robot' }]),
+    columns,
+  });
+  table.columns.value[0]?.render?.({ id: 1, name: 'Robot' }, 0);
+  useTableCrud<User>({
+    autoLoad: false,
+    columns: [{ key: 'name', render: (row) => row.name.toUpperCase() }],
+  });
+  useTableCrud<User>({
+    autoLoad: false,
+    // @ts-expect-error 列渲染仍须接收正确的业务模型。
+    columns: [{ render: (row: { id: string }) => row.id }],
+  });
+}
+void verifyExternalColumns;
