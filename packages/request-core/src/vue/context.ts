@@ -1,9 +1,4 @@
-import {
-  inject,
-  provide,
-  type App,
-  type InjectionKey,
-} from "vue";
+import { inject, provide, type App, type InjectionKey } from "vue";
 import type { RequestClient } from "../client/types";
 
 export const REQUEST_CLIENT_KEY = Symbol.for(
@@ -23,6 +18,11 @@ export function provideRequestClient(client: RequestClient): RequestClient {
   return client;
 }
 
+export function useRequestClient(optional?: false): RequestClient;
+export function useRequestClient(optional: true): RequestClient | undefined;
+export function useRequestClient(
+  optional: boolean | undefined,
+): RequestClient | undefined;
 export function useRequestClient(optional = false): RequestClient | undefined {
   const client = inject(REQUEST_CLIENT_KEY, undefined);
   if (!client && !optional) {

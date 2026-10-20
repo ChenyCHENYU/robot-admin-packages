@@ -1,7 +1,4 @@
-import {
-  getFileUtilsContext,
-  type FileUtilsContext,
-} from "../config";
+import { getFileUtilsContext, type FileUtilsContext } from "../config";
 import {
   assertWithinLimit,
   downloadBlob,
@@ -76,15 +73,16 @@ export type DownloadPayload =
   | Response
   | { data: Blob | ArrayBuffer | ArrayBufferView; headers?: unknown };
 
-export type DownloadApiFunction = (
-  params?: Record<string, unknown>,
-  context?: DownloadRequestContext,
+/** Describe a reusable API explicitly, or pass the API directly to infer its query. */
+export type DownloadApiFunction<P = Record<string, unknown> | undefined> = (
+  ...args: undefined extends P
+    ? [params?: P, context?: DownloadRequestContext]
+    : [params: P, context?: DownloadRequestContext]
 ) => Promise<DownloadPayload>;
 
-export interface DownloadConfig {
+interface DownloadOptions {
   fileName: string;
   fileType: FileExtension;
-  params?: Record<string, unknown>;
   showNotification?: boolean;
   notificationConfig?: {
     loading?: string;
@@ -98,6 +96,26 @@ export interface DownloadConfig {
   rejectUnexpectedJSON?: boolean;
   save?: (blob: Blob, fileName: string) => void | Promise<void>;
 }
+
+/** Required API queries remain required; optional and parameterless APIs need no params. */
+export type DownloadConfig<P = Record<string, unknown> | undefined> =
+  DownloadOptions & (undefined extends P ? { params?: P } : { params: P });
+
+// We always supply the request context, so APIs may require its second argument.
+type CallableDownloadApi = (
+  params: any,
+  context: DownloadRequestContext,
+) => Promise<DownloadPayload>;
+
+export type DownloadConfigFor<TApi extends CallableDownloadApi> =
+  DownloadConfig<Parameters<TApi>[0]>;
+
+type QuickDownloadParams<TApi extends CallableDownloadApi> =
+  undefined extends Parameters<TApi>[0]
+    ? [params?: NoInfer<Parameters<TApi>[0]>]
+    : [params: NoInfer<Parameters<TApi>[0]>];
+
+type RuntimeDownloadConfig = DownloadOptions & { params?: unknown };
 
 export interface DownloadResult {
   blob: Blob;
@@ -136,7 +154,7 @@ function parseContentDisposition(value: string | null): string | undefined {
 
 async function responseToBlob(
   response: Response,
-  config: DownloadConfig,
+  config: RuntimeDownloadConfig,
   context: FileUtilsContext,
 ): Promise<Blob> {
   if (!response.ok) {
@@ -192,7 +210,7 @@ async function responseToBlob(
 
 async function normalizePayload(
   payload: DownloadPayload,
-  config: DownloadConfig,
+  config: RuntimeDownloadConfig,
   context: FileUtilsContext,
 ): Promise<{ blob: Blob; serverFileName?: string }> {
   if (payload instanceof Response) {
@@ -233,16 +251,25 @@ async function detectBackendError(blob: Blob): Promise<void> {
   if (!/[/+]json\b/i.test(blob.type) || blob.size > 1024 * 1024) return;
   try {
     const data = JSON.parse(await blob.text()) as Record<string, unknown>;
-    const message = String(data.message ?? data.msg ?? data.error ?? "服务端返回错误");
+    const message = String(
+      data.message ?? data.msg ?? data.error ?? "服务端返回错误",
+    );
     throw new FileUtilsError("NETWORK_ERROR", message, { details: data });
   } catch (error) {
     if (error instanceof FileUtilsError) throw error;
   }
 }
 
-export async function useDownload(
-  api: DownloadApiFunction,
-  config: DownloadConfig,
+export function useDownload<TApi extends CallableDownloadApi>(
+  api: TApi,
+  config: DownloadConfigFor<NoInfer<TApi>>,
+): Promise<DownloadResult> {
+  return runDownload(api, config);
+}
+
+async function runDownload(
+  api: CallableDownloadApi,
+  config: RuntimeDownloadConfig,
 ): Promise<DownloadResult> {
   const context = getFileUtilsContext(config.context);
   const messages = {
@@ -253,7 +280,7 @@ export async function useDownload(
   try {
     throwIfAborted(config.signal);
     if (showNotification) context.notify("info", messages.loading);
-    const payload = await api(config.params ?? {}, {
+    const payload = await api(config.params, {
       signal: config.signal,
       onProgress: config.onProgress,
     });
@@ -264,12 +291,14 @@ export async function useDownload(
       config.maxFileSize ?? context.limits.maxFileSize,
       "下载文件",
     );
-    if (config.rejectUnexpectedJSON ?? (config.fileType !== FileType.JSON)) {
+    if (config.rejectUnexpectedJSON ?? config.fileType !== FileType.JSON) {
       await detectBackendError(normalized.blob);
     }
 
     const mimeType =
-      normalized.blob.type || MIME_TYPE_MAP[config.fileType] || "application/octet-stream";
+      normalized.blob.type ||
+      MIME_TYPE_MAP[config.fileType] ||
+      "application/octet-stream";
     const blob = normalized.blob.type
       ? normalized.blob
       : normalized.blob.slice(0, normalized.blob.size, mimeType);
@@ -298,11 +327,12 @@ export async function useDownload(
 }
 
 function createQuickDownloadMethod(fileType: FileType) {
-  return (
-    api: DownloadApiFunction,
+  return <TApi extends CallableDownloadApi>(
+    api: TApi,
     fileName: string,
-    params?: Record<string, unknown>,
-  ): Promise<DownloadResult> => useDownload(api, { fileName, fileType, params });
+    ...args: QuickDownloadParams<TApi>
+  ): Promise<DownloadResult> =>
+    runDownload(api, { fileName, fileType, params: args[0] });
 }
 
 export const useDownloadExcel = createQuickDownloadMethod(FileType.XLSX);

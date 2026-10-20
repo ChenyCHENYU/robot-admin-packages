@@ -1,5 +1,13 @@
 # @robot-admin/request-core
 
+## 0.7.0
+
+### Minor Changes
+
+- Infer row, filter and sort types from the normalized source.query result and initial state; reject invalid standard query shapes. Preserve unknown responses through the documented legacy top-level query path.
+- Require createNewRow when opening a creation draft instead of returning an empty object as a complete business model. Read-only lists and explicit create(row) remain available without a factory.
+- Make required Client injection non-optional by default and document the transport/auth boundary of legacy default helpers without changing their response envelope.
+
 ## 0.6.3
 
 ### Patch Changes

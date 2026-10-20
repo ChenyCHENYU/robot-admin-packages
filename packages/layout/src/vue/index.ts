@@ -10,7 +10,7 @@ export { setupLayout } from "../setup";
 export { createSettingsStore, useSettingsStore } from "../stores/settings";
 export type { SettingsStoreInstance } from "../stores/settings";
 export { normalizeLayoutMenus } from "../utils/menu";
-export type { LayoutMenuItem } from "../utils/menu";
+export type { LayoutMenuItem, LayoutMenuMeta } from "../utils/menu";
 
 export {
   DEFAULT_BRAND_CONFIG,

@@ -347,6 +347,9 @@ await table.editor.submit();
 
 编辑草稿与原始行隔离；提交成功后自动关闭，校验、预处理或请求失败时保持打开。`editor` 是无 UI 依赖的结构契约，可交给 Naive UI、Element Plus 或项目自己的表单弹窗呈现。
 
+`createDraft()` 和 `editor.openCreate()` 需要配置 `createNewRow`，缺少时会抛出明确的
+配置错误。只读查询、编辑已有行和直接调用 `create(row)` 均不需要草稿工厂。
+
 ### 函数式单表预配置
 
 同一项目中的 Client、加载时机、分页字段名等通常完全相同。使用
@@ -426,8 +429,25 @@ const table = useNaiveTableCrud({
 const request = createRequestClient({ setAsDefault: true });
 ```
 
-或者调用 `setDefaultRequestClient(request)`。全局兼容入口只保存“默认 Client”引用；
-请求运行状态仍属于具体实例。
+或者调用 `setDefaultRequestClient(request)`。这些入口共享该 Client 的 Axios
+传输层、认证及实例运行状态。`response.isSuccess/getData/getError` 响应适配器和
+`hooks` 属于现代 Client 方法，不会应用到全局兼容函数。
+
+例如 `request.get()` 可通过 `response.getData` 返回业务数据，而 `getData()` 仍返回
+Axios 响应的完整 `data`（如 `{ code: 0, data: user }` envelope）；它也不会按现代
+`response.isSuccess` 拒绝业务错误码。需要统一解包、业务错误和 hooks 时，直接调用
+`request.get/post/...`。
+
+## 从 0.6.x 升级到 0.7
+
+1. `source.query` 现在严格返回 `Promise<{ items: T[]; total: number }>`；把旧 envelope
+   转换为这个结构后返回。需要继续返回未知结构时，保留顶层兼容 `query`，其
+   `Promise<unknown>` 返回值及原有列表提取行为继续受支持，也可使用 `extractListData`。
+2. 调用 `createDraft()` 或 `editor.openCreate()` 前配置 `createNewRow`。缺少工厂时
+   会抛出配置错误，不再生成缺失业务字段的空对象。只读查询、编辑和直接
+   `create(row)` 无需修改。
+3. `useRequestClient()` 和 `useRequestClient(false)` 的返回类型为 `RequestClient`，
+   缺少注入时仍抛错；`useRequestClient(true)` 返回 `RequestClient | undefined`。
 
 ## 从 0.2.x 升级
 

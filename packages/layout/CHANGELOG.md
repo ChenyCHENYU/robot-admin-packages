@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.2.3
+
+### Patch Changes
+
+- Limit ThemePresetSettings to the five supported layout settings and ignore unrelated runtime keys without overriding the preset primary color.
+- Normalize menu metadata without inventing required host extension fields or preserving unsupported narrow title/icon values. Keep ordinary calls free of explicit generics.
+
 ## 3.2.2
 
 ### Patch Changes

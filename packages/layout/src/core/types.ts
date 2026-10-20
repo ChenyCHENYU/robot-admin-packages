@@ -42,15 +42,25 @@ export interface SettingsState {
   version: string;
 }
 
+/** 主题预设实际应用的外观细节；其他布局设置由宿主单独维护。 */
+export type ThemePresetSettings = Partial<
+  Pick<
+    SettingsState,
+    | "borderRadius"
+    | "transitionType"
+    | "showBreadcrumb"
+    | "showTagsView"
+    | "tagsViewStyle"
+  >
+>;
+
 /** 主题预设方案。 */
 export interface ThemePreset {
   name: string;
   description?: string;
   icon: string;
   primaryColor: string;
-  settings?: Partial<
-    Omit<SettingsState, "themeMode" | "layoutMode" | "primaryColor">
-  >;
+  settings?: ThemePresetSettings;
 }
 
 /** Settings Store 初始化选项。 */

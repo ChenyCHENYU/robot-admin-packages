@@ -29,7 +29,7 @@
     },
     "packages/file-utils": {
       "name": "@robot-admin/file-utils",
-      "version": "3.0.2",
+      "version": "3.0.3",
       "dependencies": {
         "jszip": "^3.10.1",
         "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
@@ -46,7 +46,7 @@
     },
     "packages/form-validate": {
       "name": "@robot-admin/form-validate",
-      "version": "3.4.3",
+      "version": "3.4.4",
       "devDependencies": {
         "tsup": "^8.1.0",
         "typescript": "^5.8.0",
@@ -84,7 +84,7 @@
     },
     "packages/layout": {
       "name": "@robot-admin/layout",
-      "version": "3.2.2",
+      "version": "3.2.3",
       "devDependencies": {
         "@types/node": "^22.13.9",
         "@vitejs/plugin-vue": "^6.0.5",
@@ -115,7 +115,7 @@
     },
     "packages/request-core": {
       "name": "@robot-admin/request-core",
-      "version": "0.6.3",
+      "version": "0.7.0",
       "devDependencies": {
         "@types/node": "^20.14.0",
         "axios": "^1.7.0",

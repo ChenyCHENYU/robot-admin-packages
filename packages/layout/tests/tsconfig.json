@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "baseUrl": "..",
+    "paths": {
+      "@robot-admin/layout": ["src/index.ts"],
+      "@robot-admin/layout/core": ["src/core/index.ts"],
+      "@robot-admin/layout/vue": ["src/vue/index.ts"],
+      "@robot-admin/layout/naive": ["src/naive/index.ts"]
+    }
+  },
+  "include": ["../src/**/*", "./public-types.ts"]
+}

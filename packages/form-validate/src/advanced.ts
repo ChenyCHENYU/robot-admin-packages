@@ -14,12 +14,13 @@ import { runSpec, toElementRule, toNaiveRule } from "./adapter";
 import type {
   ElementRule,
   NaiveRule,
+  NativeNaiveRule,
   RuleSpec,
   Trigger,
   ValidateResult,
 } from "./types";
 
-type NaiveComposableRule = RuleSpec | NaiveRule;
+type NaiveComposableRule = RuleSpec | NativeNaiveRule;
 type ElementComposableRule = RuleSpec | ElementRule;
 
 const snapshotSpecs = (rules: readonly RuleSpec[]): RuleSpec[] =>
@@ -40,23 +41,99 @@ const errorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+const isCoreTrigger = (trigger: string): trigger is Trigger =>
+  trigger === "blur" || trigger === "input" || trigger === "change";
+
 const toNaiveSpec = (rule: NaiveComposableRule): RuleSpec => {
   if (isRuleSpec(rule)) return rule;
 
-  const message = rule.message ?? "校验不通过";
+  const source: NativeNaiveRule = {
+    ...rule,
+    trigger: Array.isArray(rule.trigger) ? [...rule.trigger] : rule.trigger,
+  };
+  const validator = source.asyncValidator ?? source.validator;
+  if (!validator || validator.length >= 3) {
+    throw new TypeError(
+      "Naive 原生组合规则必须提供仅使用 rule、value 的自定义 validator 或 asyncValidator；不支持 callback、source/options，声明式约束请使用规则数组或 SPEC_RULES",
+    );
+  }
+  const declarativeKeys = [
+    "type",
+    "min",
+    "max",
+    "len",
+    "enum",
+    "pattern",
+    "fields",
+    "defaultField",
+    "transform",
+    "whitespace",
+  ];
+  if (declarativeKeys.some((key) => source[key] !== undefined)) {
+    throw new TypeError(
+      "Naive 组合器不解释声明式约束；请使用规则数组或 SPEC_RULES",
+    );
+  }
+  if (source.level === "warning") {
+    throw new TypeError(
+      "Naive 原生组合仅支持 error 级别；warning 规则请保留框架原生规则数组",
+    );
+  }
+  const triggers =
+    source.trigger === undefined
+      ? ["blur", "input"]
+      : Array.isArray(source.trigger)
+        ? [...source.trigger]
+        : [source.trigger];
+  if (!triggers.every(isCoreTrigger)) {
+    throw new TypeError("Naive 组合规则的 trigger 仅支持 blur、input、change");
+  }
+  const message =
+    typeof source.message === "function"
+      ? source.message()
+      : (source.message ?? "校验不通过");
   return {
-    trigger: rule.trigger ?? ["blur", "input"],
+    trigger: triggers,
     message,
-    ...(rule.required === undefined ? {} : { required: rule.required }),
-    validate: async (value): Promise<ValidateResult> => {
-      if (!rule.validator) return true;
-      try {
-        await rule.validator(rule, value);
-        return true;
-      } catch (error) {
-        return errorMessage(error, message);
-      }
-    },
+    ...(source.required === undefined ? {} : { required: source.required }),
+    validate: (value): Promise<ValidateResult> =>
+      new Promise((resolve) => {
+        const unsupportedCallback =
+          "Naive 组合器不支持 callback 或同步 undefined；请返回 true 或 Promise<void>";
+        // Reject callback completion, including hidden default/rest parameters.
+        // Resolving the same Promise again is harmless for a late callback.
+        const rejectCallback = () => resolve(unsupportedCallback);
+        const resultOf = (result: unknown): ValidateResult => {
+          if (result === true) return true;
+          if (result === false) return message;
+          if (result instanceof Error || Array.isArray(result)) {
+            if (Array.isArray(result) && result.length === 0) return true;
+            return errorMessage(
+              Array.isArray(result) ? result[0] : result,
+              message,
+            );
+          }
+          return result === undefined
+            ? unsupportedCallback
+            : "Naive 自定义 validator 返回了不支持的结果";
+        };
+        try {
+          const result = validator.call(source, source, value, rejectCallback);
+          if (
+            result &&
+            typeof (result as PromiseLike<unknown>).then === "function"
+          ) {
+            void Promise.resolve(result).then(
+              () => resolve(true),
+              (error) => resolve(errorMessage(error, message)),
+            );
+          } else {
+            resolve(resultOf(result));
+          }
+        } catch (error) {
+          resolve(errorMessage(error, message));
+        }
+      }),
   };
 };
 

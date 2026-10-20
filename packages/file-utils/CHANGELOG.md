@@ -1,5 +1,12 @@
 # @robot-admin/file-utils
 
+## 3.0.3
+
+### Patch Changes
+
+- Infer download params from the supplied API across useDownload, createFileUtils and format shortcuts. Required parameters are checked without consumer generics; no-argument calls remain compatible.
+- Preserve cancellation, request context and payload behavior, with consumer type and runtime regression coverage.
+
 ## 3.0.2
 
 ### Patch Changes

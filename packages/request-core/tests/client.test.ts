@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { createRequestClient } from "../src/client/client";
 import { RequestError } from "../src/client/errors";
+import { getData } from "../src/axios/service";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const clients: Array<ReturnType<typeof createRequestClient>> = [];
@@ -30,12 +31,16 @@ describe("request client isolation", () => {
     const second = createRequestClient({
       request: {
         baseURL: "https://second.example",
-        adapter: async (config) => response(config, { source: `second-${++secondCalls}` }),
+        adapter: async (config) =>
+          response(config, { source: `second-${++secondCalls}` }),
       },
     });
     clients.push(first, second);
 
-    const policy = { cache: { enabled: true, ttl: 60_000 }, dedupe: false } as const;
+    const policy = {
+      cache: { enabled: true, ttl: 60_000 },
+      dedupe: false,
+    } as const;
     expect(await first.get("/shared", policy)).toEqual({ source: 1 });
     expect(await second.get("/shared", policy)).toEqual({ source: "second-1" });
     expect(firstCalls).toBe(1);
@@ -98,7 +103,10 @@ describe("request concurrency", () => {
     clients.push(client);
 
     const first = client.get("/joined", { concurrency: "join", cancel: false });
-    const second = client.get("/joined", { concurrency: "join", cancel: false });
+    const second = client.get("/joined", {
+      concurrency: "join",
+      cancel: false,
+    });
     release?.();
     await expect(Promise.all([first, second])).resolves.toEqual([
       { ok: true },
@@ -119,7 +127,11 @@ describe("request concurrency", () => {
       },
     });
     clients.push(guardedClient);
-    const active = guardedClient.post("/submit", {}, { concurrency: "takeFirst" });
+    const active = guardedClient.post(
+      "/submit",
+      {},
+      { concurrency: "takeFirst" },
+    );
     await expect(
       guardedClient.post("/submit", {}, { concurrency: "takeFirst" }),
     ).rejects.toMatchObject({ kind: "concurrency" });
@@ -159,6 +171,68 @@ describe("request concurrency", () => {
 });
 
 describe("authentication and response normalization", () => {
+  it("shares default transport and auth while legacy helpers retain envelopes and bypass modern hooks", async () => {
+    const requests: Array<{ baseURL?: string; authorization: unknown }> = [];
+    const hooks = { starts: 0, ends: 0, errors: 0 };
+    const client = createRequestClient({
+      setAsDefault: true,
+      auth: { getToken: () => "shared-token" },
+      request: {
+        baseURL: "https://example.test/api",
+        adapter: async (config) => {
+          requests.push({
+            baseURL: config.baseURL,
+            authorization: config.headers.get("Authorization"),
+          });
+          return response(
+            config,
+            config.url === "/failure"
+              ? { code: 500, message: "Denied" }
+              : { code: 0, data: { name: "Robot" } },
+          );
+        },
+      },
+      response: {
+        isSuccess: (data) => (data as { code: number }).code === 0,
+        getData: (data) => (data as { data: unknown }).data,
+      },
+      hooks: {
+        onRequestStart: () => {
+          hooks.starts += 1;
+        },
+        onRequestEnd: () => {
+          hooks.ends += 1;
+        },
+        onError: () => {
+          hooks.errors += 1;
+        },
+      },
+    });
+    clients.push(client);
+
+    expect(await client.get("/success")).toEqual({ name: "Robot" });
+    expect(await getData("/success")).toEqual({
+      code: 0,
+      data: { name: "Robot" },
+    });
+    expect(hooks).toEqual({ starts: 1, ends: 1, errors: 0 });
+
+    await expect(client.get("/failure")).rejects.toMatchObject({
+      kind: "business",
+    });
+    await expect(getData("/failure")).resolves.toEqual({
+      code: 500,
+      message: "Denied",
+    });
+    expect(hooks).toEqual({ starts: 2, ends: 2, errors: 1 });
+    expect(requests).toEqual(
+      Array.from({ length: 4 }, () => ({
+        baseURL: "https://example.test/api",
+        authorization: "Bearer shared-token",
+      })),
+    );
+  });
+
   it("shares one refresh across concurrent 401 responses and replays once", async () => {
     let token = "expired";
     let refreshCalls = 0;
@@ -205,7 +279,8 @@ describe("authentication and response normalization", () => {
   it("emits a stable business RequestError", async () => {
     const client = createRequestClient({
       request: {
-        adapter: async (config) => response(config, { code: 5001, message: "Denied" }),
+        adapter: async (config) =>
+          response(config, { code: 5001, message: "Denied" }),
       },
       response: {
         isSuccess: (data) => (data as { code: number }).code === 0,

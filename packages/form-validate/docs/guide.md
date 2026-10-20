@@ -68,6 +68,17 @@ const rules = {
 // 直接用于 <n-form-item :rule>
 ```
 
+输出可直接赋给 Naive UI 官方 `FormItemRule` / `FormRules`，无需业务侧重映射工厂或类型断言：
+
+```ts
+import type { FormItemRule, FormRules } from "naive-ui";
+const nameRule: FormItemRule = PRESET_RULES.required("姓名");
+const formRules: FormRules = {
+  name: [nameRule],
+  username: RULE_COMBOS.username("用户名"),
+};
+```
+
 ### Element Plus 用户
 
 ```ts
@@ -287,6 +298,14 @@ some(
 | AND 组合   | `every`               | `everyElement`               | `everySpec`               |
 
 组合器可直接接收同框架预设：Naive 版本使用 `PRESET_RULES`，Element 版本使用 `ELEMENT_RULES`，框架无关版本使用 `SPEC_RULES`。
+
+Naive 的 `every` / `some` / `when` 也接受官方 `FormItemRule` 类型的 `error` 级别原生**自定义校验器**：同步通过返回 `true` 或空 `Error[]`；返回 `false`、`Error` / 非空 `Error[]` 或抛错表示失败。异步校验通过 `Promise<void>` 的完成 / 拒绝结算，支持 `validator` / `asyncValidator`。本包生成的规则均使用 `Promise<void>`，可继续直接组合。`level: "warning"` 会在组合时拒绝；warning 规则请保留框架原生规则数组，避免警告变成阻断错误。
+
+异步失败应 `throw` / reject；`async () => false` 或 `async () => new Error(...)` 不符合官方 `Promise<void>` 契约，会在编译期被拒绝。
+
+组合器不支持 callback，包括默认参数或剩余参数中的 callback。普通 callback 签名在组合时抛出 `TypeError`；同步返回 `undefined` 会以明确错误失败，调用被隐藏的 callback 也只会结算为不支持错误。Promise 必须代表整个校验过程的完成，不能混用 callback。
+
+组合器只拥有当前字段的值，不解释 `min`、`pattern`、`fields`、`transform` 等 async-validator 声明式约束，不提供 `source` / `options`；触发方式支持 `blur` / `input` / `change`。不支持的声明式配置在组合时抛出 `TypeError`。只有 `{ required: true }` 等声明式规则时，应保留框架原生规则数组，或改用 `SPEC_RULES` / `PRESET_RULES`；纯核心 `everySpec` 等仍只接收 `RuleSpec`。
 
 ### 适配器
 

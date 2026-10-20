@@ -1,11 +1,7 @@
 import { createFileUtilsContext, type FileUtilsConfig } from "./config";
 import { useChunkDownload, useChunkUpload } from "./chunk";
 import { useCSV } from "./csv";
-import {
-  useDownload,
-  type DownloadApiFunction,
-  type DownloadConfig,
-} from "./download";
+import { useDownload, type DownloadConfigFor } from "./download";
 import { useExcel } from "./excel";
 import { useFile } from "./file";
 import { useImage } from "./image";
@@ -64,6 +60,7 @@ export {
 export type {
   DownloadApiFunction,
   DownloadConfig,
+  DownloadConfigFor,
   DownloadPayload,
   DownloadRequestContext,
   DownloadResult,
@@ -131,11 +128,15 @@ export function createFileUtils(config: FileUtilsConfig = {}) {
     image: useImage({ context }),
     excel: useExcel({ context }),
     zip: useJSZip({ context }),
-    download(
-      api: DownloadApiFunction,
-      downloadConfig: Omit<DownloadConfig, "context">,
+    download<TApi extends Parameters<typeof useDownload>[0]>(
+      api: TApi,
+      downloadConfig: Omit<DownloadConfigFor<NoInfer<TApi>>, "context">,
     ) {
-      return useDownload(api, { ...downloadConfig, context });
+      // Omit cannot distribute the generic params requirement; only context is added.
+      return useDownload(api, {
+        ...downloadConfig,
+        context,
+      } as DownloadConfigFor<TApi>);
     },
     chunkUpload(
       options: Omit<import("./chunk").ChunkUploadOptions, "context"> = {},

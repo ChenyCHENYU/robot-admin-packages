@@ -606,7 +606,14 @@ export function useTableCrud<
       : false,
   );
 
-  const createDraft = (): T => createNewRow?.() ?? ({} as T);
+  const createDraft = (): T => {
+    if (!createNewRow) {
+      throw new Error(
+        "useTableCrud requires createNewRow to call createDraft() or editor.openCreate().",
+      );
+    }
+    return createNewRow();
+  };
   const closeEditor = (): void => {
     editorVisible.value = false;
     editorModel.value = null;
@@ -622,8 +629,9 @@ export function useTableCrud<
       editorMode.value === "create" ? creating.value : updating.value,
     ),
     openCreate: (): void => {
+      const draft = cloneValue(createDraft());
       editorMode.value = "create";
-      editorModel.value = cloneValue(createDraft());
+      editorModel.value = draft;
       editorOriginal.value = null;
       editorTitle.value = editorConfig?.createTitle ?? "新增";
       editorVisible.value = true;

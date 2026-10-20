@@ -29,5 +29,6 @@ export type {
   TagsViewStyle,
   ThemeMode,
   ThemePreset,
+  ThemePresetSettings,
   TransitionType,
 } from "./types";

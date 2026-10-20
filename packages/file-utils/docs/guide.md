@@ -157,7 +157,7 @@ await excel.exportMultipleSheets(
 import { FileType, useDownload } from "@robot-admin/file-utils/download";
 
 const result = await useDownload(
-  async (params, { signal, onProgress } = {}) =>
+  async (params: { month: string }, { signal, onProgress } = {}) =>
     api.downloadReport(params, { signal, onProgress }),
   {
     fileName: "monthly-report",
@@ -181,6 +181,26 @@ const result = await useDownload(
 - `save` 适配器可接入桌面端、对象存储或测试；默认使用浏览器 Blob URL。
 
 快捷方法：`useDownloadExcel`、`useDownloadCSV`、`useDownloadPDF`、`useDownloadJSON`。
+
+`params` 的类型与必选性从传入 API 的首参推导，`useDownload`、`createFileUtils().download` 和所有快捷方法采用同一契约，无需手填泛型：
+
+```ts
+const exportReport = async (query: { reportId: number }): Promise<Blob> =>
+  api.exportReport(query);
+
+await useDownload(exportReport, {
+  fileName: "report",
+  fileType: FileType.PDF,
+  params: { reportId: 1 },
+});
+await useDownloadPDF(exportReport, "report", { reportId: 1 });
+// 缺少 params、reportId 类型错误或对象字面量拼错字段会在编译期报错。
+
+await useDownloadPDF(async () => api.exportAll(), "all");
+// 首参可选的 API 也可省略 params；省略时传给 API 的值为 undefined。
+```
+
+需要显式保存 API / 配置类型时，可使用 `DownloadApiFunction<Query>`、`DownloadConfig<Query>` 或 `DownloadConfigFor<typeof exportReport>`。直接传入原始 API 可完整保留推导；把它提前拓宽为不带查询泛型的 `DownloadApiFunction` 会丢失业务字段信息，库无法恢复已擦除的类型。
 
 ## ZIP
 

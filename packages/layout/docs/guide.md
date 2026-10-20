@@ -277,6 +277,30 @@ const settingsActions = {
 | 优雅紫 | `#722ed1` | 💜   |
 | 经典红 | `#f5222d` | ❤️   |
 
+自定义预设使用 `ThemePreset`；可选 `settings` 的公开类型为 `ThemePresetSettings`，
+仅支持 `borderRadius`、`transitionType`、`showBreadcrumb`、`showTagsView` 和
+`tagsViewStyle`。`applyPreset()` 在校验全部支持字段成功后，统一应用主题色和这些细节。
+外部对象携带的额外设置会被忽略；主题色始终读取预设顶层的 `primaryColor`。
+布局尺寸、主题模式和其他宿主设置请通过 Store 或完整设置导入协议维护。
+
+```typescript
+import type {
+  ThemePreset,
+  ThemePresetSettings,
+} from "@robot-admin/layout/core";
+
+const details: ThemePresetSettings = {
+  borderRadius: "large",
+  showBreadcrumb: false,
+};
+const preset: ThemePreset = {
+  name: "自定义",
+  icon: "🎨",
+  primaryColor: "#722ed1",
+  settings: details,
+};
+```
+
 ---
 
 ## Store API
@@ -395,10 +419,22 @@ type BorderRadiusSize = "small" | "medium" | "large";
 type TagsViewStyle = "default" | "card" | "smart";
 type ThemeMode = "light" | "dark" | "system";
 
+type ThemePresetSettings = Partial<
+  Pick<
+    SettingsState,
+    | "borderRadius"
+    | "transitionType"
+    | "showBreadcrumb"
+    | "showTagsView"
+    | "tagsViewStyle"
+  >
+>;
 interface ThemePreset {
   name: string;
+  description?: string;
   icon: string;
   primaryColor: string;
+  settings?: ThemePresetSettings;
 }
 interface SettingsStoreOptions {
   id?: string;
@@ -411,6 +447,36 @@ interface SettingsStoreOptions {
 ---
 
 ## 高级用法
+
+### 规范化宿主菜单
+
+`normalizeLayoutMenus()` 统一 `path/key`、标题和字符串图标，并跳过缺少路径与 key 的节点，
+保留输入不变。常规菜单和扩展元数据均可直接推断，无需为调用额外传入泛型。
+
+```typescript
+import {
+  normalizeLayoutMenus,
+  type MenuMeta,
+  type MenuOptions,
+} from "@robot-admin/layout/vue";
+
+interface AppMenuMeta extends MenuMeta {
+  permission: string;
+}
+
+const source: MenuOptions<AppMenuMeta>[] = [
+  { key: "/home", label: "首页" },
+  { path: "/users", meta: { title: "用户", permission: "users:read" } },
+];
+const menus = normalizeLayoutMenus(source);
+menus[0].meta.title.toUpperCase(); // title 始终为 string
+menus[0].meta.permission?.toUpperCase(); // string | undefined，输入允许缺少 meta
+```
+
+输出 `LayoutMenuItem<TMeta>` 的 `meta` 使用公开的 `LayoutMenuMeta<TMeta>`：保证通用菜单字段
+和必填 `title`，宿主扩展字段保持可选，子菜单遵循同一约定。标题与图标可能来自回退值，
+因此分别使用 `string`、`string | undefined`，不会承诺宿主的窄字面量类型。
+规范化结果可直接传入 `createLayoutContext()`、`provideLayout()` 或现有 `LayoutContext.menus`。
 
 ### 自定义 Settings Store
 

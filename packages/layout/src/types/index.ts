@@ -14,6 +14,7 @@ export type {
   TagsViewStyle,
   ThemeMode,
   ThemePreset,
+  ThemePresetSettings,
   TransitionType,
 } from "../core/types";
 

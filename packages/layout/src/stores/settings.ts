@@ -140,12 +140,17 @@ export function createSettingsStore(options: SettingsStoreOptions = {}) {
 
     /**
      * 应用主题预设方案
-     * 注意：只应用颜色配置，不改变布局模式和主题模式
+     * 只应用主题色与 ThemePresetSettings 中的五项外观细节。
+     * 忽略外部输入的额外设置，保持预设与完整设置导入的职责边界。
      */
     const applyPreset = async (preset: ThemePreset) => {
       const safePreset = sanitizeSettingsPatch({
         primaryColor: preset.primaryColor,
-        ...preset.settings,
+        borderRadius: preset.settings?.borderRadius,
+        transitionType: preset.settings?.transitionType,
+        showBreadcrumb: preset.settings?.showBreadcrumb,
+        showTagsView: preset.settings?.showTagsView,
+        tagsViewStyle: preset.settings?.tagsViewStyle,
       });
 
       // 完整校验成功后再修改状态，避免部分应用。

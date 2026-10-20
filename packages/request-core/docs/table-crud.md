@@ -89,8 +89,29 @@ await table.save({ id: 1, name: "Robot Admin" });
 
 ### 自定义查询与变更
 
-特殊 HTTP 方法、动态 URL 或聚合接口可用 `query/mutations` 接管；以下沿用前例的
-`Employee`、`Filters` 类型：
+自定义 `source.query(context)` 返回 `Promise<{ items: T[]; total: number }>`。
+行类型从查询返回值推导，筛选类型从 `initialFilters` 推导，无需在 `useTableCrud`
+上重复填写多个泛型；`createTableCrud()` 和 `useNaiveTableCrud()` 也保留这项推导：
+
+```ts
+const table = useTableCrud({
+  autoLoad: "mounted",
+  initialFilters: { keyword: "" },
+  source: {
+    query: ({ page, pageSize, filters, signal }) =>
+      request.get<{ items: Employee[]; total: number }>("/employees", {
+        params: { page, pageSize, ...filters },
+        signal,
+      }),
+  },
+});
+
+table.rows.value[0]?.name.toUpperCase();
+await table.search({ keyword: "Robot" });
+```
+
+特殊 HTTP 方法、动态 URL 或旧响应结构也可继续用顶层 `query/mutations` 接管；
+以下沿用前例的 `Employee`、`Filters` 类型：
 
 ```ts
 import { useTableCrud } from "@robot-admin/request-core/vue";
@@ -150,7 +171,8 @@ const table = useAppTable<Employee, Filters>({
 - `context => ({ ... })`：由页面完全生成列表参数，适合特殊接口。函数形式会替代
   工厂级字段映射。
 
-`query` 可以直接返回 `{ items, total }`，也可以返回以下兼容结构：
+顶层兼容 `query` 的返回值保留 `unknown`，可以返回 `{ items, total }` 或以下兼容
+结构；新的 `source.query` 必须返回规范化的 `{ items, total }`：
 
 - `{ data: { list, total } }`
 - `{ data: { items, totalCount } }`
@@ -159,6 +181,10 @@ const table = useAppTable<Employee, Filters>({
 - `[...]`
 
 ## 新增与编辑工作流
+
+使用 `createDraft()` 或 `editor.openCreate()` 时必须配置 `createNewRow`；未配置会
+抛出包含配置项名称的错误。只查询、编辑已有行或直接调用 `create(row)` 时无需提供
+草稿工厂。
 
 通过 `editor` 配置标题和提交前转换，表单弹窗可直接消费 `table.editor`：
 
@@ -236,7 +262,7 @@ const employeeDetail = defineDetailConfig({
 | 配置                            | 说明                                                                      |
 | ------------------------------- | ------------------------------------------------------------------------- |
 | `source`                        | 推荐入口：HTTP 端点配置或 `{ query, mutations }` 自定义数据源             |
-| `query(context)`                | 需要接管查询时提供的类型化函数                                            |
+| `query(context)`                | 兼容入口，允许 unknown 响应；`source.query` 返回规范化 `{ items, total }` |
 | `mutations`                     | 可选的 create/update/remove/batchRemove/get 函数                          |
 | `client`                        | 显式 Client；省略时读取 Vue 注入                                          |
 | `listParams`                    | 使用端点 source 或 `api.list` 时重命名/省略通用参数，或完全自定义参数映射 |
@@ -247,7 +273,7 @@ const employeeDetail = defineDetailConfig({
 | `refreshAfterMutation`          | 变更成功后是否刷新，默认 true                                             |
 | `batchConcurrency`              | 单条删除降级模式的并发数，默认 4                                          |
 | `extractListData`               | 自定义列表结果提取                                                        |
-| `createNewRow`                  | `createDraft()` 和 `editor.openCreate()` 使用的草稿工厂                   |
+| `createNewRow`                  | 调用 `createDraft()` 或 `editor.openCreate()` 时必需的草稿工厂            |
 | `editor`                        | 新增/编辑标题及 `prepareSubmit(row, context)` 提交前转换                  |
 | `detail`                        | 详情配置，可用 `defineDetailConfig()` 定义                                |
 | `idKey`                         | 行标识字段，默认 `id`；用于 URL 替换和本地删除                            |

@@ -139,6 +139,70 @@ describe("headless useTableCrud", () => {
     scope.stop();
   });
 
+  it("queries and searches a read-only source without a draft factory", async () => {
+    const table = useTableCrud({
+      autoLoad: false,
+      initialFilters: { keyword: "initial" },
+      source: {
+        query: async ({ filters }) => ({
+          items: [{ id: 1, name: filters.keyword }],
+          total: 1,
+        }),
+      },
+    });
+
+    await table.refresh();
+    expect(table.rows.value).toEqual([{ id: 1, name: "initial" }]);
+    await table.search({ keyword: "searched" });
+    expect(table.rows.value).toEqual([{ id: 1, name: "searched" }]);
+    expect(table.error.value).toBeNull();
+    table.dispose();
+  });
+
+  it("requires a draft factory only for creation and preserves an active edit on error", async () => {
+    const created: Row[] = [];
+    const table = useTableCrud<Row>({
+      autoLoad: false,
+      refreshAfterMutation: false,
+      source: {
+        query: async () => ({ items: [], total: 0 }),
+        mutations: {
+          create: async (row) => {
+            created.push(row);
+          },
+        },
+      },
+    });
+
+    await table.create({ id: 1, name: "explicit row" });
+    expect(created).toEqual([{ id: 1, name: "explicit row" }]);
+    const configurationError =
+      /requires createNewRow.*createDraft\(\).*editor\.openCreate\(\)/;
+    expect(() => table.createDraft()).toThrow(configurationError);
+
+    table.editor.openEdit({ id: 2, name: "editing" });
+    expect(() => table.editor.openCreate()).toThrow(configurationError);
+    expect(table.editor.mode.value).toBe("edit");
+    expect(table.editor.model.value).toEqual({ id: 2, name: "editing" });
+    expect(table.editor.visible.value).toBe(true);
+    table.dispose();
+  });
+
+  it("keeps legacy query envelope extraction when its return type is unknown", async () => {
+    const table = useTableCrud<Row>({
+      autoLoad: false,
+      query: async (): Promise<unknown> => ({
+        data: { list: [{ id: 1, name: "legacy" }], total: 1 },
+      }),
+    });
+
+    await table.refresh();
+    expect(table.rows.value).toEqual([{ id: 1, name: "legacy" }]);
+    expect(table.total.value).toBe(1);
+    expect(table.error.value).toBeNull();
+    table.dispose();
+  });
+
   it("drives create and edit form modals without page-owned state", async () => {
     const created: Row[] = [];
     const updated: Row[] = [];

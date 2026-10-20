@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/file-utils",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "文件处理工具集 - Excel/下载/压缩/CSV/JSON/XML/图片处理/大文件分片",
   "type": "module",
   "engines": {
@@ -115,7 +115,7 @@
     "build": "tsup",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run tests",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.json",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {

@@ -21,7 +21,7 @@ import {
 } from "../src/composables/useResponsiveMenu";
 import { normalizeLayoutMenus } from "../src/utils/menu";
 import type { LayoutMenuItem } from "../src/utils/menu";
-import type { MenuOptions } from "../src/types/menu";
+import type { MenuMeta, MenuOptions } from "../src/types/menu";
 
 describe("layout helpers", () => {
   it("keeps the 3.x menu discriminator contract", () => {
@@ -177,6 +177,55 @@ describe("layout helpers", () => {
       }),
     ).rejects.toThrow(RangeError);
     expect(store.primaryColor).toBe(previousColor);
+
+    await expect(
+      store.applyPreset({
+        name: "invalid detail",
+        icon: "x",
+        primaryColor: "#722ed1",
+        settings: { borderRadius: "invalid" as never },
+      }),
+    ).rejects.toThrow(RangeError);
+    expect(store.primaryColor).toBe(previousColor);
+  });
+
+  it("applies every supported preset detail and ignores extra external settings", async () => {
+    setActivePinia(createPinia());
+    const store = createSettingsStore({ id: "settings-preset-details-test" })();
+    const previousState = { ...store.$state };
+    // JavaScript / external objects may still carry fields excluded from ThemePresetSettings.
+    const preset = {
+      name: "custom",
+      icon: "x",
+      primaryColor: "#722ed1",
+      settings: {
+        borderRadius: "small" as const,
+        transitionType: "none" as const,
+        showBreadcrumb: false,
+        showTagsView: false,
+        tagsViewStyle: "smart" as const,
+        primaryColor: "not-a-color",
+        themeMode: "invalid",
+        layoutMode: "invalid",
+        fixedHeader: false,
+        enableTransition: false,
+        sidebarWidth: 0,
+        version: 123,
+      },
+    };
+
+    await store.applyPreset(preset);
+
+    expect(store.$state).toEqual({
+      ...previousState,
+      primaryColor: "#722ed1",
+      borderRadius: "small",
+      transitionType: "none",
+      showBreadcrumb: false,
+      showTagsView: false,
+      tagsViewStyle: "smart",
+    });
+    expect(preset.settings.primaryColor).toBe("not-a-color");
   });
 
   it("creates a reactive layout context from the minimal host contract", () => {
@@ -268,6 +317,50 @@ describe("layout helpers", () => {
       { key: "/home", label: "Home", icon: "home-icon" },
       { label: "Missing route" },
     ]);
+  });
+
+  it("keeps missing host metadata optional throughout normalized children", () => {
+    interface PermissionMeta extends MenuMeta {
+      permission: string;
+    }
+    const source: MenuOptions<PermissionMeta>[] = [
+      {
+        key: "/users",
+        label: "Users",
+        children: [
+          { path: "/users/list", meta: { permission: "users:read" } },
+          { path: "/users/new", label: "Create user" },
+        ],
+      },
+    ];
+    const before = JSON.stringify(source);
+    const normalized = normalizeLayoutMenus(source);
+
+    expect(normalized[0].meta).toEqual({ title: "Users" });
+    expect(normalized[0].meta.permission).toBeUndefined();
+    expect(normalized[0].children?.map((item) => item.meta)).toEqual([
+      { title: "/users/list", permission: "users:read" },
+      { title: "Create user" },
+    ]);
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it("feeds normalized menus into the existing host layout context", () => {
+    setActivePinia(createPinia());
+    const settings = createSettingsStore({
+      id: "normalized-layout-context-test",
+    })();
+    const menus = ref(
+      normalizeLayoutMenus([
+        { path: "/users", meta: { permission: "users:read" }, label: "Users" },
+        { key: "/home", label: "Home" },
+      ]),
+    );
+    const context = createLayoutContext({ settings, menus, isDark: false });
+
+    expect(context.menus.value).toEqual(menus.value);
+    menus.value = normalizeLayoutMenus([{ key: "/home", label: "Dashboard" }]);
+    expect(context.menus.value[0].meta?.title).toBe("Dashboard");
   });
 
   it("scopes CSS variables and restores the target on disposal", async () => {

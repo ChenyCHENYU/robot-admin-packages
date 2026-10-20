@@ -38,14 +38,34 @@ export interface RuleSpec {
 }
 
 /**
- * naive-ui 兼容规则类型（与 naive-ui FormItemRule 结构兼容）。
- * validator 通过 throw 报错。
+ * Naive UI 适配器的输出，可直接赋给官方 FormItemRule。
+ * 适配器不读取框架传入的 rule；使用 unknown 避免递归规则类型导致参数逆变。
+ * 同步成功返回 undefined，异步校验通过 Promise<void> 结算。
  */
 export interface NaiveRule {
   trigger?: Trigger | Trigger[];
-  validator?: (rule: NaiveRule, value: any) => void | Promise<void>;
+  validator?: (rule: unknown, value: any) => undefined | Promise<void>;
   required?: boolean;
   message?: string;
+  [key: string]: any;
+}
+
+/**
+ * Naive 组合器接受的 error 级别原生自定义规则边界，warning 规则不支持。
+ * 输入签名由 UI 框架定义，组合器仅使用 rule / value 两个参数。
+ * 同步通过返回 true 或空 Error[]；false / 非空 Error[] / Error / 抛错表示失败。
+ * 异步校验通过 Promise<void> 的完成 / 拒绝结算。
+ * 不支持 callback（包括 default/rest 参数）、同步 undefined、声明式约束和
+ * source / options 上下文；本包生成的 Promise<void> validator 可直接组合。
+ */
+export interface NativeNaiveRule {
+  trigger?: string | string[];
+  required?: boolean;
+  message?: string | (() => string);
+  validator?: (
+    ...args: any[]
+  ) => boolean | Error | Error[] | Promise<void> | undefined;
+  asyncValidator?: (...args: any[]) => Promise<void> | undefined;
   [key: string]: any;
 }
 

@@ -16,7 +16,8 @@ import type { FieldAliases } from "../core";
 import type { RequestError } from "./errors";
 
 export type MaybePromise<T> = T | Promise<T>;
-export type AuthTokenResult = string | { token: string } | null | undefined | void;
+export type AuthTokenResult =
+  string | { token: string } | null | undefined | void;
 
 export interface RawRequest {
   <T = unknown, D = unknown>(
@@ -51,10 +52,7 @@ export interface BusinessErrorDescriptor<T = unknown> {
 }
 
 export interface ResponseAdapter {
-  isSuccess?: (
-    data: unknown,
-    response: AxiosResponse,
-  ) => MaybePromise<boolean>;
+  isSuccess?: (data: unknown, response: AxiosResponse) => MaybePromise<boolean>;
   getData?: (data: unknown, response: AxiosResponse) => MaybePromise<unknown>;
   getError?: (
     data: unknown,
@@ -90,14 +88,19 @@ export interface RequestClientConfig {
   response?: ResponseAdapter;
   interceptors?: RequestInterceptors;
   hooks?: RequestHooks;
-  /** Make legacy getData/postData helpers point at this client. @default false */
+  /**
+   * Share this Axios transport/auth with legacy helpers. response adapters and
+   * hooks apply only to RequestClient methods; legacy helpers return the envelope.
+   * @default false
+   */
   setAsDefault?: boolean;
   successCodes?: Array<number | string>;
   fieldAliases?: FieldAliases;
 }
 
-export interface RequestConfig<D = unknown>
-  extends EnhancedAxiosRequestConfig<D> {}
+export interface RequestConfig<
+  D = unknown,
+> extends EnhancedAxiosRequestConfig<D> {}
 
 export interface RequestCacheController {
   clear(): void;

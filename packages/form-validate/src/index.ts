@@ -13,6 +13,7 @@
 export type {
   RuleSpec,
   NaiveRule,
+  NativeNaiveRule,
   ElementRule,
   Trigger,
   ValidateResult,
@@ -87,11 +88,7 @@ export {
 } from "./advanced";
 
 // ==================== 预设规则组合 ====================
-export {
-  RULE_COMBOS,
-  NAIVE_COMBOS,
-  ELEMENT_COMBOS,
-} from "./combos";
+export { RULE_COMBOS, NAIVE_COMBOS, ELEMENT_COMBOS } from "./combos";
 
 // ==================== 整合的预设规则对象 ====================
 export { SPEC_RULES, PRESET_RULES, ELEMENT_RULES } from "./presets";

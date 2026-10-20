@@ -99,7 +99,7 @@ export interface CrudMutations<T> {
   get?: (row: T, context: TableMutationContext) => Promise<T>;
 }
 
-/** A complete custom data source for local data, tests and non-HTTP backends. */
+/** Custom sources return normalized rows; legacy envelopes use top-level query. */
 export interface TableCrudDataSource<
   T extends DataRecord,
   Filters extends object = Record<string, unknown>,
@@ -107,7 +107,7 @@ export interface TableCrudDataSource<
 > {
   query: (
     context: TableQueryContext<Filters, Sort>,
-  ) => Promise<TableQueryResult<T> | unknown>;
+  ) => Promise<TableQueryResult<T>>;
   mutations?: CrudMutations<T>;
 }
 
@@ -185,9 +185,7 @@ export interface UseTableCrudConfig<
    * controls the parameters; an object only renames or omits standard fields.
    */
   listParams?: TableListParams<Filters, Sort>;
-  query?: (
-    context: TableQueryContext<Filters, Sort>,
-  ) => Promise<TableQueryResult<T> | unknown>;
+  query?: (context: TableQueryContext<Filters, Sort>) => Promise<unknown>;
   mutations?: CrudMutations<T>;
   client?: RequestClient;
   columns?: TableColumnInput<T>[];
@@ -199,6 +197,7 @@ export interface UseTableCrudConfig<
   defaultPaginationEnabled?: boolean;
   initialFilters?: Filters;
   initialSort?: Sort | null;
+  /** Required only when createDraft() or editor.openCreate() is used. */
   createNewRow?: () => T;
   extractListData?: (response: unknown) => TableQueryResult<T>;
   /** true keeps the historical immediate behavior; "mounted" is SSR-safe. */
