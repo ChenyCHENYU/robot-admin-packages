@@ -42,7 +42,7 @@ npm install @robot-admin/file-utils
 bun add @robot-admin/file-utils
 ```
 
-`vue >=3.3` 是 peer dependency。Excel 使用 SheetJS 官方发布的 `xlsx 0.20.3`，ZIP 使用 `jszip`；包内不再依赖 `file-saver`。
+`vue >=3.3` 是 peer dependency。Excel 使用 SheetJS 官方发布的 `xlsx 0.20.3`；自 `3.0.4` 起，其运行时和工作簿类型随包提供，使用侧不需要安装 `xlsx` 或访问 SheetJS CDN。ZIP 使用独立的 `jszip` 依赖，包内不再依赖 `file-saver`。来源与许可见 [第三方声明](../THIRD_PARTY_NOTICES.md)。
 
 ## 推荐初始化方式
 
@@ -427,7 +427,7 @@ import { useChunkDownload } from "@robot-admin/file-utils/chunk";
 | 分片上传 `retries` 表示额外重试次数               | `0` 表示只尝试一次；按新语义调整配置                             |
 | `abort()` 与外部 AbortSignal 会使 Promise 拒绝    | 捕获 `FileUtilsError` 且判断 `code === "ABORTED"`                |
 | 分片下载仅在传 sink 时真正不缓冲                  | 超大文件接入 `ChunkDownloadSink`；无 sink 时设置合理上限         |
-| xlsx 更新为官方 0.20.3 发布包                     | 若企业制品库禁用 URL 依赖，请镜像该 tarball 并使用 lockfile 固化 |
+| xlsx 更新为官方 0.20.3 发布包                     | `3.0.4+` 已随包提供运行时与类型，使用侧无需再镜像 CDN tarball |
 
 ## 开发验证
 

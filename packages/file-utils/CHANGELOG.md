@@ -1,5 +1,11 @@
 # @robot-admin/file-utils
 
+## 3.0.4
+
+### Patch Changes
+
+- Bundle the verified official SheetJS 0.20.3 runtime and workbook declarations so consumers no longer install a CDN dependency. Preserve public Excel APIs, include the upstream Apache-2.0 license and share internal ESM/CommonJS chunks so lightweight entries stay independent of spreadsheets. Add source integrity, publish artifact and isolated consumer checks.
+
 ## 3.0.3
 
 ### Patch Changes

@@ -61,6 +61,7 @@ web_modules/
 
 # Output of 'npm pack'
 *.tgz
+!vendor/xlsx-0.20.3.tgz
 
 # Yarn Integrity file
 .yarn-integrity

@@ -20,7 +20,7 @@ Configured limits reduce accidental exhaustion and common denial-of-service inpu
 
 ## Dependency policy
 
-SheetJS is consumed from its official release tarball and pinned by the repository lockfile. Organizations that disallow URL dependencies should mirror the exact artifact in their approved registry and preserve integrity metadata. Monitor `xlsx`, `jszip`, Vue and this package in the normal software-composition analysis process.
+SheetJS Community Edition 0.20.3 is bundled from the unmodified official release archive retained in the repository's `vendor/` directory. The build verifies its SHA-512 integrity and compares the runtime, declarations and license against the installed build input. Consumers do not download a SheetJS CDN dependency. See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) and the included Apache-2.0 license. Monitor the bundled SheetJS version, `jszip`, Vue and this package in the normal software-composition analysis process; bundled code still requires upstream security updates.
 
 ## Reporting
 
