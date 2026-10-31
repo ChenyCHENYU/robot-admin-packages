@@ -1,0 +1,84 @@
+{
+  "name": "@robot-admin/dictionary",
+  "version": "0.1.0",
+  "description": "Instance-scoped dictionaries and enums with resilient loading and optional Vue integration",
+  "type": "module",
+  "keywords": [
+    "dictionary",
+    "enum",
+    "vue",
+    "options",
+    "i18n"
+  ],
+  "author": "ChenYu <ycyplus@gmail.com>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChenyCHENYU/robot-admin-packages.git",
+    "directory": "packages/dictionary"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./vue": {
+      "import": {
+        "types": "./dist/vue.d.ts",
+        "default": "./dist/vue.js"
+      },
+      "require": {
+        "types": "./dist/vue.d.cts",
+        "default": "./dist/vue.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "vitest run tests",
+    "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "check:package": "publint --pack npm && node scripts/verify-package.mjs",
+    "verify": "bun run type-check && bun run test && bun run build && bun run check:package",
+    "prepublishOnly": "bun run verify"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "publint": "0.3.24",
+    "tsup": "^8.3.5",
+    "typescript": "~5.8.0",
+    "vue": "^3.5.13"
+  }
+}

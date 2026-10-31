@@ -4,7 +4,7 @@
 
 <div align="center">
   <p><strong>把可复用能力做成独立包，让应用专注业务。</strong></p>
-  <p>6 个运行时能力包 · 1 个工程工具 · 独立版本 · Bun Workspaces</p>
+  <p>7 个运行时能力包 · 1 个工程工具 · 独立版本 · Bun Workspaces</p>
   <p>
     <a href="./package.json"><img src="https://img.shields.io/badge/Bun-1.4.2-7295F6?style=flat-square&amp;logo=bun&amp;logoColor=white&amp;labelColor=202A3B" alt="Bun 1.4.2"></a>
     <a href="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml"><img src="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml/badge.svg" alt="Workspace quality gate"></a>
@@ -20,7 +20,7 @@
 
 ## 项目定位
 
-**Robot Packages** 是 Robot Admin 公共能力的 Monorepo，包含请求、验证、文件、指令、布局、主题与 Git 工程工具。各包独立安装、独立版本、独立发布；应用按职责组合，无需接入整个 Robot Admin。
+**Robot Packages** 是 Robot Admin 公共能力的 Monorepo，包含请求、字典、验证、文件、指令、布局、主题与 Git 工程工具。各包独立安装、独立版本、独立发布；应用按职责组合，无需接入整个 Robot Admin。
 
 根项目是私有工作区容器，固定为 `private: true`、`version: 0.0.0`。使用方安装下表中的具体包；各包源码版本与 npm 线上状态分别以仓库清单和对应 npm 页面为准。
 
@@ -29,6 +29,7 @@
 | 包                                                     | 当前版本 | 核心职责与推荐入口                                                        |
 | ------------------------------------------------------ | -------- | ------------------------------------------------------------------------- |
 | [@robot-admin/request-core](./packages/request-core)   | `0.7.0`  | 请求编排与 Headless CRUD；按 `/axios`、`/vue`、`/naive` 选择依赖层级      |
+| [@robot-admin/dictionary](./packages/dictionary)       | `0.1.0`  | 纯内核字典与枚举、作用域缓存、可靠加载与翻译；可选 `/vue` 订阅和合并刷新 |
 | [@robot-admin/form-validate](./packages/form-validate) | `3.4.4`  | 框架无关 `RuleSpec`，统一 Naive UI、Element Plus 与批量校验               |
 | [@robot-admin/file-utils](./packages/file-utils)       | `3.0.4`  | Excel、CSV、ZIP、图片、下载与可续传分片；按模块子路径消费                 |
 | [@robot-admin/directives](./packages/directives)       | `2.0.2`  | 11 个 Vue 交互指令，应用级适配与生命周期清理                              |
@@ -94,7 +95,7 @@ bun run verify
 
 ```text
 robot-admin-packages/
-├── packages/          # 七个独立发布包，各自维护 README / docs / CHANGELOG
+├── packages/          # 八个独立发布包，各自维护 README / docs / CHANGELOG
 ├── docs/              # 维护、联调与品牌资源
 ├── scripts/           # 工作区任务执行与契约检查
 ├── .changeset/        # 包版本与用户可见变更
