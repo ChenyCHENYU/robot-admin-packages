@@ -22,7 +22,7 @@
 
 **Robot Theme** 是分层主题基础设施，以 `@robot-admin/theme` 发布。从框架无关的模式解析与设计 Token，到 Vue / Pinia 状态管理和 Naive UI 适配，按应用需要选择入口。
 
-当前仓库版本 **0.6.1**。覆盖 light / dark / system 模式、3 套设计风格、同源标签页同步、可恢复 CSS Variables 与 View Transition 渐进增强。
+当前仓库版本 **0.6.2**。覆盖 light / dark / system 模式、3 套设计风格、同源标签页同步、可恢复 CSS Variables 与 View Transition 渐进增强。
 
 ## 能力地图
 

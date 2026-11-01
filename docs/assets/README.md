@@ -6,11 +6,14 @@
 
 ![Robot Packages 品牌总览](./brand-overview.png)
 
+总览包含工作区与 8 个独立包；[SVG 源文件](./brand-overview.svg) 可用于高清导出。
+
 ## 资源索引
 
 | 项目           | 识别色         | Logo                                                                                                                | 封面                                                                                                                    |
 | -------------- | -------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Robot Packages | 蓝 `#7295F6`   | [SVG](./logo.svg) · [PNG](./logo.png)                                                                               | [SVG](./banner.svg) · [PNG](./banner.png)                                                                               |
+| Dictionary     | 珊瑚 `#F2A990` | [SVG](../../packages/dictionary/docs/assets/logo.svg) · [PNG](../../packages/dictionary/docs/assets/logo.png)       | [SVG](../../packages/dictionary/docs/assets/banner.svg) · [PNG](../../packages/dictionary/docs/assets/banner.png)       |
 | Directives     | 天蓝 `#58C3E8` | [SVG](../../packages/directives/docs/assets/logo.svg) · [PNG](../../packages/directives/docs/assets/logo.png)       | [SVG](../../packages/directives/docs/assets/banner.svg) · [PNG](../../packages/directives/docs/assets/banner.png)       |
 | File Utils     | 琥珀 `#EABB65` | [SVG](../../packages/file-utils/docs/assets/logo.svg) · [PNG](../../packages/file-utils/docs/assets/logo.png)       | [SVG](../../packages/file-utils/docs/assets/banner.svg) · [PNG](../../packages/file-utils/docs/assets/banner.png)       |
 | Form Validate  | 绿 `#67D7AB`   | [SVG](../../packages/form-validate/docs/assets/logo.svg) · [PNG](../../packages/form-validate/docs/assets/logo.png) | [SVG](../../packages/form-validate/docs/assets/banner.svg) · [PNG](../../packages/form-validate/docs/assets/banner.png) |
@@ -21,6 +24,7 @@
 
 各包资源目录：
 
+- [Dictionary](../../packages/dictionary/docs/assets/)
 - [Directives](../../packages/directives/docs/assets/)
 - [File Utils](../../packages/file-utils/docs/assets/)
 - [Form Validate](../../packages/form-validate/docs/assets/)

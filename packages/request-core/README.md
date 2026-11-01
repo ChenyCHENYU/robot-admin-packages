@@ -22,7 +22,7 @@
 
 **Robot Request Core** 是实例化请求编排与 Vue 3 Headless CRUD 工具，以 `@robot-admin/request-core` 发布。基于 Axios，统一处理并发、缓存、取消、重试、Token 恢复与数据列表生命周期。
 
-当前仓库版本 **0.6.1**。每个 Client 隔离运行状态；Vue 层不绑定表格或 UI 组件，Naive UI 通过单独兼容适配层接入。
+当前仓库版本 **0.7.0**。每个 Client 隔离运行状态；Vue 层不绑定表格或 UI 组件，Naive UI 通过单独兼容适配层接入。
 
 ## 能力地图
 

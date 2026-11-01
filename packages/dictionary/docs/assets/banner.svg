@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="390" viewBox="0 0 1280 390" role="img" aria-labelledby="title description">
+<title id="title">Robot Dictionary</title><desc id="description">Define once. Read labels everywhere. SCOPED DICTIONARIES / FIELD REUSE / VUE / GRID READY.</desc>
+<defs><linearGradient id="tile" x1="5" y1="0" x2="120" y2="128" gradientUnits="userSpaceOnUse"><stop stop-color="#F2A990" stop-opacity=".8"/><stop offset="1" stop-color="#30212D"/></linearGradient><linearGradient id="bg" x1="0" y1="0" x2="1280" y2="390" gradientUnits="userSpaceOnUse"><stop stop-color="#101721"/><stop offset="1" stop-color="#30212D"/></linearGradient><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#F2A990" stroke-opacity=".045"/></pattern><clipPath id="edge"><rect width="1280" height="390" rx="24"/></clipPath></defs>
+<g clip-path="url(#edge)"><rect width="1280" height="390" fill="url(#bg)"/><rect width="1280" height="390" fill="url(#grid)"/>
+<svg x="60" y="104" width="130" height="130" viewBox="0 0 128 128"><rect x="2" y="2" width="124" height="124" rx="30" fill="url(#tile)"/>
+<rect x="2.5" y="2.5" width="123" height="123" rx="29.5" fill="none" stroke="#FFF" stroke-opacity=".2"/>
+<path d="M35 99V35H69C86 35 96 44 96 60C96 72 90 80 81 83L99 99H78L61 85H51V99H35ZM51 51V69H68C75 69 79 66 79 60C79 54 75 51 68 51H51Z" fill="#F9FAFF"/>
+<path d="M66 34V28" stroke="#F9FAFF" stroke-width="4" stroke-linecap="round"/>
+<circle cx="66" cy="23" r="4" fill="#F2A990"/>
+<rect x="55" y="56" width="5" height="7" rx="2.5" fill="#F2A990"/>
+<rect x="67" y="56" width="5" height="7" rx="2.5" fill="#F2A990"/>
+<rect x="91" y="91" width="35" height="35" rx="10" fill="#F2A990" stroke="#30212D" stroke-width="3"/>
+<g transform="translate(97 97) scale(.86)" fill="none" stroke="#30212D" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h6c3 0 4 2 4 4v14c0-3-2-4-5-4H3V5Zm20 0h-6c-3 0-4 2-4 4v14c0-3 2-4 5-4h5V5Z"/></g></svg>
+<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
+<text x="64" y="58" fill="#F2A990" font-size="12" font-weight="600" letter-spacing="2.2">ROBOT ECOSYSTEM / DICTIONARIES</text>
+<text x="224" y="146" fill="#F5F8FF" font-size="51" font-weight="700" letter-spacing="-1.5">Robot Dictionary</text>
+<text x="227" y="189" fill="#BFC8DC" font-size="17">Define once. Read labels everywhere.</text>
+<text x="227" y="230" fill="#F2A990" font-family="SFMono-Regular,Consolas,monospace" font-size="15">@robot-admin/dictionary</text>
+<text x="227" y="270" fill="#8393AE" font-size="12" letter-spacing=".8">TYPED APIs · COMPOSABLE BY DESIGN · OPEN SOURCE / MIT</text>
+<path d="M64 306H1216" stroke="#BFC8DC" stroke-opacity=".17"/><text x="64" y="342" fill="#F2A990" font-size="12" font-weight="600" letter-spacing="1.1">SCOPED DICTIONARIES</text><text x="425" y="342" fill="#BFC8DC" font-size="12" font-weight="600" letter-spacing="1.1">FIELD REUSE</text><text x="810" y="342" fill="#BFC8DC" font-size="12" font-weight="600" letter-spacing="1.1">VUE / GRID READY</text>
+<g transform="translate(952 89)" fill="none" stroke="#F2A990" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="32" y="22" text-anchor="middle" font-size="10" letter-spacing="1.2" fill="#F2A990" stroke="none">CODE</text><text x="183" y="22" text-anchor="middle" font-size="10" letter-spacing="1.2" fill="#F2A990" stroke="none">LABEL</text><rect x="4" y="36" width="56" height="126" rx="10" fill="#F2A990" fill-opacity=".06" stroke-opacity=".6"/><rect x="114" y="36" width="138" height="126" rx="10" fill="#F2A990" fill-opacity=".06" stroke-opacity=".6"/><text x="32" y="63" text-anchor="middle" font-size="15" fill="#F5F8FF" stroke="none">0</text><path d="M71 58h31m-6-6 6 6-6 6" stroke-opacity=".7"/><text x="183" y="63" text-anchor="middle" font-size="12" letter-spacing=".8" fill="#F5F8FF" stroke="none">READY</text><text x="32" y="105" text-anchor="middle" font-size="15" fill="#F5F8FF" stroke="none">1</text><path d="M71 100h31m-6-6 6 6-6 6" stroke-opacity=".7"/><text x="183" y="105" text-anchor="middle" font-size="12" letter-spacing=".8" fill="#F5F8FF" stroke="none">RUNNING</text><text x="32" y="147" text-anchor="middle" font-size="15" fill="#F5F8FF" stroke="none">2</text><path d="M71 142h31m-6-6 6 6-6 6" stroke-opacity=".7"/><text x="183" y="147" text-anchor="middle" font-size="12" letter-spacing=".8" fill="#F5F8FF" stroke="none">DONE</text></g>
+</g></g></svg>

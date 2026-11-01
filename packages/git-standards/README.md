@@ -22,7 +22,7 @@
 
 **Robot Git Standards** 是 Git 工程工具包，以 `@robot-admin/git-standards` 发布，CLI 名称为 `robot-standards`。它将 Commitizen、Commitlint、Husky 与可选的 Lint / 格式化工具组合为可重复执行的项目初始化流程。
 
-当前仓库版本 **1.0.5**，运行需要 **Node.js ≥18.18.0**。生成的配置是项目自己的完整文件，可直接调整；应用运行时无需导入本包。
+当前仓库版本 **1.0.6**，运行需要 **Node.js ≥18.18.0**。生成的配置是项目自己的完整文件，可直接调整；应用运行时无需导入本包。
 
 ## 能力地图
 
