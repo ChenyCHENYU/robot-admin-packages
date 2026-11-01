@@ -3,6 +3,7 @@ import {
   defineEnum,
   type DictionaryDefinition,
   type DictionarySource,
+  type DictionaryOptionsSource,
 } from "../src";
 import {
   useDictionary,
@@ -66,4 +67,35 @@ useDictionaryLabels(store, { state: false }, { state: "unknown" });
 // @ts-expect-error 标签只读，不能覆盖原码或共享映射。
 details.labels.value.state = "修改";
 void label;
+const minimalSource: DictionaryOptionsSource = { getOptions: () => [] };
+const reader = { getDictionary: (_name: string) => minimalSource };
+const schema = [
+  { prop: "state", type: "select", dictionary: "state" },
+  { prop: "other", type: "input" },
+] as const;
+const reused = useDictionaryLabels(reader, { state: false, other: 0 }, schema);
+const reusedLabel: string = reused.labels.value.state;
+// @ts-expect-error 没有字典的字段不声明为已翻译字段。
+reused.labels.value.other;
+// @ts-expect-error 同时有正确字段时也必须拒绝多余字段。
+useDictionaryLabels(store, { state: false }, { state: "state", typo: "state" });
+useDictionaryLabels(
+  reader,
+  { state: false },
+  { state: minimalSource },
+  { enabled: () => true },
+);
+void reusedLabel;
+// 与组件库既有 interface 协议兼容，不要求任意元数据索引签名。
+interface ExistingOption {
+  value: string | number | boolean;
+  label: string;
+  disabled?: boolean;
+}
+const existingProvider = {
+  getDictionary: (_name: string) => ({
+    getOptions: (): readonly ExistingOption[] => [],
+  }),
+};
+useDictionaryLabels(existingProvider, { state: false }, schema);
 void [unsafe, unsafeDynamic, formProvider, machSource, binding];

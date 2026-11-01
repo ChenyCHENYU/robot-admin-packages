@@ -46,10 +46,14 @@ status.label("S1B,S1C", { split: "," }); // 不显式 split 时不会拆分编�
 import { useDictionaryLabels } from "@robot-admin/dictionary/vue";
 
 // order 是原始记录的 ref、reactive 对象，或 () => 当前记录。
+const fields = [
+  { prop: "status", type: "select", dictionary: "planStatus" },
+  { prop: "enabled", type: "select", dictionary: "enabled" },
+] as const;
 const { labels, loading, error, reload } = useDictionaryLabels(
   dictionaries,
   order,
-  { status: "planStatus", enabled: "enabled" },
+  fields,
 );
 ```
 
@@ -58,9 +62,24 @@ const { labels, loading, error, reload } = useDictionaryLabels(
 <span>{{ labels.enabled }}</span>
 ```
 
-字段名与字典名只绑定一次，不手写状态码，也不逐字段查找 Source。记录尚未到达时显示 `—`；记录、字段原码、远程选项或作用域变化后自动更新，原始记录保持不变。绑定表在 setup 时声明；换记录使用 ref 或 getter，不需要重新创建绑定。
+直接复用既有表单、搜索或列配置中的 `prop/key/field` 与 `dictionary`，非字典字段忽略，不另建一份字段映射。原有 `{ status: 'planStatus' }` 映射仍支持，也可直接绑定选项源。配置在 setup 时解析一次；同一字段的矛盾配置通过 `error` 明确报告，不猜测覆盖顺序。仅复用字典元数据，不解释 UI 的 renderer、formatter、显式下拉选项或校验规则。
 
-同名字典只建立一个订阅，标签只跟随选项快照和已绑定的记录字段计算。加载及错误状态单独暴露，不重复计算整组标签；`reload()` 返回按字典去重的 `allSettled` 结果，失败仍通过 `error` 明确可见。默认按需加载，第四参数 `{ immediate: false }` 可延后；卸载自动归还订阅。此工具用于详情记录，虚拟表格继续使用下面的同步列策略。
+记录尚未到达时显示 `—`，不解析、订阅或加载远程源；记录、字段原码、远程选项变化后自动更新，原始记录保持不变。字段路径支持自身属性上的点号及数字下标，不读取原型链；原样包含点号的属性优先。换记录使用 ref 或 getter，不需要重新创建绑定。
+
+同名字典只建立一个订阅，标签只跟随选项快照和已绑定的记录字段计算。加载及错误状态单独暴露；`reload()` 返回按字典去重的 `allSettled` 结果，失败仍通过 `error` 明确可见。第四参数 `{ enabled: visible }` 接受 boolean/ref/getter：禁用后退订并取消本消费者等待，保留最后展示快照，重新启用时先读取当前作用域数据；禁用时手动重试也不请求。`{ immediate: false }` 仅延后初次加载。卸载自动归还订阅。此工具用于详情记录，虚拟表格继续使用下面的同步列策略。
+
+## 页面覆盖与既有选项源
+
+```ts
+import { createDictionaryProvider } from "@robot-admin/dictionary";
+
+// 页面优先、应用兜底；把同一个 provider 交给所有消费者。
+const provider = createDictionaryProvider(pageDictionaries, dictionaries);
+```
+
+仅名称未注册时继续查找下一层；已找到源的接口失败仍呈现失败，不用全局同名标签遮盖错误。组合器不创建请求、缓存或全局单例。`useDictionaryLabels` 只需要只读 Provider，不要求完整 Store。
+
+兼容已有 `getOptions()` 选项源，`load/getState/subscribe/label` 可选。标准源复用原有不可变快照及 O(1) 标签索引；旧源在加载/通知边界校验并复制选项，支持原地更新后通知。无状态的异步源也有局部加载/错误与重试；取消本消费者不等待忽略 signal 的迟到 loader。共享缓存、TTL、超时与跨消费者请求合并由数据源负责，推荐使用本包 Store；读取适配不再叠一套数据缓存。
 
 ## 下拉、搜索与表格
 

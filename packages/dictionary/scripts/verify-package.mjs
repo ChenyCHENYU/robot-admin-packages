@@ -8,7 +8,7 @@ import { effectScope, ref } from "vue";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const expected = {
-  index: ["createDictionaryStore", "defineEnum"],
+  index: ["createDictionaryStore", "createDictionaryProvider", "defineEnum"],
   vue: ["useDictionary", "useDictionaryLabels", "useDictionaryRefresh"],
 };
 
@@ -52,6 +52,12 @@ for (const [entry, names] of Object.entries(expected)) {
       const store = api.createDictionaryStore({
         enabled: api.defineEnum([{ value: false, label: "停用" }]),
       });
+      const provider = api.createDictionaryProvider(
+        { getDictionary: () => undefined },
+        store,
+      );
+      if (provider.getDictionary("enabled") !== store.getDictionary("enabled"))
+        throw new Error("SSR Provider 顺序兜底不可用");
       if (store.getDictionary("enabled").label(false) !== "停用")
         throw new Error("SSR 纯内核不可用");
       store.destroy();
@@ -64,9 +70,18 @@ for (const [entry, names] of Object.entries(expected)) {
       });
       const owner = effectScope();
       const model = ref({ enabled: false });
+      const visible = ref(false);
       const details = owner.run(() =>
-        api.useDictionaryLabels(store, model, { enabled: "enabled" }),
+        api.useDictionaryLabels(
+          store,
+          model,
+          [{ prop: "enabled", dictionary: "enabled" }],
+          { enabled: visible },
+        ),
       );
+      if (details.labels.value.enabled !== "false")
+        throw new Error(`${entry}.${extension} 未启用的详情不应解析字典`);
+      visible.value = true;
       if (details.labels.value.enabled !== "停用")
         throw new Error(`${entry}.${extension} 详情字段绑定不可用`);
       model.value = { enabled: true };
