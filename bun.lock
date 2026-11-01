@@ -16,7 +16,7 @@
     },
     "packages/dictionary": {
       "name": "@robot-admin/dictionary",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "devDependencies": {
         "@types/node": "^22.13.9",
         "publint": "0.3.24",

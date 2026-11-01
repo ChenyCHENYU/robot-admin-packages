@@ -4,7 +4,11 @@ import {
   type DictionaryDefinition,
   type DictionarySource,
 } from "../src";
-import { useDictionary, useDictionaryRefresh } from "../src/vue";
+import {
+  useDictionary,
+  useDictionaryLabels,
+  useDictionaryRefresh,
+} from "../src/vue";
 
 const store = createDictionaryStore({
   state: defineEnum([
@@ -49,4 +53,17 @@ const machSource: { get(key: string | number): string | undefined } = source;
 source.label([false, 0, "001"]);
 const binding = useDictionary(() => maybe, { immediate: false });
 useDictionaryRefresh([source], () => undefined);
+const details = useDictionaryLabels(store, () => ({ state: false, other: 0 }), {
+  state: "state",
+});
+const label: string = details.labels.value.state;
+// @ts-expect-error 未绑定字段不能作为标签访问。
+details.labels.value.other;
+// @ts-expect-error 必须绑定实际存在的记录字段。
+useDictionaryLabels(store, { state: false }, { missing: "state" });
+// @ts-expect-error 命名注册表校验字典名，避免拼写错误。
+useDictionaryLabels(store, { state: false }, { state: "unknown" });
+// @ts-expect-error 标签只读，不能覆盖原码或共享映射。
+details.labels.value.state = "修改";
+void label;
 void [unsafe, unsafeDynamic, formProvider, machSource, binding];

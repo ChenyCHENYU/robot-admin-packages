@@ -3,12 +3,13 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
+import { effectScope, ref } from "vue";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const expected = {
   index: ["createDictionaryStore", "defineEnum"],
-  vue: ["useDictionary", "useDictionaryRefresh"],
+  vue: ["useDictionary", "useDictionaryLabels", "useDictionaryRefresh"],
 };
 
 async function sources(path, seen = new Set()) {
@@ -53,6 +54,25 @@ for (const [entry, names] of Object.entries(expected)) {
       });
       if (store.getDictionary("enabled").label(false) !== "停用")
         throw new Error("SSR 纯内核不可用");
+      store.destroy();
+    } else {
+      const { createDictionaryStore } = await import(
+        pathToFileURL(resolve(root, "dist/index.js"))
+      );
+      const store = createDictionaryStore({
+        enabled: [{ value: false, label: "停用" }],
+      });
+      const owner = effectScope();
+      const model = ref({ enabled: false });
+      const details = owner.run(() =>
+        api.useDictionaryLabels(store, model, { enabled: "enabled" }),
+      );
+      if (details.labels.value.enabled !== "停用")
+        throw new Error(`${entry}.${extension} 详情字段绑定不可用`);
+      model.value = { enabled: true };
+      if (details.labels.value.enabled !== "true")
+        throw new Error(`${entry}.${extension} 详情原码变化未同步`);
+      owner.stop();
       store.destroy();
     }
   }

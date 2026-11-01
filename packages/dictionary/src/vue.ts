@@ -6,6 +6,7 @@
  */
 import {
   computed,
+  getCurrentScope,
   onScopeDispose,
   shallowRef,
   toValue,
@@ -16,6 +17,7 @@ import type {
   DictionaryLabelOptions,
   DictionarySource,
   DictionaryState,
+  DictionaryStore,
 } from "./types";
 import { EMPTY_OPTIONS, formatLabels } from "./values";
 
@@ -98,6 +100,78 @@ export function useDictionary(
         formatLabels(value, () => undefined, config)
       );
     },
+  };
+}
+
+/** 绑定记录与字段字典，详情直接读取 labels.field；同名源只订阅一次。 */
+export function useDictionaryLabels<
+  TModel extends object,
+  TName extends string,
+  TKey extends Extract<keyof TModel, string>,
+>(
+  store: DictionaryStore<TName>,
+  model: MaybeRefOrGetter<TModel | null | undefined>,
+  fields: Readonly<Record<TKey, NoInfer<TName>>>,
+  options: { immediate?: boolean } = {},
+) {
+  const owner = getCurrentScope();
+  const bindings = new Map<
+    string,
+    {
+      source: DictionarySource | undefined;
+      binding: ReturnType<typeof useDictionary> | undefined;
+      missing: Error | null;
+    }
+  >();
+  const entries = Object.entries(fields) as [TKey, TName][];
+  for (const [, name] of entries) {
+    if (bindings.has(name)) continue;
+    const source = store.getDictionary(name);
+    bindings.set(name, {
+      source,
+      // 前一个源的同步订阅可能卸载整个作用域，不再创建后续消费者。
+      binding:
+        owner?.active === false ? undefined : useDictionary(source, options),
+      missing: source ? null : new Error(`[dictionary] 未注册字典：${name}`),
+    });
+  }
+  return {
+    labels: computed(() => {
+      const row = toValue(model);
+      return Object.freeze(
+        Object.fromEntries(
+          entries.map(([field, name]) => {
+            const entry = bindings.get(name);
+            // 仅选项快照参与标签依赖；loading/error 变化不重算整组文字。
+            void entry?.binding?.options.value;
+            return [
+              field,
+              entry?.source?.label(row?.[field]) ??
+                formatLabels(row?.[field], () => undefined),
+            ];
+          }),
+        ),
+      ) as Readonly<Record<TKey, string>>;
+    }),
+    loading: computed(() =>
+      [...bindings.values()].some(({ binding }) => binding?.loading.value),
+    ),
+    error: computed(() => {
+      for (const { binding, missing } of bindings.values()) {
+        const error = missing ?? binding?.error.value;
+        if (error != null) return error;
+      }
+      return null;
+    }),
+    // 各源独立返回结果，一个失败不阻断其他字段，也不产生未处理拒绝。
+    reload: () =>
+      Promise.allSettled(
+        [...bindings.values()].map(({ binding, missing }) =>
+          missing
+            ? Promise.reject(missing)
+            : (binding?.reload() ?? Promise.resolve(EMPTY_OPTIONS)),
+        ),
+      ),
   };
 }
 

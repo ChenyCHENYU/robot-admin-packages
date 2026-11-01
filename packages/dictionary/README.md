@@ -40,6 +40,28 @@ status.label("S1B,S1C", { split: "," }); // 不显式 split 时不会拆分编�
 
 字典实例由应用、SSR 请求或独立业务作用域持有，不建立全局单例。`scope` 是应用生成的字符串，应包含影响字典结果的租户、组织、用户权限或语言。切换时执行 `dictionaries.setScope(next)`；注销或销毁宿主时执行 `destroy()`。不要把令牌放入 scope。
 
+## 详情文字：绑定一次，直接读取字段
+
+```ts
+import { useDictionaryLabels } from "@robot-admin/dictionary/vue";
+
+// order 是原始记录的 ref、reactive 对象，或 () => 当前记录。
+const { labels, loading, error, reload } = useDictionaryLabels(
+  dictionaries,
+  order,
+  { status: "planStatus", enabled: "enabled" },
+);
+```
+
+```vue
+<span>{{ labels.status }}</span>
+<span>{{ labels.enabled }}</span>
+```
+
+字段名与字典名只绑定一次，不手写状态码，也不逐字段查找 Source。记录尚未到达时显示 `—`；记录、字段原码、远程选项或作用域变化后自动更新，原始记录保持不变。绑定表在 setup 时声明；换记录使用 ref 或 getter，不需要重新创建绑定。
+
+同名字典只建立一个订阅，标签只跟随选项快照和已绑定的记录字段计算。加载及错误状态单独暴露，不重复计算整组标签；`reload()` 返回按字典去重的 `allSettled` 结果，失败仍通过 `error` 明确可见。默认按需加载，第四参数 `{ immediate: false }` 可延后；卸载自动归还订阅。此工具用于详情记录，虚拟表格继续使用下面的同步列策略。
+
 ## 下拉、搜索与表格
 
 Store 的 `getDictionary(name)` 和源的 `getOptions/load/subscribe` 结构兼容 Naive UI Components 的 DictionaryProvider。将实例传入现有字典 Provider 后，字段只需声明 `dictionary: 'planStatus'`。本包不依赖组件库或更改业务模型。

@@ -26,16 +26,16 @@
 
 ## 包与能力地图
 
-| 包                                                     | 当前版本 | 核心职责与推荐入口                                                        |
-| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------- |
-| [@robot-admin/request-core](./packages/request-core)   | `0.7.0`  | 请求编排与 Headless CRUD；按 `/axios`、`/vue`、`/naive` 选择依赖层级      |
-| [@robot-admin/dictionary](./packages/dictionary)       | `0.1.0`  | 纯内核字典与枚举、作用域缓存、可靠加载与翻译；可选 `/vue` 订阅和合并刷新 |
-| [@robot-admin/form-validate](./packages/form-validate) | `3.4.4`  | 框架无关 `RuleSpec`，统一 Naive UI、Element Plus 与批量校验               |
-| [@robot-admin/file-utils](./packages/file-utils)       | `3.0.4`  | Excel、CSV、ZIP、图片、下载与可续传分片；按模块子路径消费                 |
-| [@robot-admin/directives](./packages/directives)       | `2.0.2`  | 11 个 Vue 交互指令，应用级适配与生命周期清理                              |
-| [@robot-admin/layout](./packages/layout)               | `3.2.3`  | 6 种布局、设置与宿主上下文；分为 `/core`、`/vue`、`/naive`                |
-| [@robot-admin/theme](./packages/theme)                 | `0.6.2`  | 设计 Token、明暗状态和 UI 适配；分为 `/tokens`、`/core`、`/vue`、`/naive` |
-| [@robot-admin/git-standards](./packages/git-standards) | `1.0.6`  | `init` / `doctor` CLI，生成团队 Git、Lint 与格式化配置                    |
+| 包                                                     | 当前版本 | 核心职责与推荐入口                                                               |
+| ------------------------------------------------------ | -------- | -------------------------------------------------------------------------------- |
+| [@robot-admin/request-core](./packages/request-core)   | `0.7.0`  | 请求编排与 Headless CRUD；按 `/axios`、`/vue`、`/naive` 选择依赖层级             |
+| [@robot-admin/dictionary](./packages/dictionary)       | `0.2.0`  | 纯内核字典与枚举、作用域缓存、可靠加载与翻译；可选 `/vue` 详情字段绑定与合并刷新 |
+| [@robot-admin/form-validate](./packages/form-validate) | `3.4.4`  | 框架无关 `RuleSpec`，统一 Naive UI、Element Plus 与批量校验                      |
+| [@robot-admin/file-utils](./packages/file-utils)       | `3.0.4`  | Excel、CSV、ZIP、图片、下载与可续传分片；按模块子路径消费                        |
+| [@robot-admin/directives](./packages/directives)       | `2.0.2`  | 11 个 Vue 交互指令，应用级适配与生命周期清理                                     |
+| [@robot-admin/layout](./packages/layout)               | `3.2.3`  | 6 种布局、设置与宿主上下文；分为 `/core`、`/vue`、`/naive`                       |
+| [@robot-admin/theme](./packages/theme)                 | `0.6.2`  | 设计 Token、明暗状态和 UI 适配；分为 `/tokens`、`/core`、`/vue`、`/naive`        |
+| [@robot-admin/git-standards](./packages/git-standards) | `1.0.6`  | `init` / `doctor` CLI，生成团队 Git、Lint 与格式化配置                           |
 
 ### 按业务需要组合
 
