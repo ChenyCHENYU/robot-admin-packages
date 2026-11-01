@@ -1,5 +1,11 @@
 # @robot-admin/dictionary
 
+## 0.3.1
+
+### Patch Changes
+
+- 统一字典包的品牌封面、导航和精简接入示例，将完整指南与图片一并纳入 npm 发布产物。推荐直接复用已有字段配置，区分 RobotAdmin 应用封装与公开 API；运行时 API 和行为保持兼容。
+
 ## 0.3.0
 
 ### Minor Changes
