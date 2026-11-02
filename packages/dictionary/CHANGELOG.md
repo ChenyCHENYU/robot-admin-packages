@@ -1,5 +1,11 @@
 # @robot-admin/dictionary
 
+## 0.6.1
+
+### Patch Changes
+
+- 精简 README 为安装、单次插件接入、页面 hooks 和场景索引，移除首页重复的架构说明与旧接入迁移全文；历史用法对照仅保留在指南的升级说明。同步发布 npm README，运行时 API 与行为不变。
+
 ## 0.6.0
 
 ### Minor Changes
