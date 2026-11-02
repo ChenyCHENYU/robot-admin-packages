@@ -1,299 +1,406 @@
 [← @robot-admin/dictionary](../README.md)
 
-# 使用与 API 指南
+# 接入与场景指南
 
-首页提供推荐接入。本页按需要查阅远程接口、页面覆盖、启停、表格与底层 API。
+按 **接入一次 → 选择页面场景 → 按需处理错误与生命周期** 阅读。RobotAdmin 已完成第一部分，直接看[项目用法](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/docs/dictionaries.md)。
 
-## 本页导航
+| 要做什么                          | 去哪里                                      |
+| --------------------------------- | ------------------------------------------- |
+| 接后台接口、提供应用实例          | [接入步骤](#一接入只做一次)                 |
+| 下拉、搜索、列表、详情、MachTable | [场景索引](#二接入后按场景使用)             |
+| 静态枚举、专属接口、页面覆盖      | [场景六](#场景六静态枚举专属接口和页面覆盖) |
+| 无 Vue 的脚本、提示、导出         | [场景七](#场景七脚本提示和导出前准备)       |
+| 空字典、失败、重试                | [状态处理](#三空失败与重试)                 |
+| 身份切换、失效、销毁、性能        | [维护边界](#四身份切换维护与性能边界)       |
 
-- [应用配置](#应用配置)
-- [远程字典接入](#远程字典接入)
-- [表单搜索与 C_Table](#表单搜索与-c_table)
-- [详情与弹窗](#详情与弹窗)
-- [页面覆盖](#页面覆盖)
-- [MachTable 接入](#machtable-接入)
-- [状态与失败处理](#状态与失败处理)
-- [身份切换与生命周期](#身份切换与生命周期)
-- [API 速查](#api-速查)
-- [原码与性能边界](#原码与性能边界)
+## 一、接入只做一次
 
-## 应用配置
+### 1. 接口统一返回选项
 
-远程字典在现有应用入口接一次接口。函数本身就是加载器，不需要单独的注册文件或逐项映射：
+以下是示例协议，路径换成项目真实接口。字段 `dictionary: "user_status"` 会把 `user_status` 原样传给接口函数：
+
+```json
+[
+  { "value": "1", "label": "正常" },
+  { "value": "0", "label": "停用", "disabled": true }
+]
+```
+
+在已有 API 模块实现一个函数，所有字典共用：
+
+```ts
+// api.ts：示例接口直接返回标准选项数组。
+import type { DictionaryLoader } from "@robot-admin/dictionary";
+
+export const getDictionaryOptionsApi: DictionaryLoader = async (
+  code,
+  { signal },
+) => {
+  const response = await fetch(
+    `/api/dictionaries/${encodeURIComponent(code)}`,
+    { signal },
+  );
+  if (!response.ok) throw new Error("字典暂时不可用，请重试");
+  return response.json();
+};
+```
+
+真实接口若返回 `{ code, data, msg }` 或使用 `dictValue/dictLabel`，只替换上面的 API 函数。下面演示**成功码为数字 0、原码为字符串**的协议；成功码、字段名和编码类型须以真实后台约定为准，两个 API 示例二选一：
+
+```ts
+import type { DictionaryLoader } from "@robot-admin/dictionary";
+
+interface DictionaryResponse {
+  code: number;
+  msg?: string;
+  data: { dictValue: string; dictLabel: string; disabled?: boolean }[];
+}
+export const getDictionaryOptionsApi: DictionaryLoader = async (
+  code,
+  { signal },
+) => {
+  const response = await fetch(
+    `/api/dictionaries/${encodeURIComponent(code)}`,
+    { signal },
+  );
+  if (!response.ok) throw new Error("字典暂时不可用，请重试");
+  const result: DictionaryResponse = await response.json();
+  if (result.code !== 0) throw new Error(result.msg || "字典加载失败");
+  return result.data.map((item) => ({
+    value: item.dictValue,
+    label: item.dictLabel,
+    disabled: item.disabled,
+  }));
+};
+```
+
+这样业务码检查、解包和映射只做一次，页面代码完全相同。最终返回值须为 `{ value, label, disabled? }[]`；格式错误会进入 `error`，不会冒充空字典。树接口的实际适配可参考 [RobotAdmin 的实现](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/src/api/dictionary-options.ts)。
+
+使用已有请求客户端时保留 `signal`，启用其静默错误模式（如 `silent: true`），由控件就地显示失败与重试；不要 `catch(() => [])`。租户、公司、语言等参数从上下文 `scope` 或现有请求层取得，库不猜测后台协议。
+
+### 2. 应用创建并提供同一个实例
+
+**已使用 Naive UI Components 的 Vue 项目**：把下面代码放在已有的 `createApp` 之后、`mount` 之前。`app` 是现有 Vue 应用，`./api` 是上一步的 API 模块；无需创建字典注册清单。
+
+```ts
+import { createDictionaryStore } from "@robot-admin/dictionary";
+import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
+import { getDictionaryOptionsApi } from "./api";
+
+const dictionaries = createDictionaryStore(getDictionaryOptionsApi);
+app.provide(DICTIONARY_PROVIDER_KEY, dictionaries);
+app.onUnmount(() => dictionaries.destroy());
+```
+
+创建 Store、声明字段、调用 `getDictionary()` 均不发请求，消费者启用后才加载。同码共用稳定源、缓存和请求。新增远程类型时只写后台字典码，不新增别名、loader 或 `dictionaries.ts`。
+
+**其他 Vue 或纯 TypeScript 项目**：只需要 `createDictionaryStore(getDictionaryOptionsApi)`；用项目现有服务/依赖注入传递实例。Vue 详情使用公开的 `useDictionaryLabels`，纯脚本见场景七，不必为此引入 Naive UI Components。
+
+不要从 `main.ts` 反向导入实例到组件，也不要在每个页面重新创建应用 Store。应用持有并销毁它；SSR 每个请求创建独立实例。
+
+## 二、接入后按场景使用
+
+下列表单、搜索与 C_Table 片段在组件 `setup` 或其页面组合函数中使用，前提是应用已完成接入。Vue/组件导入按项目自动导入配置取舍；例中的类型导入用于检查字段，不是额外运行时依赖。
+
+### 场景一：表单下拉
+
+```ts
+import { ref } from "vue";
+import type { FormOption } from "@robot-admin/naive-ui-components/C_Form";
+
+interface UserForm {
+  account: string;
+}
+const model = ref<UserForm>({ account: "1" });
+const fields: FormOption<UserForm>[] = [
+  {
+    prop: "account",
+    label: "账户状态",
+    type: "select",
+    dictionary: "user_status",
+  },
+];
+```
+
+```vue
+<C_Form v-model="model" :options="fields" />
+```
+
+显示“正常”，`model.account` 仍为字符串 `"1"`。已有 fields 只补 `dictionary`，不要再手写 `options` 加载或 `onMounted` 请求。
+
+多选在字段中配置 `attrs: { multiple: true }`，模型对应字段使用数组；布尔值、零、前导零仍保留原始类型。组件继续负责校验、布局与显式选项优先级。
+
+### 场景二：搜索条件
+
+```ts
+import { ref } from "vue";
+import type { SearchFormItem } from "@robot-admin/naive-ui-components/C_FormSearch";
+
+interface UserQuery {
+  account: string | null;
+}
+const query = ref<UserQuery>({ account: null });
+const searchFields: SearchFormItem<UserQuery>[] = [
+  {
+    prop: "account",
+    label: "账户状态",
+    type: "select",
+    dictionary: "user_status",
+  },
+];
+```
+
+```vue
+<C_FormSearch v-model="query" :form-item-list="searchFields" />
+```
+
+选项与表单共享来源，搜索载荷仍使用 `query.account` 的原码。查询触发与序列化继续使用搜索组件现有配置，不把标签写回查询条件。
+
+### 场景三：C_Table 列表
+
+```ts
+import { ref } from "vue";
+import { defineTableColumns } from "@robot-admin/naive-ui-components/C_Table";
+
+interface UserRow {
+  id: string;
+  account: string;
+}
+const rows = ref<UserRow[]>([{ id: "U-1", account: "1" }]);
+const columns = defineTableColumns<UserRow>([
+  { key: "account", title: "账户状态", dictionary: "user_status" },
+]);
+```
+
+```vue
+<C_Table :data="rows" :columns="columns" row-key="id" />
+```
+
+接口完成后更新展示，行对象继续保留 `account: "1"`。普通字典默认文字展示；状态色通过列的 `status` 单独配置，不将所有枚举自动染成状态 Tag。自定义 renderer/formatter 等优先级仍由 C_Table 决定。
+
+### 场景四：详情和弹窗
+
+**RobotAdmin**：`useDictLabels(record, fields)` 自动读取最近 Provider，模板直接使用 `labels.account`。`record` 是响应式记录，`fields` 可以复用场景一已有的表单字段，无需再写翻译映射；不要从本包导入 `useDictLabels`。
+
+**其他 Vue 项目**使用公开 API。下面是已接 NUI Provider 的完整绑定片段；其他 Vue 项目把 `provider` 换成现有服务传入的 Store 即可：
+
+```ts
+import { inject, ref } from "vue";
+import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
+import { useDictionaryLabels } from "@robot-admin/dictionary/vue";
+
+const provider = inject(DICTIONARY_PROVIDER_KEY);
+if (!provider) throw new Error("请先在应用启动时提供字典实例");
+const user = ref<{ account: string } | null>(null);
+const visible = ref(false);
+const fields = [{ prop: "account", dictionary: "user_status" }] as const;
+const { labels, loading, error, reload } = useDictionaryLabels(
+  provider,
+  user,
+  fields,
+  { enabled: visible },
+);
+// 详情接口返回后，调用 showDetail(record)。
+function showDetail(record: { account: string }) {
+  user.value = record;
+  visible.value = true;
+}
+```
+
+```vue
+<NModal
+  v-model:show="visible"
+  preset="card"
+  title="账户详情"
+  style="width: min(520px, calc(100vw - 32px))"
+>
+  <NDescriptions :column="1">
+    <NDescriptionsItem label="账户状态">{{ labels.account }}</NDescriptionsItem>
+  </NDescriptions>
+  <NAlert v-if="error" type="warning">
+    字典加载失败。<NButton :loading="loading" @click="reload">重试</NButton>
+  </NAlert>
+</NModal>
+```
+
+这里的 `fields` 仅演示独立详情；已有表单/表格配置时直接复用其 `prop/key/field + dictionary`，非字典字段会忽略。`labels` 是 ref，模板自动解包；脚本中读取 `labels.value.account`。
+
+记录为空或 `enabled: false` 时不解析、不订阅、不加载；关闭保留最后标签供离场动画使用，重开读取当前身份的数据。`reload()` 返回按字典去重的 `allSettled` 结果，一个失败不阻断其他字典。翻译不修改原始记录。
+
+### 场景五：MachTable
+
+MachTable 不读取 C_Table 的 `dictionary` 字段，使用自己的公共列策略。下面的页面组合函数接收**接入步骤创建的同一个 Store**；RobotAdmin 调用时传 `useAppDictionaries()`（从项目 `@/utils/d_dictionaryContext` 导入）。
+
+```ts
+import { ref } from "vue";
+import type { DictionaryStore } from "@robot-admin/dictionary";
+import {
+  useDictionary,
+  useDictionaryRefresh,
+} from "@robot-admin/dictionary/vue";
+import { defineVueColumns, useMachTable } from "@agile-team/mach-table-vue";
+import { createDictionaryColumn } from "@agile-team/mach-table-vue/business";
+
+export function useAccountGrid(dictionaries: DictionaryStore) {
+  const table = useMachTable<{ id: string; account: string }>();
+  const rows = ref([{ id: "U-1", account: "1" }]);
+  const source = dictionaries.getDictionary("user_status");
+  if (!source) throw new Error("字典实例不可用");
+  const state = useDictionary(source);
+  const columns = defineVueColumns<{ id: string; account: string }>([
+    {
+      field: "account",
+      headerName: "账户状态",
+      ...createDictionaryColumn(source, { options: source.getOptions }),
+    },
+  ]);
+  useDictionaryRefresh([source], () => table.api.value?.view.refreshCells());
+  async function reload() {
+    try {
+      await state.reload();
+    } catch {
+      /* 错误已保存在 state.error，由下面的局部提示呈现。 */
+    }
+  }
+  return { table, rows, columns, state, reload };
+}
+```
+
+在页面 setup 中调用该组合函数并解构返回值；模板组件 `MachTable` 从 `@agile-team/mach-table-vue` 导入：
+
+```vue
+<NAlert v-if="state.error.value" type="warning">
+  字典加载失败。<NButton @click="reload">重试</NButton>
+</NAlert>
+<MachTable
+  :ref="table.ref"
+  :row-data="rows"
+  :column-defs="columns"
+  style="height: 260px"
+/>
+```
+
+`useDictionaryRefresh` 仅在选项快照变化后合并刷新，loading/error 变化不重绘。单元格只做同步 Map 查询，不发请求、不逐单元格订阅。复制与 CSV/XLSX 的原码/标签输出由 MachTable 列策略单独配置。
+
+### 场景六：静态枚举、专属接口和页面覆盖
+
+**应用静态枚举或专属定义**：替换接入步骤中的 Store 创建语句，其余接入不变。普通远程码继续走统一接口：
 
 ```ts
 import { createDictionaryStore } from "@robot-admin/dictionary";
 import { getDictionaryOptionsApi } from "./api";
 
-export const dictionaries = createDictionaryStore(getDictionaryOptionsApi);
-```
-
-静态枚举或专属接口按需声明，未声明名称自动使用统一接口：
-
-```ts
 const dictionaries = createDictionaryStore(
   {
-    "order-status": [
-      { value: 0, label: "待下达" },
-      { value: 1, label: "执行中" },
-      { value: 2, label: "已完成" },
+    urgency: [
+      { value: false, label: "普通" },
+      { value: true, label: "加急" },
     ],
+    // 只有需要特殊 TTL/接口的类型才单独声明。
+    special_status: {
+      ttlMs: 60_000,
+      load: (context) => getDictionaryOptionsApi("special_status", context),
+    },
   },
   { load: getDictionaryOptionsApi },
 );
 ```
 
-应用持有这个实例并提供给所有消费者；应用卸载时调用 `destroy()`，不要在某个页面卸载时销毁共享实例。SSR 每个请求单独创建，避免跨用户共享缓存。没有统一加载器的既有注册表写法继续有效，未知名称仍返回 `undefined`。
+字段配置 `dictionary: "urgency"` 即可使用静态选项。需要导出同一枚举数组供其他业务复用时，再用 `defineEnum(options)` 校验、复制和冻结；仅注册给 Store 不必包装。
 
-`defineEnum(options)` 适合需要独立导出、复用的静态枚举常量；它校验并复制冻结选项。仅向 Store 注册时，直接使用数组即可。
-
-## 远程字典接入
-
-在应用 API 层实现一个通用函数，参数中的字典码就是字段声明的 `dictionary`：
+**只覆盖当前页面**：在页面 setup 创建局部 Store、组合祖先来源并 provide；不要在局部 Store 配统一 loader，否则它会接管所有原码：
 
 ```ts
+import { inject, provide, onScopeDispose } from "vue";
 import {
-  type DictionaryLoadContext,
-  type DictionaryOption,
+  createDictionaryStore,
+  createDictionaryProvider,
 } from "@robot-admin/dictionary";
-
-// 示例接口直接返回标准选项数组；真实项目可复用自己的 API 函数。
-export async function getDictionaryOptionsApi(
-  code: string,
-  { signal }: DictionaryLoadContext,
-): Promise<readonly DictionaryOption[]> {
-  const response = await fetch(
-    `/api/dictionaries/${encodeURIComponent(code)}`,
-    { signal },
-  );
-  if (!response.ok) throw new Error("订单状态暂时不可用，请重试");
-  return response.json();
-}
-```
-
-Loader 返回 `{ value, label, disabled? }[]`。接口若使用 `{ code, data, message }`、树形结构或不同字段名，在应用 API 层统一检查业务状态、解包和映射一次。Store 仍会校验返回的选项，非法格式进入错误状态。
-
-`getDictionary(name)` 按需建立稳定源，但不发请求；真正消费时才加载。同码共用一份快照和请求，沿用 TTL、失败冷却、超时与作用域隔离。显式静态/专属定义优先，合法空字典和加载失败均不换源。名称按原码传递，不自动改大小写、连接符或编码类型。
-
-`preload(["order_status"])` 可以显式预热未出现过的原码；不传名称时只处理已建立的源，不枚举后台目录。销毁后不再创建新源。统一远程来源适合作为应用兜底；页面只覆盖少数名称时保留显式定义，避免抢占应用来源。
-
-有全局错误提示的请求客户端应为字典消费启用 `silent: true`，把错误交给使用位置展示和重试；认证恢复继续遵循应用请求层。不要使用 `catch(() => [])`，否则会把接口故障伪装成合法空字典。
-
-Loader 同时收到 `{ signal, scope }`。`scope` 由应用定义；需要租户、公司或语言参数时，在 API 层适配真实业务协议，库不隐式注入 HTTP 请求。
-
-## 表单搜索与 C_Table
-
-Naive UI Components 通过现有 Provider 取字典。在应用初始化时注册一次；下例 `./app` 代表已有启动模块，不要求创建新文件：
-
-```ts
-import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
-import { dictionaries } from "./app";
-
-app.provide(DICTIONARY_PROVIDER_KEY, dictionaries); // app 为已有的 Vue 应用实例
-```
-
-之后字段只声明名称：
-
-```ts
-// C_Form / C_FormSearch
-const formField = {
-  prop: "status",
-  label: "计划状态",
-  type: "select",
-  dictionary: "order-status",
-};
-
-// C_Table
-const tableColumn = {
-  key: "status",
-  title: "计划状态",
-  dictionary: "order-status",
-};
-```
-
-NUI 控件管理加载、错误和局部重试。普通枚举保持文字显示；需要状态标签时，另外使用组件的 `status` 配置。字段自己的 renderer、formatter 或显式下拉选项优先级由组件决定，字典包不改写它们。
-
-## 详情与弹窗
-
-### 复用已有字段
-
-在组件 `setup` 中传入现有记录和字段定义：
-
-```ts
-import { useDictionaryLabels } from "@robot-admin/dictionary/vue";
-import { dictionaries } from "./app";
-
-const { labels } = useDictionaryLabels(dictionaries, order, fields);
-```
-
-```vue
-<span>{{ labels.status }}</span>
-```
-
-- `order` 接受 ref、reactive 对象或 getter，例如 `() => detailOrder.value?.header`。
-- `fields` 读取 `prop/key/field` 和 `dictionary`；非字典字段忽略，配置在 setup 解析一次。
-- 兼容 `{ status: "order-status" }` 映射和直接选项源；换记录不需要重新创建绑定。
-- 字段路径支持点号和数字下标；原样包含点号的自身属性优先，不读取原型链。
-- 同一字段声明不同字典时，通过 `error` 报告冲突，不猜测覆盖顺序。
-
-类型明确的字段定义可以保留精确的标签键。宽泛配置数组的可选字典字段会表现为可选标签；使用既有组件类型检查字段声明即可，无需业务侧断言。
-
-### 按弹窗状态启用
-
-```ts
-const { labels, loading, error, reload } = useDictionaryLabels(
-  dictionaries,
-  order,
-  fields,
-  { enabled: visible },
-);
-```
-
-`enabled` 接受 boolean/ref/getter。缺少记录或未启用时不解析、订阅、加载远程源；关闭时归还当前订阅并取消等待，保留最后展示快照供弹窗离场。重新启用时先读取当前作用域的数据；禁用时手动重试也不会发请求。`{ immediate: false }` 只延后初次加载。
-
-`labels` 只读，翻译不会改写 `order`。`loading/error/reload` 按需取用；字段组的 `reload()` 返回按字典去重的 `allSettled` 结果，一个失败不会阻断其他字典。
-
-### RobotAdmin 的简写
-
-```ts
-const { labels } = useDictLabels(order, HEADER_FIELDS);
-```
-
-这是 RobotAdmin 的自动导入封装，负责读取当前 Provider；并非本包导出。弹窗同样可补充 `{ enabled: visible }`。已有的应用初始化、接口适配和演示入口见 [RobotAdmin 字典接入](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/docs/dictionaries.md)。
-
-## 页面覆盖
-
-在页面配置处组合一次，所有控件和详情共用同一个 Provider：
-
-```ts
-import { provide } from "vue";
-import { createDictionaryProvider } from "@robot-admin/dictionary";
 import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
 
-const provider = createDictionaryProvider(pageDictionaries, dictionaries);
+const parent = inject(DICTIONARY_PROVIDER_KEY);
+if (!parent) throw new Error("请先提供应用字典实例");
+const local = createDictionaryStore({
+  user_status: [{ value: "1", label: "本页正常" }],
+});
+const provider = createDictionaryProvider(local, parent);
 provide(DICTIONARY_PROVIDER_KEY, provider);
-const { labels } = useDictionaryLabels(provider, order, fields);
+onScopeDispose(() => local.destroy());
 ```
 
-按传入顺序查找，页面名称缺失时兜底应用。已找到源的加载失败、合法空字典或未知编码都不触发换源，避免用另一份标签掩盖问题。组合器只读取来源，不创建请求或缓存，不负责销毁所组合的实例。
+子组件的表单、搜索、C_Table 和详情自动读取最近 Provider。同一个 setup 内的详情显式把 `provider` 传给 `useDictionaryLabels`；RobotAdmin 使用 `useDictLabels(record, fields, { provider })`。Vue 的 inject 读取祖先，不会读取本层刚提供的值。
 
-Vue 的 `inject` 读取祖先。RobotAdmin 的同层控制器显式使用 `useDictLabels(order, fields, { provider })`；子组件直接继承最近 Provider。不要在不同消费者里各写一条兜底链。
+只有“名称不存在”才向应用来源查找；已找到的源即使为空、失败或无匹配值，也不会换源掩盖问题。组合器不创建缓存，不代替所有者销毁 Store。
 
-既有轻量源只需 `getOptions()`，可选 `load/getState/subscribe/label`。标准 Store 复用不可变快照及 O(1) 标签索引；旧源在加载/通知边界校验并复制选项，也支持原地更新后通知。共享缓存、TTL、超时及跨消费者请求合并由数据源负责，推荐使用本包 Store；读取适配不会再叠一套数据缓存。
+### 场景七：脚本、提示和导出前准备
 
-## MachTable 接入
-
-在已有 Vue 表格页面中，把同一个 Store 字典源接入公开业务列策略：
+纯 TypeScript 不需要 Vue 或组件库。以下函数接收应用已有 Store，可用于提交提示或导出前准备：
 
 ```ts
-import { defineVueColumns, useMachTable } from "@agile-team/mach-table-vue";
-import { createDictionaryColumn } from "@agile-team/mach-table-vue/business";
-import {
-  useDictionary,
-  useDictionaryRefresh,
-} from "@robot-admin/dictionary/vue";
-import { dictionaries } from "./app";
+import type { DictionaryStore } from "@robot-admin/dictionary";
 
-interface Order {
-  id: string;
-  status: number;
+export async function getAccountText(
+  dictionaries: DictionaryStore,
+  code: string,
+) {
+  const source = dictionaries.getDictionary("user_status");
+  if (!source) throw new Error("字典实例不可用");
+  await source.load();
+  return source.label(code);
 }
-const table = useMachTable<Order>();
-const source = dictionaries.getDictionary("order_status");
-if (!source) throw new Error("字典实例不可用");
-const state = useDictionary(source);
-const columns = defineVueColumns<Order>([
-  {
-    field: "status",
-    headerName: "计划状态",
-    ...createDictionaryColumn(source, { options: source.getOptions }),
-  },
-]);
-useDictionaryRefresh([source], () => table.api.value?.view.refreshCells());
 ```
 
-将 `table.ref`、业务行和 `columns` 传给 MachTable。页面通过 `state.loading/error/reload` 展示独立网格的请求状态；`useDictionary().reload()` 会拒绝失败，事件处理器应捕获并交给局部状态反馈。
+`load()` 会拒绝原始错误，由调用方捕获并在该操作处反馈；成功后 `label()` 是同步查找。预热多个码使用 `await dictionaries.preload(["user_status", "gender"])`，返回每个字典的 `allSettled` 结果。无参预热只处理已建立的源，不枚举后台目录。
 
-单元格执行同步索引查询，不发请求、不遍历整份字典。异步选项变化后，`useDictionaryRefresh` 在 Vue post-flush 合并刷新；仅加载或错误状态变化不重绘表格。列默认保持原码输出，复制与 CSV/XLSX 的展示策略由 MachTable 列配置决定。
+## 三、空、失败与重试
 
-大规模客户/物料实体的按码解析继续使用 MachTable 的 `createCachedDictionary` 或业务批量接口，不在完整字典源外重复叠加缓存。
+| 情况                            | 实际行为                  | 页面怎么处理                                    |
+| ------------------------------- | ------------------------- | ----------------------------------------------- |
+| 未使用、记录未到达、弹窗关闭    | 不请求                    | 等真正使用时加载，不阻断应用启动                |
+| 成功返回 `[]`                   | `empty`，仍按 TTL 缓存    | 明确显示暂无选项，不弹失败消息                  |
+| HTTP/业务码失败、格式异常、超时 | `error`，保留同身份旧快照 | 控件局部重试；独立详情/MachTable 显示上面的提示 |
+| 未匹配的历史编码                | 保留原码                  | 不改写提交数据，由业务治理历史值                |
+| 停用选项                        | 标签仍能回显              | 下拉限制新选择，是否合法仍由业务校验决定        |
 
-## 状态与失败处理
+C_Form/C_FormSearch/C_Table 已处理字典状态。独立详情使用 `error/loading/reload`；独立网格使用 `state.error/state.loading/reload`，不要把接口错误只藏进控制台。
 
-| 状态      | 含义与呈现                                         |
-| --------- | -------------------------------------------------- |
-| `idle`    | 尚未加载、已失效或消费暂停                         |
-| `loading` | 正在加载；已有同作用域标签继续可读                 |
-| `ready`   | 成功加载非空选项                                   |
-| `empty`   | 成功返回空数组，提示暂无选项                       |
-| `error`   | 接口、超时或校验失败，保留同作用域旧快照并提供重试 |
+| 策略     | 默认值                                                                            |
+| -------- | --------------------------------------------------------------------------------- |
+| 成功缓存 | 5 分钟；`ttlMs: 0` 表示显式失效前一直有效                                         |
+| 失败冷却 | 5 秒，避免重复消费形成错误风暴                                                    |
+| 超时     | 15 秒                                                                             |
+| 手动重试 | `source.load({ force: true })` 或 `reload()`，绕过 TTL/冷却；正在执行的请求仍共享 |
 
-Store 源的 `getState()` 返回不可变 `{ status, options, error, updatedAt, scope }`。`load()` 拒绝原始错误，状态及共享的 `onError(error, { name, scope })` 同步更新；每次共享失败只通知一次观察者。取消、作用域失效及销毁不会触发 `onError`。
+Store 配置可覆盖 `ttlMs/retryDelayMs/timeoutMs`；专属远程定义可覆盖 TTL。`source.load()` 和 `useDictionary().reload()` 失败拒绝；详情组的 `reload()` 与 `preload()` 返回 `allSettled`。
 
-| Store 策略   | 默认值                                            |
-| ------------ | ------------------------------------------------- |
-| 成功 TTL     | 5 分钟；`ttlMs: 0` 表示显式失效前一直有效         |
-| 失败冷却     | 5 秒，避免重复请求造成错误风暴                    |
-| 单次加载超时 | 15 秒                                             |
-| 手动重试     | `force: true` 绕过 TTL/冷却，正在执行的请求仍共享 |
+## 四、身份切换、维护与性能边界
 
-可通过 Store 的 `ttlMs/retryDelayMs/timeoutMs` 调整，单个远程定义可覆盖 TTL。`source.load()`、`useDictionary().reload()` 的失败需要调用者处理；`useDictionaryLabels().reload()` 与 `store.preload()` 返回 `allSettled` 结果。
+- **身份变化**：应用调用 `setScope(scope)`；scope 包含影响结果的用户/租户/公司/语言，不含令牌。同步清空旧远程快照、取消旧请求并阻止迟到回填；静态枚举不重新加载。是否允许退出后的请求由应用认证层及 loader 决定。
+- **字典维护成功**：调用 `invalidate("user_status")`。活跃订阅源重载，未使用源继续惰性；没有名称时失效本 Store 的所有远程源。
+- **销毁**：应用卸载销毁应用 Store，页面卸载只销毁局部 Store。一个消费者取消不影响其他消费者的共享加载；销毁后不再创建新源。
+- **原码**：`0`、`false`、`"0"`、`"001"` 严格区分，不自动数字化；数组逐项翻译。逗号串只有 `source.label(value, { split: "," })` 才拆分，不修改模型。
+- **规模**：适合可整份读取的小字典。客户、物料、组织树的大型实体使用 DataPicker、分页检索或按码批量解析。按类型接口优先，不为每个原码重复拉全目录，也不再叠一套全目录缓存。
+- **旧接入**：显式注册表继续有效，无统一 loader 时未知名称返回 `undefined`。轻量 `getOptions/load/subscribe/getState` 源仍可接入；标准 Store 还提供稳定快照与 O(1) 标签索引。
 
-## 身份切换与生命周期
+## 五、API 速查
 
-```ts
-dictionaries.setScope(nextScope);
-dictionaries.invalidate("order-status");
-```
+| 入口/API                                                         | 用途                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| 根入口 `createDictionaryStore(loader, options?)`                 | 应用统一远程接口                                             |
+| 根入口 `createDictionaryStore(definitions, options?)`            | 静态/专属源；`options.load` 处理其余名称                     |
+| 根入口 `createDictionaryProvider(...providers)`                  | 按顺序组合只读来源                                           |
+| 根入口 `defineEnum(options)`                                     | 校验、复制、冻结可复用静态枚举                               |
+| Store `getDictionary(name)`                                      | 取稳定源，不发请求；无统一 loader 的未知名称返回 `undefined` |
+| Store `preload(names?)`                                          | 去重预热，返回 `allSettled`                                  |
+| Store `setScope / invalidate / destroy`                          | 身份隔离、失效、销毁                                         |
+| 源 `getOptions / get / label`                                    | 当前选项与同步翻译                                           |
+| 源 `load / getState / subscribe`                                 | 加载、不可变状态与订阅清理                                   |
+| `/vue` `useDictionaryLabels(provider, record, fields, options?)` | 详情字段标签与组加载状态                                     |
+| `/vue` `useDictionary(source, options?)`                         | 单源状态与重试                                               |
+| `/vue` `useDictionaryRefresh(sources, refresh)`                  | 选项快照变化后合并刷新                                       |
 
-`scope` 是应用生成的字符串，应包含影响字典结果的用户、租户、公司或语言，不放令牌。切换时同步清空旧远程快照、取消旧请求并阻止迟到回填；静态枚举不重新请求。
+`useDictLabels`、`useAppDictionaries`、`setupDictionaries` 属于 RobotAdmin 应用，不是本包导出。`createDictionaryColumn` 属于 MachTable 的 `/business` 入口，NUI 的 Provider key 属于其 `/config` 入口。
 
-`invalidate(name?)` 清除选定远程源的快照，活跃订阅源重新加载；未使用源保持惰性。字典维护在服务端成功且会话仍有效后调用它。页面自有 Store 由页面同步业务 scope 并在卸载时销毁，应用共享 Store 由应用所有者销毁。
-
-一个消费者取消只结束自己的等待，不影响其他消费者共享请求。Vue 作用域卸载自动退订；手写订阅用返回的函数清理。退出登录后是否允许远程调用，由应用认证层及 loader 决定。
-
-## API 速查
-
-### Store 与只读 Provider
-
-| API                                            | 用途                                               |
-| ---------------------------------------------- | -------------------------------------------------- |
-| `createDictionaryStore(loader, options?)`      | 应用统一接口，远程名称按原码惰性取源               |
-| `createDictionaryStore(definitions, options?)` | 显式枚举或专属源；`options.load` 处理其余名称      |
-| `createDictionaryProvider(...providers)`       | 按顺序组合只读来源                                 |
-| `defineEnum(options)`                          | 校验、复制并冻结可复用枚举                         |
-| `store.getDictionary(name)`                    | 返回稳定源；无统一 loader 的未知名称为 `undefined` |
-| `store.preload(names?)`                        | 显式预加载并返回 `allSettled` 结果                 |
-| `store.setScope(scope)` / `invalidate(name?)`  | 身份切换及数据失效                                 |
-| `store.destroy()`                              | 清理本实例及等待；后续加载拒绝                     |
-
-### 源与 Vue
-
-| API                                                      | 用途                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------- |
-| `source.getOptions()`                                    | 当前只读选项                                               |
-| `source.get(code)`                                       | O(1) 查找，未知返回 `undefined`                            |
-| `source.label(value, options?)`                          | 同步翻译；适合脚本、提示与导出准备                         |
-| `source.load({ signal?, force? }?)`                      | 加载或复用请求；失败拒绝                                   |
-| `source.getState()` / `subscribe(listener)`              | 获取状态、订阅及清理                                       |
-| `useDictionaryLabels(provider, model, fields, options?)` | 字段组的 `labels/loading/error/reload`                     |
-| `useDictionary(source, options?)`                        | 单个源的 `state/status/options/loading/error/reload/label` |
-| `useDictionaryRefresh(sources, refresh)`                 | 按选项快照合并表格刷新                                     |
-
-字段绑定用于详情，表格保持各自的同步列策略。需要一次性同步翻译时，显式加载后读取 `source.label(record.status)`；页面优先使用字段绑定，避免逐字段获取 Source。
-
-## 原码与性能边界
-
-- `0`、`false`、`"0"`、`"false"` 和 `"001"` 都是不同编码，不自动数字化或推断类型。
-- 未知值默认回显原码，空值为 `—`；底层 `label()` 可配置 `empty/unknown`。
-- 多选数组逐项翻译；逗号串只有显式设置 `{ split: ',' }` 才拆分，结果保持字符串。`separator` 可改多值连接符。
-- `disabled` 不影响历史标签，只限制控件中的新选择；提交是否合法仍由业务校验判断。
-- 枚举检查重复值、有限数值、字符串标签及 boolean disabled，不递归冻结应用自有 metadata。
-- 标签跟随不可变选项快照及绑定字段变化；不在单元格请求，也不为每个单元格创建订阅。
-- Store 适合可整份读取的小字典。大型实体、树分页、无限远程搜索使用专用组件或按码 API。
-
-## 验证与许可证
-
-本包 `bun run verify` 覆盖类型、并发及生命周期、Vue 消费、ESM/CJS、声明、SSR 和体积。仓库维护流程见[维护指南](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/docs/maintenance.md)。
+维护流程见[仓库指南](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/docs/maintenance.md)。在本包运行 `bun run verify`，覆盖类型、生命周期、Vue 消费、ESM/CJS、SSR 和体积。
 
 [MIT License](../LICENSE) · Robot Packages

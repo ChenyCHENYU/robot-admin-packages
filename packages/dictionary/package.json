@@ -1,6 +1,6 @@
 {
   "name": "@robot-admin/dictionary",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Instance-scoped dictionaries and enums with resilient loading and optional Vue integration",
   "type": "module",
   "keywords": [

@@ -1,5 +1,11 @@
 # @robot-admin/dictionary
 
+## 0.4.1
+
+### Patch Changes
+
+- 按接入路线和实际场景重整 README 与指南，补齐标准数组/业务响应对象适配、Provider 初始化、表单、搜索、C_Table、详情弹窗、MachTable、页面覆盖、静态枚举和脚本用法。明确变量来源、原码与标签、加载错误及重试约定；文档 TypeScript/Vue 示例和链接独立验证，运行时 API 与行为不变。
+
 ## 0.4.0
 
 ### Minor Changes
