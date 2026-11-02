@@ -17,6 +17,7 @@ async function main() {
     useDictLabels,
     useDictionaries,
   } = sdk;
+  assert.equal("DICTIONARY_PROVIDER_KEY" in sdk, false);
   assert.equal(
     vue.version,
     "3.4.0",

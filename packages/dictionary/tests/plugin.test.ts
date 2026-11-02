@@ -19,13 +19,15 @@ import {
 } from "../src";
 import {
   createDictionaryPlugin,
-  DICTIONARY_PROVIDER_KEY,
   useDictionaries,
   useDictLabels,
   useDictionary,
   type DictionaryPlugin,
 } from "../src/vue";
-import { DICTIONARY_STORE_KEY } from "../src/vue-context";
+import {
+  DICTIONARY_PROVIDER_KEY,
+  DICTIONARY_STORE_KEY,
+} from "../src/vue-context";
 
 const installations: Array<{ app: App; plugin: DictionaryPlugin }> = [];
 const consumers: EffectScope[] = [];
@@ -57,6 +59,19 @@ afterEach(() => {
 });
 
 describe("独立字典插件", () => {
+  it("不读取外部按固定字符串提供的桥接 token，命名消费只读取本插件实例", async () => {
+    const app = createSSRApp({ render: () => null });
+    const external = { getDictionary: vi.fn(() => undefined) };
+    app.provide(Symbol.for("@robot-admin/dictionary/provider/v1"), external);
+    const plugin = createDictionaryPlugin({
+      dictionaries: { own: [{ value: 0, label: "本插件" }] },
+    });
+    app.use(plugin);
+    installations.push({ app, plugin });
+    const state = consume(app, () => useDictionary("own"));
+    expect(state.label(0)).toBe("本插件");
+    expect(external.getDictionary).not.toHaveBeenCalled();
+  });
   it("scope getter 重入安装内层插件时，外层回滚且不覆盖或销毁内层", () => {
     const app = createSSRApp({ render: () => null });
     const inner = createDictionaryPlugin({
@@ -151,7 +166,8 @@ describe("独立字典插件", () => {
       original.call(this, key, value);
       if (key === DICTIONARY_PROVIDER_KEY && !replaced) {
         replaced = true;
-        const clear = (target: symbol) => original.call(this, target, undefined);
+        const clear = (target: symbol) =>
+          original.call(this, target, undefined);
         clear(DICTIONARY_STORE_KEY);
         clear(DICTIONARY_PROVIDER_KEY);
         app.use(inner);
@@ -204,9 +220,7 @@ describe("独立字典插件", () => {
       setup() {
         model = { account: "1" };
         const state = useDictionary("user_status");
-        const detail = useDictLabels(model, [
-          { prop: "account", dictionary: "user_status" },
-        ] as const);
+        const detail = useDictLabels(model, { account: "user_status" });
         const dictionaries = useDictionaries();
         onServerPrefetch(() => dictionaries.preload(["user_status"]));
         return () =>
@@ -258,7 +272,7 @@ describe("独立字典插件", () => {
     plugin.dispose(a);
   });
 
-  it("名称 ref/getter 跟随切换，页面 Provider 只覆盖读取，不接管应用 Store", async () => {
+  it("名称 ref/getter 跟随切换，显式局部来源不接管应用 Store", async () => {
     const { app, store } = install({
       load: async (code) => [{ value: 0, label: code }],
     });
@@ -275,14 +289,15 @@ describe("独立字典插件", () => {
       first: [{ value: 0, label: "本页" }],
     });
     rawStores.push(local);
-    app.provide(DICTIONARY_PROVIDER_KEY, local);
     const scoped = consume(app, () =>
-      useDictLabels(ref({ value: 0 }), { value: "first" }),
+      useDictLabels(ref({ value: 0 }), { value: "first" }, { provider: local }),
     );
     expect(scoped.labels.value.value).toBe("本页");
     expect(app.runWithContext(useDictionaries)).toBe(store);
     const direct = consume(app, () => useDictionary(code));
-    expect(direct.error.value).not.toBeNull();
+    await direct.reload();
+    expect(direct.error.value).toBeNull();
+    expect(direct.label(0)).toBe("second");
   });
 
   it("停用/换身份取消同源旧等待，不伪装 empty 或闪错误，恢复只发一次", async () => {

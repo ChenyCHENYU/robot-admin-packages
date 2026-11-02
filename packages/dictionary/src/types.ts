@@ -55,7 +55,7 @@ export interface DictionaryState {
   readonly scope: string;
 }
 
-/** 只读选项源；兼容已有组件 Provider，不要求引入 Store 或请求客户端。 */
+/** 只读选项源；数据订阅与可选加载，不要求特定 Store 或请求客户端。 */
 export interface DictionaryOptionsSource {
   getOptions(): readonly Pick<
     DictionaryOption,
@@ -82,7 +82,7 @@ export interface DictionaryProvider {
   getDictionary(name: string): DictionaryOptionsSource | undefined;
 }
 
-/** 同时兼容 Naive 组件选项源和 MachTable 同步 get() 列策略。 */
+/** 可加载的字典源，包含同步索引和完整状态。 */
 export interface DictionarySource extends DictionaryOptionsSource {
   getOptions(): readonly DictionaryOption[];
   get(key: DictionaryValue): string | undefined;

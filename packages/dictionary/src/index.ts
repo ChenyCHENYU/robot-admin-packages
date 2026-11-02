@@ -7,6 +7,7 @@
 export { createDictionaryStore } from "./store";
 export { defineEnum } from "./values";
 export { createDictionaryProvider } from "./provider";
+export { createDictionaryParser } from "./parser";
 export type {
   DictionaryValue,
   DictionaryOption,

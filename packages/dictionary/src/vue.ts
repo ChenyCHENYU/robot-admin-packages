@@ -33,51 +33,23 @@ export interface DictionaryUseOptions {
   enabled?: MaybeRefOrGetter<boolean>;
 }
 
-/** 接受现有表单/搜索 prop、表格 key/field，不引入任何 UI 类型。 */
-export interface DictionaryLabelField {
-  readonly prop?: string;
-  readonly key?: string;
-  readonly field?: string;
-  readonly dictionary?: string | DictionaryOptionsSource;
-}
+/** 记录字段到字典名称/数据源的映射，与任何组件字段结构无关。 */
 export type DictionaryLabelFields<
   TModel extends object,
   TName extends string = string,
-> =
-  | Readonly<
-      Partial<
-        Record<Extract<keyof TModel, string>, TName | DictionaryOptionsSource>
-      >
-    >
-  | readonly DictionaryLabelField[];
-type FieldKey<T> = T extends { prop: infer P extends string }
-  ? P
-  : T extends { key: infer P extends string }
-    ? P
-    : T extends { field: infer P extends string }
-      ? P
-      : never;
-type RequiredLabels<T> = T extends {
-  dictionary: string | DictionaryOptionsSource;
-}
-  ? FieldKey<T>
-  : never;
-type PossibleLabels<T> = T extends unknown
-  ? "dictionary" extends keyof T
-    ? FieldKey<T>
-    : never
-  : never;
-export type DictionaryLabels<TFields> =
-  TFields extends readonly DictionaryLabelField[]
-    ? Readonly<
-        Record<RequiredLabels<TFields[number]>, string> &
-          Partial<Record<PossibleLabels<TFields[number]>, string>>
-      >
-    : Readonly<Record<Extract<keyof TFields, string>, string>>;
-export type DictionaryFieldInput<TModel, TFields> =
-  TFields extends readonly DictionaryLabelField[]
-    ? TFields
-    : TFields & Record<Exclude<keyof TFields, keyof TModel>, never>;
+> = Readonly<
+  Partial<
+    Record<Extract<keyof TModel, string>, TName | DictionaryOptionsSource>
+  >
+>;
+export type DictionaryLabels<TFields> = Readonly<
+  Record<Extract<keyof TFields, string>, string>
+>;
+export type DictionaryFieldInput<TModel, TFields> = TFields &
+  Record<Exclude<keyof TFields, keyof TModel>, never> & {
+    /** 映射不是序列；可选标记保留普通 interface 的结构兼容性。 */
+    readonly [Symbol.iterator]?: never;
+  };
 type ProviderNames<T> = T extends DictionaryStore<infer TName> ? TName : string;
 
 function readState(
@@ -328,7 +300,7 @@ export function useDictionary(
   };
 }
 
-/** 插件接入后的详情简写；使用最近 Provider，显式 provider 仍可覆盖同层来源。 */
+/** 插件接入后的详情简写；默认读取本插件实例，可显式指定局部数据来源。 */
 export function useDictLabels<
   TModel extends object,
   const TFields extends DictionaryLabelFields<NoInfer<TModel>>,
@@ -347,7 +319,7 @@ export function useDictLabels<
   );
 }
 
-export { DICTIONARY_PROVIDER_KEY, useDictionaries } from "./vue-context";
+export { useDictionaries } from "./vue-context";
 export {
   createDictionaryPlugin,
   type DictionaryPluginConfig,
@@ -356,13 +328,17 @@ export {
 
 type LabelBinding = string | DictionaryOptionsSource;
 
-/** 配置只解析一次；冲突不猜测优先级，保留错误并隔离有问题的字段。 */
-function labelEntries(fields: object | readonly DictionaryLabelField[]) {
+/** 映射只解析一次；无效源保留局部错误，不触发该字段的加载。 */
+function labelEntries(fields: object) {
   const entries = new Map<string, LabelBinding>();
-  const conflicts = new Set<string>();
   let error: unknown = null;
+  if (!fields || typeof fields !== "object" || Array.isArray(fields))
+    return {
+      entries: [] as [string, LabelBinding][],
+      error: new TypeError("[dictionary] fields 必须是字段到字典的映射对象。"),
+    };
   const add = (field: string, binding: unknown) => {
-    if (binding === undefined || conflicts.has(field)) return;
+    if (binding === undefined) return;
     if (
       typeof binding !== "string" &&
       (!binding || typeof binding !== "object" || !("getOptions" in binding))
@@ -370,39 +346,13 @@ function labelEntries(fields: object | readonly DictionaryLabelField[]) {
       error ??= new TypeError(`[dictionary] 字段 ${field} 缺少有效字典源`);
       return;
     }
-    if (entries.has(field) && entries.get(field) !== binding) {
-      error ??= new Error(`[dictionary] 字段 ${field} 存在冲突的字典配置`);
-      conflicts.add(field);
-      entries.delete(field);
-      return;
-    }
     entries.set(field, binding as LabelBinding);
   };
-  if (Array.isArray(fields)) {
-    for (const item of fields) {
-      if (item.dictionary === undefined) continue;
-      const keys = [
-        ...new Set(
-          [item.prop, item.key, item.field].filter(
-            (key): key is string => typeof key === "string",
-          ),
-        ),
-      ];
-      if (keys.length !== 1 || !keys[0]) {
-        error ??= new Error(
-          "[dictionary] 字典字段必须有唯一的 prop、key 或 field",
-        );
-        continue;
-      }
-      add(keys[0], item.dictionary);
-    }
-  } else {
-    for (const [field, binding] of Object.entries(fields)) add(field, binding);
-  }
+  for (const [field, binding] of Object.entries(fields)) add(field, binding);
   return { entries: [...entries], error };
 }
 
-/** 绑定记录与字段配置；未取得记录或被禁用时不解析、订阅、加载远程源。 */
+/** 绑定记录与字段映射；未取得记录或被禁用时不解析、订阅、加载远程源。 */
 export function useDictionaryLabels<
   TModel extends object,
   TProvider extends DictionaryProvider,

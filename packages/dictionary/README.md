@@ -3,8 +3,8 @@
 ![Robot Dictionary](./docs/assets/banner.png)
 
 <div align="center">
-  <p><strong>接口接入一次，字段直接声明字典码。</strong></p>
-  <p>静态枚举 · 远程字典 · 字段配置复用 · 按需加载 · 作用域隔离</p>
+  <p><strong>一次接入，任意页面直接取字典。</strong></p>
+  <p>静态枚举 · 远程字典 · 独立插件 · 按需加载 · 作用域隔离</p>
   <p>
     <a href="https://www.npmjs.com/package/@robot-admin/dictionary"><img src="https://img.shields.io/npm/v/@robot-admin/dictionary?style=flat-square&amp;color=F2A990&amp;labelColor=202A3B" alt="npm version"></a>
     <a href="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml"><img src="https://github.com/ChenyCHENYU/robot-admin-packages/actions/workflows/ci.yml/badge.svg" alt="Workspace quality gate"></a>
@@ -20,31 +20,29 @@
 
 ## 项目定位
 
-**Robot Dictionary** 统一字典选项、加载状态和字段翻译。业务模型保存原始编码，表单、搜索、详情和表格共用同一份来源。
+**Robot Dictionary** 管理静态枚举、远程字典、加载状态和原码翻译。接口接入项目后，页面直接取选项或标签。
 
-当前仓库版本 **0.5.0**。根入口无框架、UI 或请求库依赖；Vue 能力通过 `/vue` 按需使用。
+当前仓库版本 **0.6.0**。根入口无框架、UI 或请求库依赖；Vue 插件和 hooks 通过 `/vue` 按需使用。
+
+SDK 不导入、不识别任何组件库的字段或注入协议。项目把普通 `options/loading` 和标签函数绑定到现有控件，组件包无需接入字典 SDK。
 
 ## 插件化接入
 
-Vue 项目只使用本包的 `/vue` 入口。接口、枚举与默认策略集中在一个可选配置文件；字典插件不依赖任何 UI 组件库。
-
 ```bash
 bun add @robot-admin/dictionary
-# Vue 适配需要项目已有 vue >= 3.4
+# Vue 入口需要项目已有 vue >= 3.4；纯 TypeScript 使用根入口
 ```
 
-**1. 配置一次**，放在项目已有的配置目录：
+**1. 配置一次**，只覆盖需要调整的默认项：
 
 ```ts
 // src/config/dictionary.ts
 import { getDictionaryOptionsApi } from "../api/dictionary";
 
-export default {
-  load: getDictionaryOptionsApi,
-};
+export default { load: getDictionaryOptionsApi };
 ```
 
-`getDictionaryOptionsApi(code, { signal, scope })` 返回 `{ value, label, disabled? }[]`。接口响应解包只适配一次，见[接口接入](./docs/guide.md#一插件与配置接入一次)。默认缓存 5 分钟、失败冷却 5 秒、超时 15 秒，配置文件只写需要覆盖的项。
+`getDictionaryOptionsApi(code, { signal, scope })` 返回 `{ value, label, disabled? }[]`。标准数组和业务响应的适配见[接口指南](./docs/guide.md#二接口适配一次)。普通远程字典按原码加载，不逐项注册。
 
 **2. 安装插件**，`app` 是项目已创建的 Vue 应用：
 
@@ -55,64 +53,70 @@ import dictionaryConfig from "./config/dictionary";
 app.use(createDictionaryPlugin(dictionaryConfig));
 ```
 
-插件按应用创建实例，负责配置、注入、响应式作用域与卸载。创建插件和声明字段都不请求接口，消费时才加载。仅使用静态枚举时可不配置 `load`；新项目不需要引入 NUI、MachTable 或它们的注入 key。
+插件按应用管理实例、响应式身份和卸载；安装不请求，消费时才加载。仅用静态枚举时不必提供 `load`，也可无配置安装 `createDictionaryPlugin()`。
 
-## 独立 Vue 页面
+## 页面怎么用
 
-原生控件或任意 UI 框架都能直接取字典：
+下拉、搜索或任意自定义控件，只取同一份字典数据：
 
 ```ts
 import { useDictionary } from "@robot-admin/dictionary/vue";
 
-const { options, loading, error, reload, label } = useDictionary("user_status");
+const status = useDictionary("order_status");
+// status.options / loading / error / reload / label
 ```
 
-详情复用已有记录 `user` 和字段 `fields`，`fields` 中已有 `dictionary` 声明：
+项目将 `status.options.value` 绑定控件已有的选项属性，将 `status.label(value)` 用于详情、列表或提示。SDK 不安装组件渲染器，不改变组件字段定义。
+
+详情使用普通记录映射：
 
 ```ts
+import { ref } from "vue";
 import { useDictLabels } from "@robot-admin/dictionary/vue";
 
-const { labels } = useDictLabels(user, fields);
+const order = ref({ status: 0 });
+const { labels } = useDictLabels(order, { status: "order_status" });
 ```
 
 ```vue
-<span>{{ labels.account }}</span>
+<span>{{ labels.status }}</span>
 ```
-
-RobotAdmin 已安装插件，并自动导入 `useDictLabels`；页面无需再写这个 import。以上 hooks 均由字典包提供，完整变量与模板见[场景指南](./docs/guide.md#二接入后按场景使用)。
 
 ## 按场景使用
 
-| 场景                         | 使用方式                                               | 完整示例                                                       |
-| ---------------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
-| 独立 Vue                     | `useDictionary("user_status")`，直接绑定原生或任意下拉 | [通用读法](./docs/guide.md#独立-vue原生或其他组件库)           |
-| 表单下拉                     | `prop/type/dictionary`，提交仍为原码                   | [表单](./docs/guide.md#场景一表单下拉)                         |
-| 搜索条件                     | `prop/type/dictionary`，搜索传原码                     | [搜索](./docs/guide.md#场景二搜索条件)                         |
-| C_Table                      | `key/title/dictionary`，异步自动更新标签               | [C_Table](./docs/guide.md#场景三c_table-列表)                  |
-| 详情、弹窗                   | 复用字段，读取 `labels.field`；按可见状态启用          | [详情](./docs/guide.md#场景四详情和弹窗)                       |
-| MachTable                    | 公共字典列策略，异步合并刷新                           | [MachTable](./docs/guide.md#场景五machtable)                   |
-| 静态枚举、专属接口、页面覆盖 | 只声明确有差异的名称                                   | [覆盖与枚举](./docs/guide.md#场景六静态枚举专属接口和页面覆盖) |
-| 提示、脚本、导出前准备       | 显式加载，再同步 `source.label(value)`                 | [脚本翻译](./docs/guide.md#场景七脚本提示和导出前准备)         |
+| 场景               | SDK 提供什么                     | 项目负责什么                           |
+| ------------------ | -------------------------------- | -------------------------------------- |
+| 下拉、搜索         | `options/loading/error/reload`   | 绑定当前控件的普通 props，查询仍传原码 |
+| 详情、弹窗         | `useDictLabels(record, mapping)` | 展示 `labels.status`，按可见状态启用   |
+| 列表、网格         | 同步 `label(value)`              | 普通 formatter、筛选、编辑与导出配置   |
+| 静态枚举、专属接口 | 配置中的 `dictionaries`          | 只声明确有差异的字典                   |
+| 脚本、服务端       | 无框架 Store 和同步翻译          | 显式加载、错误反馈与销毁               |
 
-Naive UI Components ≥0.26 的表单、搜索与 C_Table 自动消费插件公开协议；MachTable 复用同一个 Store。**枚举翻译与状态配色分别配置**，普通字典不会自动全部变成彩色状态标签。
+完整变量和模板见[接入与场景指南](./docs/guide.md)。真实项目组合方式见 [RobotAdmin 用法](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/docs/dictionaries.md)。
 
-## 默认行为与边界
+## 默认行为
 
-- 成功空字典和加载失败分别处理；失败保留同作用域旧标签，并提供局部错误和重试。见[空与失败](./docs/guide.md#三空失败与重试)。
-- 默认成功缓存 5 分钟、失败冷却 5 秒、超时 15 秒；同码请求合并，不在单元格内请求或订阅。
-- `0`、`false`、`"0"` 和 `"001"` 严格区分；未知值保留原码，翻译不回写模型。
-- 多选数组逐项翻译；停用项保留历史标签。身份切换、失效和销毁见[生命周期](./docs/guide.md#四身份切换维护与性能边界)。
-- 适合可整份读取的小字典；大型客户、物料、组织树使用分页检索或按码批量查询。
+- 成功缓存 5 分钟、失败冷却 5 秒、请求超时 15 秒；同码请求合并。
+- 成功空字典与加载失败区分，失败保留同身份旧标签；错误由项目局部呈现和重试。
+- `0`、`false`、`"0"`、`"001"` 严格区分；未知值保留原码，翻译不改模型。
+- 未消费不请求；暂停保持 `idle`，身份切换取消旧请求并阻止迟到回填。
+- 适合可整份读取的小字典；大型客户、物料等使用分页检索或批量解析。
+
+## 从 0.5 升级
+
+插件安装和通用 loader 不变。新版移除跨包自动联动与公开注入 key：
+
+- `useDictLabels` 只接受普通字段映射，不再识别 UI 字段数组。
+- 表单、搜索、表格由项目显式绑定普通选项与 formatter，不要求组件包提供字典协议。
+- 原有自动接入需要迁移项目组合代码，不能只升级版本而保留旧字段声明。
+
+迁移步骤见[升级说明](./docs/guide.md#升级说明)。
 
 ## 文档与维护
 
-| 文档                                                                                             | 内容                                     |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| [完整指南](./docs/guide.md)                                                                      | 接入步骤、七类使用场景、错误恢复与 API   |
-| [RobotAdmin 项目用法](https://github.com/ChenyCHENYU/Robot_Admin/blob/main/docs/dictionaries.md) | 已接入项目直接怎么写、配置位置与体验入口 |
-| [变更记录](./CHANGELOG.md)                                                                       | 版本变化与兼容性                         |
+[完整指南](./docs/guide.md) · [变更记录](./CHANGELOG.md) · [维护指南](../../docs/maintenance.md)
 
-在本包目录运行 `bun run verify`；工作区完整门禁使用根目录同名命令。`bun run check:vue-min` 单独冷安装声明的最低 Vue 版本验证兼容性，不改变工作区依赖。
+本包和工作区根目录均可运行 `bun run verify`。`bun run check:vue-min` 独立冷安装声明的最低 Vue 版本，不改变工作区依赖。
 
 ## 许可证
 

@@ -1,14 +1,14 @@
-/** 字典自己的 Vue 注入协议；key 可跨重复打包边界共享，不保存全局实例。 */
+/** 本包私有的应用注入；外部项目通过插件与 hooks 使用，不暴露跨包 token。 */
 import { hasInjectionContext, inject, type InjectionKey } from "vue";
 import type { DictionaryProvider, DictionaryStore } from "./types";
 
 export const DICTIONARY_PROVIDER_KEY = Symbol.for(
-  "@robot-admin/dictionary/provider/v1",
+  "@robot-admin/dictionary/internal/provider",
 ) as InjectionKey<DictionaryProvider>;
 
 /** 应用 Store 与页面只读 Provider 分开：局部覆盖不接管应用的销毁/身份。 */
 export const DICTIONARY_STORE_KEY = Symbol.for(
-  "@robot-admin/dictionary/store/v1",
+  "@robot-admin/dictionary/internal/store",
 ) as InjectionKey<DictionaryStore>;
 
 export function readDictionaryProvider(): DictionaryProvider | undefined {

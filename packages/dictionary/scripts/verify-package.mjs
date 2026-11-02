@@ -9,7 +9,12 @@ import { renderToString } from "vue/server-renderer";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const expected = {
-  index: ["createDictionaryStore", "createDictionaryProvider", "defineEnum"],
+  index: [
+    "createDictionaryStore",
+    "createDictionaryProvider",
+    "createDictionaryParser",
+    "defineEnum",
+  ],
   vue: [
     "useDictionary",
     "useDictionaryLabels",
@@ -46,8 +51,10 @@ for (const [entry, names] of Object.entries(expected)) {
       if (typeof api[name] !== "function")
         throw new Error(`${entry}.${extension} 缺少 ${name}`);
     }
+    if ("DICTIONARY_PROVIDER_KEY" in api || "DICTIONARY_STORE_KEY" in api)
+      throw new Error(`${entry}.${extension} 暴露了私有插件注入 key`);
     if (
-      /\b(?:from\s+|require\()["'](?:@robot-admin\/naive-ui-components|@agile-team\/mach-table|naive-ui|pinia|axios)(?:\/[^"']*)?["']/.test(
+      /\b(?:from\s+|require\()["'](?:@robot-admin\/naive-ui-components|@agile-team\/mach-table(?:-[\w-]+)?|naive-ui|pinia|axios)(?:\/[^"']*)?["']/.test(
         await sources(file),
       )
     )
@@ -63,6 +70,16 @@ for (const [entry, names] of Object.entries(expected)) {
       }
       if (gzipSync(source).byteLength > 8 * 1024)
         throw new Error("纯内核 gzip 超过 8 KiB 预算");
+      const parse = api.createDictionaryParser([
+        { value: 0, label: "零" },
+        { value: false, label: "否" },
+        { value: "001", label: "前导零" },
+      ]);
+      if (
+        JSON.stringify(parse(["零", "否", "001", "未知"])) !==
+        JSON.stringify([0, false, "001", "未知"])
+      )
+        throw new Error(`${entry}.${extension} 标签解析或原码类型不可用`);
       const store = api.createDictionaryStore({
         enabled: api.defineEnum([{ value: false, label: "停用" }]),
       });
@@ -100,7 +117,7 @@ for (const [entry, names] of Object.entries(expected)) {
         api.useDictionaryLabels(
           store,
           model,
-          [{ prop: "enabled", dictionary: "enabled" }],
+          { enabled: "enabled" },
           { enabled: visible },
         ),
       );
@@ -151,6 +168,28 @@ for (const [entry, names] of Object.entries(expected)) {
     ) {
       throw new Error(`${entry}.${extension} 纯内核声明引入了 Vue`);
     }
+  }
+}
+
+// 同一 SDK 的两种导出可以混用；内部 token 不要求外部组件理解或接入。
+{
+  const esm = await import(pathToFileURL(resolve(root, "dist/vue.js")));
+  const cjs = require(resolve(root, "dist/vue.cjs"));
+  const plugin = esm.createDictionaryPlugin({
+    dictionaries: { local: [{ value: false, label: "仅本包" }] },
+  });
+  const app = createSSRApp({
+    setup() {
+      const state = cjs.useDictionary("local");
+      return () => h("span", state.label(false));
+    },
+  });
+  app.use(plugin);
+  try {
+    if ((await renderToString(app)) !== "<span>仅本包</span>")
+      throw new Error("同一 SDK 的 ESM/CJS 私有插件上下文不互通");
+  } finally {
+    plugin.dispose(app);
   }
 }
 

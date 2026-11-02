@@ -1,5 +1,6 @@
 import {
   createDictionaryStore,
+  createDictionaryParser,
   defineEnum,
   type DictionaryDefinition,
   type DictionarySource,
@@ -14,6 +15,7 @@ import {
   useDictLabels,
 } from "../src/vue";
 import { ref } from "vue";
+import * as dictionaryVue from "../src/vue";
 
 const plugin = createDictionaryPlugin({
   enabled: ref(true),
@@ -48,6 +50,20 @@ const store = createDictionaryStore({
   },
 });
 const source: DictionarySource = store.getDictionary("state");
+const parse = createDictionaryParser(() => source.getOptions());
+const parsedInput: unknown = parse("否");
+interface ImportOption {
+  value: number | boolean;
+  label: string;
+}
+const importOptions: readonly ImportOption[] = [{ value: false, label: "否" }];
+createDictionaryParser(importOptions);
+createDictionaryParser([{ value: "retired", label: "历史值", disabled: true }]);
+// @ts-expect-error 解析器同步读取快照，不接受异步 loader。
+createDictionaryParser(async () => []);
+// @ts-expect-error 选项原码须为字符串、数字或布尔值。
+createDictionaryParser([{ value: new Date(), label: "日期" }]);
+void parsedInput;
 const remote = createDictionaryStore(async (name, { signal, scope }) =>
   signal.aborted ? [] : [{ value: scope, label: name }],
 );
@@ -71,7 +87,7 @@ const dynamicStore = createDictionaryStore(
 );
 // @ts-expect-error 动态注册表无法保证任一名称一定存在。
 const unsafeDynamic: DictionarySource = dynamicStore.getDictionary("unknown");
-const formProvider: {
+const optionsReader: {
   getDictionary(name: string):
     | {
         getOptions(): readonly {
@@ -90,7 +106,7 @@ const formProvider: {
       }
     | undefined;
 } = store;
-const machSource: { get(key: string | number): string | undefined } = source;
+const indexReader: { get(key: string | number): string | undefined } = source;
 source.label([false, 0, "001"]);
 const binding = useDictionary(() => maybe, { immediate: false });
 useDictionaryRefresh([source], () => undefined);
@@ -109,14 +125,17 @@ details.labels.value.state = "修改";
 void label;
 const minimalSource: DictionaryOptionsSource = { getOptions: () => [] };
 const reader = { getDictionary: (_name: string) => minimalSource };
-const schema = [
-  { prop: "state", type: "select", dictionary: "state" },
-  { prop: "other", type: "input" },
-] as const;
-const reused = useDictionaryLabels(reader, { state: false, other: 0 }, schema);
+const mapping = { state: "state" } as const;
+const reused = useDictionaryLabels(reader, { state: false, other: 0 }, mapping);
 const reusedLabel: string = reused.labels.value.state;
-// @ts-expect-error 没有字典的字段不声明为已翻译字段。
+// @ts-expect-error 没有绑定的字段不声明为已翻译字段。
 reused.labels.value.other;
+// @ts-expect-error 不识别 UI 组件的字段数组；只接受记录映射。
+useDictionaryLabels(reader, { state: false }, [
+  { prop: "state", dictionary: "state" },
+]);
+// @ts-expect-error 插件的注入 key 是包内私有实现。
+dictionaryVue.DICTIONARY_PROVIDER_KEY;
 // @ts-expect-error 同时有正确字段时也必须拒绝多余字段。
 useDictionaryLabels(store, { state: false }, { state: "state", typo: "state" });
 useDictionaryLabels(
@@ -126,7 +145,7 @@ useDictionaryLabels(
   { enabled: () => true },
 );
 void reusedLabel;
-// 与组件库既有 interface 协议兼容，不要求任意元数据索引签名。
+// 标准选项 interface 不要求任意元数据索引签名。
 interface ExistingOption {
   value: string | number | boolean;
   label: string;
@@ -137,5 +156,5 @@ const existingProvider = {
     getOptions: (): readonly ExistingOption[] => [],
   }),
 };
-useDictionaryLabels(existingProvider, { state: false }, schema);
-void [unsafe, unsafeDynamic, formProvider, machSource, binding];
+useDictionaryLabels(existingProvider, { state: false }, mapping);
+void [unsafe, unsafeDynamic, optionsReader, indexReader, binding];

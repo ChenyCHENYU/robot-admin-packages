@@ -20,16 +20,13 @@ afterEach(() => {
   for (const value of stores.splice(0)) value.destroy();
 });
 
-describe("复用字段配置与延迟加载", () => {
+describe("独立字段映射与延迟加载", () => {
   it("无注册表的远程原码供多个字段共用，关闭不请求，异步完成后同步标签", async () => {
     const load = vi.fn(async (name: string) => [{ value: 0, label: name }]);
     const store = createDictionaryStore(load);
     stores.push(store);
     const enabled = ref(false);
-    const fields = [
-      { prop: "first", dictionary: "backend_code" },
-      { field: "second", dictionary: "backend_code" },
-    ];
+    const fields = { first: "backend_code", second: "backend_code" };
     const details = scope().run(() =>
       useDictionaryLabels(store, { first: 0, second: 0 }, fields, { enabled }),
     )!;
@@ -104,15 +101,14 @@ describe("复用字段配置与延迟加载", () => {
     expect(createDictionaryProvider().getDictionary("state")).toBeUndefined();
   });
 
-  it("直接复用 prop/key/field，忽略非字典字段，直接源可用且不改配置", async () => {
+  it("普通字段映射支持直接源，共享名称只解析一次且不改映射", async () => {
     const source = { getOptions: () => [{ value: 0, label: "零" }] };
     const getDictionary = vi.fn(() => source);
-    const fields = Object.freeze([
-      { prop: "status", dictionary: "state", type: "select" },
-      { key: "previous", dictionary: "state", title: "历史" },
-      { field: "direct", dictionary: source },
-      { prop: "plain", type: "input" },
-    ] as const);
+    const fields = Object.freeze({
+      status: "state",
+      previous: "state",
+      direct: source,
+    } as const);
     const details = scope().run(() =>
       useDictionaryLabels(
         { getDictionary },
@@ -128,7 +124,7 @@ describe("复用字段配置与延迟加载", () => {
     });
     expect(getDictionary).toHaveBeenCalledOnce();
     expect(details.error.value).toBeNull();
-    expect(fields[0].dictionary).toBe("state");
+    expect(fields.status).toBe("state");
   });
 
   it("空记录与关闭状态均不解析/订阅/加载，打开共享缓存，关闭后不因 scope 变化加载", async () => {
@@ -255,24 +251,31 @@ describe("复用字段配置与延迟加载", () => {
     expect(listeners.size).toBe(0);
   });
 
-  it("配置冲突明确报错且不加载该字段，重复相同配置只解析一次", () => {
+  it("不识别组件字段数组，非法映射保持局部错误且不加载", () => {
     const getDictionary = vi.fn(() => ({ getOptions: () => [] }));
-    const details = scope().run(() =>
-      useDictionaryLabels({ getDictionary }, { status: 0 }, [
-        { prop: "status", dictionary: "one" },
-        { key: "status", dictionary: "two" },
-      ]),
+    for (const fields of [
+      [{ prop: "status", dictionary: "state" }],
+      [{ key: "status", dictionary: "state" }],
+      [{ field: "status", dictionary: "state" }],
+      null,
+    ]) {
+      const details = scope().run(() =>
+        useDictionaryLabels(
+          { getDictionary },
+          { status: 0 },
+          fields as unknown as { status: string },
+        ),
+      )!;
+      expect(String(details.error.value)).toContain("映射对象");
+      expect(details.labels.value).toEqual({});
+    }
+    const invalid = scope().run(() =>
+      useDictionaryLabels({ getDictionary }, { status: 0 }, {
+        status: 12,
+      } as unknown as { status: string }),
     )!;
-    expect(String(details.error.value)).toContain("冲突");
+    expect(String(invalid.error.value)).toContain("缺少有效字典源");
     expect(getDictionary).not.toHaveBeenCalled();
-    const duplicate = scope().run(() =>
-      useDictionaryLabels({ getDictionary }, { status: 0 }, [
-        { prop: "status", dictionary: "one" },
-        { key: "status", dictionary: "one" },
-      ]),
-    )!;
-    expect(duplicate.error.value).toBeNull();
-    expect(getDictionary).toHaveBeenCalledOnce();
   });
 
   it("保留嵌套路径与原样带点字段，不读取原型链", () => {
@@ -282,11 +285,11 @@ describe("复用字段配置与延迟加载", () => {
       "raw.key": false,
     });
     const details = scope().run(() =>
-      useDictionaryLabels({ getDictionary: () => source }, model, [
-        { prop: "nested[0].flag", dictionary: "state" },
-        { key: "raw.key", dictionary: "state" },
-        { field: "inherited", dictionary: "state" },
-      ]),
+      useDictionaryLabels({ getDictionary: () => source }, model, {
+        "nested[0].flag": "state",
+        "raw.key": "state",
+        inherited: "state",
+      }),
     )!;
     expect(details.labels.value).toEqual({
       "nested[0].flag": "否",
