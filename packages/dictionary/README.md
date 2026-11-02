@@ -81,6 +81,8 @@ app.provide(DICTIONARY_PROVIDER_KEY, dictionaries);
 app.onUnmount(() => dictionaries.destroy());
 ```
 
+启动示例使用 Vue 3.5+ 的 `app.onUnmount`；Vue 3.4 项目在已有应用卸载流程调用 `dictionaries.destroy()`。SDK 的 `/vue` 入口仍支持 Vue ≥3.4。
+
 接口接收 `(字典码, { signal, scope })`，返回 `{ value, label, disabled? }[]`。创建实例和取源都不发请求，实际消费时才加载；同码共享请求、缓存和状态。接口实现、返回格式及业务响应解包见[接入步骤](./docs/guide.md#一接入只做一次)。
 
 ## 按场景使用

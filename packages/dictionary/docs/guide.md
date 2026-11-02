@@ -92,6 +92,8 @@ app.provide(DICTIONARY_PROVIDER_KEY, dictionaries);
 app.onUnmount(() => dictionaries.destroy());
 ```
 
+此启动示例使用 Vue 3.5+ 的 [app.onUnmount](https://vuejs.org/api/application.html#app-onunmount)。Vue 3.4 项目把 `dictionaries.destroy()` 接入已有应用卸载流程即可，不需要修改每个页面或建立全局 mixin。
+
 创建 Store、声明字段、调用 `getDictionary()` 均不发请求，消费者启用后才加载。同码共用稳定源、缓存和请求。新增远程类型时只写后台字典码，不新增别名、loader 或 `dictionaries.ts`。
 
 **其他 Vue 或纯 TypeScript 项目**：只需要 `createDictionaryStore(getDictionaryOptionsApi)`；用项目现有服务/依赖注入传递实例。Vue 详情使用公开的 `useDictionaryLabels`，纯脚本见场景七，不必为此引入 Naive UI Components。
