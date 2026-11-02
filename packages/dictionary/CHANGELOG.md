@@ -1,5 +1,11 @@
 # @robot-admin/dictionary
 
+## 0.4.0
+
+### Minor Changes
+
+- 增加应用统一远程 loader：`createDictionaryStore(loader)` 直接按字段的后台字典码惰性取源，无需逐项注册或前端别名。混合场景由 `options.load` 处理未显式声明的名称，静态和专属源优先。沿用同一请求合并、缓存、失败恢复与身份隔离机制，晚创建源使用当前作用域，销毁后不再创建。保留原注册表 API，精简 README 并补齐类型、生命周期和发布产物回归。
+
 ## 0.3.1
 
 ### Patch Changes

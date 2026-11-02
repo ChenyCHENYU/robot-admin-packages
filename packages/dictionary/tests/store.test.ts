@@ -154,6 +154,113 @@ describe("枚举与同步翻译", () => {
   });
 });
 
+describe("应用统一远程加载", () => {
+  it("原码直连、按需建源且不发请求，同码同源并共享缓存", async () => {
+    const load = vi.fn(async (name: string) => [{ value: 0, label: name }]);
+    const dictionaries = createDictionaryStore(load);
+    stores.push(dictionaries);
+    expect(await dictionaries.preload()).toEqual([]);
+    const source = dictionaries.getDictionary("order_status")!;
+    expect(source).toBe(dictionaries.getDictionary("order_status"));
+    expect(load).not.toHaveBeenCalled();
+    await Promise.all([source.load(), source.load()]);
+    await source.load();
+    for (let index = 0; index < 1_000; index++) source.label(0);
+    expect(load).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenCalledWith("order_status", {
+      signal: expect.any(AbortSignal),
+      scope: "default",
+    });
+    expect(source.label(0)).toBe("order_status");
+  });
+
+  it("静态和专属 loader 优先，已找到的空值和错误不会转发统一接口", async () => {
+    const load = vi.fn(async (_name: string) => [{ value: 0, label: "远程" }]);
+    const error = new Error("专属接口不可用");
+    const dictionaries = createDictionaryStore(
+      {
+        fixed: [],
+        own: {
+          load: async () => {
+            throw error;
+          },
+        },
+      },
+      { load },
+    );
+    stores.push(dictionaries);
+    const result = await dictionaries.preload(["fixed", "own", "backend"]);
+    expect(result.map((item) => item.status)).toEqual([
+      "fulfilled",
+      "rejected",
+      "fulfilled",
+    ]);
+    expect(load).toHaveBeenCalledOnce();
+    expect(load.mock.calls[0]![0]).toBe("backend");
+    expect(dictionaries.getDictionary("own")!.getState().error).toBe(error);
+  });
+
+  it("显式预热未知原码并去重，不枚举或加载整个后台目录", async () => {
+    const load = vi.fn(async (name: string) => [{ value: name, label: name }]);
+    const dictionaries = createDictionaryStore(load);
+    stores.push(dictionaries);
+    await dictionaries.preload(["first", "first", "second"]);
+    expect(load.mock.calls.map(([name]) => name)).toEqual(["first", "second"]);
+    await dictionaries.preload();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("晚创建的源使用当前身份，已创建源的旧响应不能跨身份回填", async () => {
+    const { load, requests } = controlled();
+    const dictionaries = createDictionaryStore((_name, context) =>
+      load(context),
+    );
+    stores.push(dictionaries);
+    dictionaries.setScope("公司甲");
+    const first = dictionaries.getDictionary("first")!;
+    expect(first.getState().scope).toBe("公司甲");
+    const pending = first.load();
+    const rejected = expect(pending).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    await tick();
+    dictionaries.setScope("公司乙");
+    await rejected;
+    const second = dictionaries.getDictionary("second")!;
+    await tick();
+    const next = second.load();
+    await tick();
+    expect(requests[0]!.signal.aborted).toBe(true);
+    expect(requests[1]!.scope).toBe("公司乙");
+    requests[0]!.resolve([{ value: 0, label: "旧身份" }]);
+    requests[1]!.resolve([{ value: 0, label: "新身份" }]);
+    await next;
+    expect(first.get(0)).toBeUndefined();
+    expect(second.get(0)).toBe("新身份");
+  });
+
+  it("销毁或空名称不创建新源，格式异常不冒充空字典且仍可局部重试", async () => {
+    const load = vi.fn().mockResolvedValueOnce(null).mockResolvedValue([]);
+    const dictionaries = createDictionaryStore(load);
+    stores.push(dictionaries);
+    expect(dictionaries.getDictionary("")).toBeUndefined();
+    expect(dictionaries.getDictionary("  ")).toBeUndefined();
+    const source = dictionaries.getDictionary("backend")!;
+    await expect(source.load()).rejects.toThrow();
+    expect(source.getState().status).toBe("error");
+    await source.load({ force: true });
+    expect(source.getState().status).toBe("empty");
+    dictionaries.destroy();
+    expect(dictionaries.getDictionary("new")).toBeUndefined();
+    await expect(source.load()).rejects.toThrow("销毁");
+  });
+
+  it("错误配置及时报告，未启用统一 loader 的既有缺名行为保持不变", () => {
+    expect(() => store({}, { load: false } as never)).toThrow("load");
+    expect(store({ fixed: [] }).getDictionary("unknown")).toBeUndefined();
+  });
+});
+
 describe("共享请求、状态和恢复", () => {
   it("普通与 force 等待共享同一请求，先提交完整状态再通知", async () => {
     const { load, requests } = controlled();

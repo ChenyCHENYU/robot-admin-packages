@@ -61,6 +61,17 @@ for (const [entry, names] of Object.entries(expected)) {
       if (store.getDictionary("enabled").label(false) !== "停用")
         throw new Error("SSR 纯内核不可用");
       store.destroy();
+      let calls = 0;
+      const remote = api.createDictionaryStore(async (name) => {
+        calls++;
+        return [{ value: "0", label: name }];
+      });
+      const dynamic = remote.getDictionary("backend_code");
+      if (calls !== 0) throw new Error("按需取源不应发请求");
+      await Promise.all([dynamic.load(), dynamic.load()]);
+      if (calls !== 1 || dynamic.label("0") !== "backend_code")
+        throw new Error(`${entry}.${extension} 统一原码加载或请求合并不可用`);
+      remote.destroy();
     } else {
       const { createDictionaryStore } = await import(
         pathToFileURL(resolve(root, "dist/index.js"))

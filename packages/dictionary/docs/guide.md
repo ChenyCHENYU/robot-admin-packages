@@ -19,53 +19,63 @@
 
 ## 应用配置
 
-静态字典直接写选项数组，不需要额外包装：
+远程字典在现有应用入口接一次接口。函数本身就是加载器，不需要单独的注册文件或逐项映射：
 
 ```ts
 import { createDictionaryStore } from "@robot-admin/dictionary";
+import { getDictionaryOptionsApi } from "./api";
 
-export function createAppDictionaries() {
-  return createDictionaryStore({
+export const dictionaries = createDictionaryStore(getDictionaryOptionsApi);
+```
+
+静态枚举或专属接口按需声明，未声明名称自动使用统一接口：
+
+```ts
+const dictionaries = createDictionaryStore(
+  {
     "order-status": [
       { value: 0, label: "待下达" },
       { value: 1, label: "执行中" },
       { value: 2, label: "已完成" },
     ],
-  });
-}
-
-export const dictionaries = createAppDictionaries(); // 单个浏览器应用的实例
+  },
+  { load: getDictionaryOptionsApi },
+);
 ```
 
-应用持有这个实例，页面共用；应用卸载时调用 `destroy()`，不要在某个页面卸载时销毁共享实例。SSR 在每个请求内调用工厂，避免跨用户共享缓存。
+应用持有这个实例并提供给所有消费者；应用卸载时调用 `destroy()`，不要在某个页面卸载时销毁共享实例。SSR 每个请求单独创建，避免跨用户共享缓存。没有统一加载器的既有注册表写法继续有效，未知名称仍返回 `undefined`。
 
 `defineEnum(options)` 适合需要独立导出、复用的静态枚举常量；它校验并复制冻结选项。仅向 Store 注册时，直接使用数组即可。
 
 ## 远程字典接入
 
-把注册处的选项数组替换成 `load`，页面的 `dictionary` 名称继续使用：
+在应用 API 层实现一个通用函数，参数中的字典码就是字段声明的 `dictionary`：
 
 ```ts
 import {
-  createDictionaryStore,
+  type DictionaryLoadContext,
   type DictionaryOption,
 } from "@robot-admin/dictionary";
 
 // 示例接口直接返回标准选项数组；真实项目可复用自己的 API 函数。
-async function getOrderStatusOptions(
-  signal: AbortSignal,
+export async function getDictionaryOptionsApi(
+  code: string,
+  { signal }: DictionaryLoadContext,
 ): Promise<readonly DictionaryOption[]> {
-  const response = await fetch("/api/dictionaries/order-status", { signal });
+  const response = await fetch(
+    `/api/dictionaries/${encodeURIComponent(code)}`,
+    { signal },
+  );
   if (!response.ok) throw new Error("订单状态暂时不可用，请重试");
   return response.json();
 }
-
-export const dictionaries = createDictionaryStore({
-  "order-status": { load: ({ signal }) => getOrderStatusOptions(signal) },
-});
 ```
 
 Loader 返回 `{ value, label, disabled? }[]`。接口若使用 `{ code, data, message }`、树形结构或不同字段名，在应用 API 层统一检查业务状态、解包和映射一次。Store 仍会校验返回的选项，非法格式进入错误状态。
+
+`getDictionary(name)` 按需建立稳定源，但不发请求；真正消费时才加载。同码共用一份快照和请求，沿用 TTL、失败冷却、超时与作用域隔离。显式静态/专属定义优先，合法空字典和加载失败均不换源。名称按原码传递，不自动改大小写、连接符或编码类型。
+
+`preload(["order_status"])` 可以显式预热未出现过的原码；不传名称时只处理已建立的源，不枚举后台目录。销毁后不再创建新源。统一远程来源适合作为应用兜底；页面只覆盖少数名称时保留显式定义，避免抢占应用来源。
 
 有全局错误提示的请求客户端应为字典消费启用 `silent: true`，把错误交给使用位置展示和重试；认证恢复继续遵循应用请求层。不要使用 `catch(() => [])`，否则会把接口故障伪装成合法空字典。
 
@@ -73,11 +83,11 @@ Loader 同时收到 `{ signal, scope }`。`scope` 由应用定义；需要租户
 
 ## 表单搜索与 C_Table
 
-Naive UI Components 通过现有 Provider 取字典。在应用初始化时注册一次：
+Naive UI Components 通过现有 Provider 取字典。在应用初始化时注册一次；下例 `./app` 代表已有启动模块，不要求创建新文件：
 
 ```ts
 import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
-import { dictionaries } from "./dictionaries";
+import { dictionaries } from "./app";
 
 app.provide(DICTIONARY_PROVIDER_KEY, dictionaries); // app 为已有的 Vue 应用实例
 ```
@@ -111,7 +121,7 @@ NUI 控件管理加载、错误和局部重试。普通枚举保持文字显示�
 
 ```ts
 import { useDictionaryLabels } from "@robot-admin/dictionary/vue";
-import { dictionaries } from "./dictionaries";
+import { dictionaries } from "./app";
 
 const { labels } = useDictionaryLabels(dictionaries, order, fields);
 ```
@@ -182,14 +192,15 @@ import {
   useDictionary,
   useDictionaryRefresh,
 } from "@robot-admin/dictionary/vue";
-import { dictionaries } from "./dictionaries";
+import { dictionaries } from "./app";
 
 interface Order {
   id: string;
   status: number;
 }
 const table = useMachTable<Order>();
-const source = dictionaries.getDictionary("order-status");
+const source = dictionaries.getDictionary("order_status");
+if (!source) throw new Error("字典实例不可用");
 const state = useDictionary(source);
 const columns = defineVueColumns<Order>([
   {
@@ -245,15 +256,16 @@ dictionaries.invalidate("order-status");
 
 ### Store 与只读 Provider
 
-| API                                            | 用途                                             |
-| ---------------------------------------------- | ------------------------------------------------ |
-| `createDictionaryStore(definitions, options?)` | 创建独立实例，支持选项数组与远程 loader          |
-| `createDictionaryProvider(...providers)`       | 按顺序组合只读来源                               |
-| `defineEnum(options)`                          | 校验、复制并冻结可复用枚举                       |
-| `store.getDictionary(name)`                    | 已知名字返回稳定源；动态未知名字返回 `undefined` |
-| `store.preload(names?)`                        | 显式预加载并返回 `allSettled` 结果               |
-| `store.setScope(scope)` / `invalidate(name?)`  | 身份切换及数据失效                               |
-| `store.destroy()`                              | 清理本实例及等待；后续加载拒绝                   |
+| API                                            | 用途                                               |
+| ---------------------------------------------- | -------------------------------------------------- |
+| `createDictionaryStore(loader, options?)`      | 应用统一接口，远程名称按原码惰性取源               |
+| `createDictionaryStore(definitions, options?)` | 显式枚举或专属源；`options.load` 处理其余名称      |
+| `createDictionaryProvider(...providers)`       | 按顺序组合只读来源                                 |
+| `defineEnum(options)`                          | 校验、复制并冻结可复用枚举                         |
+| `store.getDictionary(name)`                    | 返回稳定源；无统一 loader 的未知名称为 `undefined` |
+| `store.preload(names?)`                        | 显式预加载并返回 `allSettled` 结果                 |
+| `store.setScope(scope)` / `invalidate(name?)`  | 身份切换及数据失效                                 |
+| `store.destroy()`                              | 清理本实例及等待；后续加载拒绝                     |
 
 ### 源与 Vue
 

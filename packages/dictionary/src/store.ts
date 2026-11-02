@@ -7,6 +7,7 @@
 import { defineEnum, EMPTY_OPTIONS, formatLabels } from "./values";
 import type {
   DictionaryDefinition,
+  DictionaryLoader,
   DictionaryLoadOptions,
   DictionaryOption,
   DictionaryRemoteDefinition,
@@ -294,12 +295,30 @@ function createSource(
 }
 
 /** 每个应用或 SSR 请求创建自己的 Store；不建立模块级缓存或隐式请求。 */
+export function createDictionaryStore(
+  load: DictionaryLoader,
+  config?: DictionaryStoreOptions,
+): DictionaryStore;
 export function createDictionaryStore<
   T extends Record<string, DictionaryDefinition>,
 >(
   definitions: T,
+  config: DictionaryStoreOptions & { load: DictionaryLoader },
+): DictionaryStore<Extract<keyof T, string>> & DictionaryStore;
+export function createDictionaryStore<
+  T extends Record<string, DictionaryDefinition>,
+>(
+  definitions: T,
+  config?: DictionaryStoreOptions,
+): DictionaryStore<Extract<keyof T, string>>;
+export function createDictionaryStore(
+  input: Record<string, DictionaryDefinition> | DictionaryLoader,
   config: DictionaryStoreOptions = {},
-): DictionaryStore<Extract<keyof T, string>> {
+): DictionaryStore {
+  const definitions = typeof input === "function" ? {} : input;
+  const load = typeof input === "function" ? input : config.load;
+  if (load !== undefined && typeof load !== "function")
+    throw new TypeError("[dictionary] 统一 load 必须是函数。");
   let scope = config.scope ?? "default";
   if (typeof scope !== "string")
     throw new TypeError("[dictionary] scope 必须是字符串。");
@@ -317,11 +336,22 @@ export function createDictionaryStore<
     ]),
   );
   let disposed = false;
+  const getDictionary = (name: string): DictionarySource | undefined => {
+    const existing = entries.get(name);
+    if (existing) return existing.source;
+    if (disposed || !load || typeof name !== "string" || !name.trim())
+      return undefined;
+    // 名称即后端编码，复用相同源；创建不发请求，晚创建的源使用当前作用域。
+    const entry = createSource(
+      name,
+      { load: (context) => load(name, context) },
+      { ...options, scope },
+    );
+    entries.set(name, entry);
+    return entry.source;
+  };
   return {
-    getDictionary: ((name: string) =>
-      entries.get(name)?.source) as DictionaryStore<
-      Extract<keyof T, string>
-    >["getDictionary"],
+    getDictionary: getDictionary as DictionaryStore["getDictionary"],
     setScope(next) {
       if (typeof next !== "string")
         throw new TypeError("[dictionary] scope 必须是字符串。");
@@ -344,7 +374,7 @@ export function createDictionaryStore<
       const keys = names ? [...new Set(names)] : [...entries.keys()];
       return Promise.allSettled(
         keys.map((name) => {
-          const source = entries.get(name)?.source;
+          const source = getDictionary(name);
           return source
             ? source.load()
             : Promise.reject(new Error(`[dictionary] 未注册字典: ${name}`));

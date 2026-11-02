@@ -3,7 +3,7 @@
 ![Robot Dictionary](./docs/assets/banner.png)
 
 <div align="center">
-  <p><strong>字典定义一次，表单、搜索、详情与表格共用。</strong></p>
+  <p><strong>接口接入一次，字段直接声明字典码。</strong></p>
   <p>静态枚举 · 远程字典 · 字段配置复用 · 按需加载 · 作用域隔离</p>
   <p>
     <a href="https://www.npmjs.com/package/@robot-admin/dictionary"><img src="https://img.shields.io/npm/v/@robot-admin/dictionary?style=flat-square&amp;color=F2A990&amp;labelColor=202A3B" alt="npm version"></a>
@@ -22,13 +22,13 @@
 
 **Robot Dictionary** 统一枚举选项、远程字典和字段翻译，以 `@robot-admin/dictionary` 发布。使用侧声明字段的 `dictionary`，下拉和详情共用标签，业务模型继续保存原始编码。
 
-当前仓库版本 **0.3.1**。根入口无框架、UI 或请求库依赖；Vue 响应式能力通过 `/vue` 按需使用。
+当前仓库版本 **0.4.0**。根入口无框架、UI 或请求库依赖；Vue 响应式能力通过 `/vue` 按需使用。
 
 ## 能力地图
 
 | 场景       | 提供能力                                        |
 | ---------- | ----------------------------------------------- |
-| 静态与远程 | 同一份配置支持枚举数组或接口加载函数            |
+| 静态与远程 | 远程按后台原码自动取源，静态枚举按需声明        |
 | 表单与搜索 | 声明 `dictionary`，共用选项、加载状态与局部重试 |
 | 详情       | 复用已有字段配置，直接读取 `labels.status`      |
 | 两种表格   | C_Table 字典列、MachTable 公开字典列策略        |
@@ -51,7 +51,13 @@ bun add @robot-admin/dictionary
 
 ### RobotAdmin：直接复用已有字段
 
-RobotAdmin 已完成应用注册，页面直接使用：
+RobotAdmin 已完成应用注册。表单、搜索或 C_Table 字段直接声明后台字典码，无需新增注册文件：
+
+```ts
+dictionary: "user_status";
+```
+
+详情复用已有字段：
 
 ```ts
 const { labels } = useDictLabels(order, HEADER_FIELDS);
@@ -63,50 +69,27 @@ const { labels } = useDictLabels(order, HEADER_FIELDS);
 
 `order` 是已有的响应式记录，`HEADER_FIELDS` 是已有的字段配置。`useDictLabels` 是 **RobotAdmin 的自动导入封装**，并非本包导出；其他项目使用下面的公开 API。弹窗按可见状态启用时，补充 `{ enabled: visible }` 即可。
 
-### 其他 Vue 项目：注册一次，再绑定字段
+### 其他项目：入口接一次接口
 
-应用集中定义字典：
+在现有应用启动模块中接入统一接口，不按字典逐项注册：
 
 ```ts
-// dictionaries.ts
 import { createDictionaryStore } from "@robot-admin/dictionary";
+import { getDictionaryOptionsApi } from "./api";
 
-export const dictionaries = createDictionaryStore({
-  "order-status": [
-    { value: 0, label: "待下达" },
-    { value: 1, label: "执行中" },
-    { value: 2, label: "已完成" },
-  ],
-});
+const dictionaries = createDictionaryStore(getDictionaryOptionsApi);
 ```
 
-在组件 `setup` 中复用业务记录和字段配置：
+接口函数接收 `(字典码, { signal, scope })`，返回 `{ value, label, disabled? }[]`。后续增加远程字典，只改页面字段的 `dictionary`；无需增加别名映射、逐项 loader 或 `dictionaries.ts`。
 
-```ts
-import { ref } from "vue";
-import { useDictionaryLabels } from "@robot-admin/dictionary/vue";
-import { dictionaries } from "./dictionaries";
-
-const order = ref({ status: 0 });
-const fields = [
-  {
-    prop: "status",
-    label: "计划状态",
-    type: "select",
-    dictionary: "order-status",
-  },
-]; // 实际项目复用已有 fields
-const { labels } = useDictionaryLabels(dictionaries, order, fields);
-```
-
-模板同样读取 `{{ labels.status }}`。记录或字典变化后自动更新；接真实接口时，在注册处把选项数组换成 `load`，页面字段配置继续复用，见[远程字典接入](./docs/guide.md#远程字典接入)。
+静态枚举和专属接口仍可显式配置，优先于统一接口。应用提供共享实例一次，详见[远程字典接入](./docs/guide.md#远程字典接入)与[组件接入](./docs/guide.md#表单搜索与-c_table)。
 
 ## 组件与表格接入
 
 | 使用位置              | 最小配置                                                           |
 | --------------------- | ------------------------------------------------------------------ |
-| C_Form / C_FormSearch | `{ prop: 'status', type: 'select', dictionary: 'order-status' }`   |
-| C_Table               | `{ key: 'status', title: '计划状态', dictionary: 'order-status' }` |
+| C_Form / C_FormSearch | `{ prop: 'status', type: 'select', dictionary: 'order_status' }`   |
+| C_Table               | `{ key: 'status', title: '计划状态', dictionary: 'order_status' }` |
 | 详情文字              | `useDictionaryLabels(provider, record, fields)`                    |
 | MachTable             | 同一字典源接入 `createDictionaryColumn`，异步完成后合并刷新        |
 

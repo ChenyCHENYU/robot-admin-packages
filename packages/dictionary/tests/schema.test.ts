@@ -21,6 +21,32 @@ afterEach(() => {
 });
 
 describe("复用字段配置与延迟加载", () => {
+  it("无注册表的远程原码供多个字段共用，关闭不请求，异步完成后同步标签", async () => {
+    const load = vi.fn(async (name: string) => [{ value: 0, label: name }]);
+    const store = createDictionaryStore(load);
+    stores.push(store);
+    const enabled = ref(false);
+    const fields = [
+      { prop: "first", dictionary: "backend_code" },
+      { field: "second", dictionary: "backend_code" },
+    ];
+    const details = scope().run(() =>
+      useDictionaryLabels(store, { first: 0, second: 0 }, fields, { enabled }),
+    )!;
+    expect(load).not.toHaveBeenCalled();
+    enabled.value = true;
+    await store.getDictionary("backend_code")!.load();
+    expect(details.labels.value).toEqual({
+      first: "backend_code",
+      second: "backend_code",
+    });
+    expect(load).toHaveBeenCalledOnce();
+    enabled.value = false;
+    store.setScope("next");
+    await nextTick();
+    expect(load).toHaveBeenCalledOnce();
+  });
+
   it("同步卸载后的迟到退订异常不阻断销毁或启动请求", () => {
     const owner = scope();
     const load = vi.fn(async () => []);

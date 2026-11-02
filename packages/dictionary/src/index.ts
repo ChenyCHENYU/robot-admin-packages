@@ -13,6 +13,7 @@ export type {
   DictionaryLabelOptions,
   DictionaryLoadOptions,
   DictionaryLoadContext,
+  DictionaryLoader,
   DictionaryRemoteDefinition,
   DictionaryDefinition,
   DictionaryStatus,

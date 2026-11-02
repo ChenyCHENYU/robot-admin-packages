@@ -32,6 +32,12 @@ export interface DictionaryLoadContext {
   readonly scope: string;
 }
 
+/** 应用统一按后端字典码加载；仅在对应源首次消费或刷新时调用。 */
+export type DictionaryLoader = (
+  name: string,
+  context: DictionaryLoadContext,
+) => Promise<readonly DictionaryOption[]>;
+
 export interface DictionaryRemoteDefinition {
   load(context: DictionaryLoadContext): Promise<readonly DictionaryOption[]>;
   ttlMs?: number;
@@ -87,6 +93,8 @@ export interface DictionarySource extends DictionaryOptionsSource {
 }
 
 export interface DictionaryStoreOptions {
+  /** 未显式定义的名称按原码加载；静态或专属定义优先，失败不换源。 */
+  load?: DictionaryLoader;
   scope?: string;
   ttlMs?: number;
   retryDelayMs?: number;

@@ -22,6 +22,20 @@ const store = createDictionaryStore({
   },
 });
 const source: DictionarySource = store.getDictionary("state");
+const remote = createDictionaryStore(async (name, { signal, scope }) =>
+  signal.aborted ? [] : [{ value: scope, label: name }],
+);
+const remoteSource: DictionarySource | undefined =
+  remote.getDictionary("backend_code");
+useDictionaryLabels(remote, { state: false }, { state: "backend_code" });
+const mixed = createDictionaryStore(
+  { state: [{ value: false, label: "否" }] },
+  { load: async (name) => [{ value: name, label: name }] },
+);
+useDictionaryLabels(mixed, { state: false }, { state: "backend_code" });
+const mixedStatic: DictionarySource = mixed.getDictionary("state");
+void mixedStatic;
+void remoteSource;
 const dynamic: string = "unregistered";
 const maybe: DictionarySource | undefined = store.getDictionary(dynamic);
 // @ts-expect-error 动态名称必须处理未知字典。
