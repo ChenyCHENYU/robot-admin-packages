@@ -12,7 +12,6 @@ import {
   toValue,
   watch,
   type MaybeRefOrGetter,
-  type ComputedRef,
 } from "vue";
 import type {
   DictionaryLabelOptions,
@@ -24,6 +23,10 @@ import type {
   DictionaryOption,
 } from "./types";
 import { EMPTY_OPTIONS, defineEnum, formatLabels } from "./values";
+import {
+  missingDictionaryProvider,
+  readDictionaryProvider,
+} from "./vue-context";
 
 export interface DictionaryUseOptions {
   immediate?: boolean;
@@ -97,21 +100,47 @@ function readState(
 
 /** 同一源的多个组件共享加载；卸载只取消当前消费者等待和订阅。 */
 export function useDictionary(
-  source: MaybeRefOrGetter<DictionaryOptionsSource | undefined>,
+  source: MaybeRefOrGetter<DictionaryOptionsSource | string | undefined>,
   options: DictionaryUseOptions = {},
 ) {
   const state = shallowRef<DictionaryState>();
+  const provider = readDictionaryProvider();
+  // SSR 的 computed 可以不缓存；解析直接由下面的单个 watch 跟踪，
+  // 每次输入变化只取得一个快照，回调再次读取不会因临时对象重入或重复解析 Provider。
+  const resolveSource = () => {
+    if (!toValue(options.enabled ?? true))
+      return { source: undefined, error: null };
+    try {
+      const value = toValue(source);
+      if (typeof value !== "string") return { source: value, error: null };
+      const resolved = (provider ?? missingDictionaryProvider).getDictionary(
+        value,
+      );
+      return {
+        source: resolved,
+        error: resolved ? null : new Error(`[dictionary] 未注册字典：${value}`),
+      };
+    } catch (error) {
+      return { source: undefined, error };
+    }
+  };
+  const resolution = shallowRef<ReturnType<typeof resolveSource>>({
+    source: undefined,
+    error: null,
+  });
+  let latestResolution: ReturnType<typeof resolveSource>;
   let owner:
     | {
         source: DictionaryOptionsSource | undefined;
         controller: AbortController;
         active: boolean;
+        revision: number;
         flight?: Promise<readonly DictionaryOption[]>;
       }
     | undefined;
-  const currentSource = () =>
-    toValue(options.enabled ?? true) ? toValue(source) : undefined;
+  const currentSource = () => resolution.value.source;
   const load = (force: boolean): Promise<readonly DictionaryOption[]> => {
+    if (resolution.value.error) return Promise.reject(resolution.value.error);
     const own = owner;
     if (!own?.active) {
       const error = new Error("[dictionary] 字典消费者已停止。");
@@ -137,6 +166,7 @@ export function useDictionary(
       reject = fail;
     });
     own.flight = flight;
+    const revision = own.revision;
     const abort = () => {
       const error = new Error("[dictionary] 字典消费者已停止。");
       error.name = "AbortError";
@@ -159,11 +189,11 @@ export function useDictionary(
         const values = await (request ??
           own.source?.getOptions() ??
           EMPTY_OPTIONS);
-        if (own.active && own.source)
+        if (own.active && own.revision === revision && own.source)
           state.value = readState(own.source, values);
         resolve(values);
       } catch (error) {
-        if (own.active && state.value)
+        if (own.active && own.revision === revision && state.value)
           state.value = { ...state.value, status: "error", error };
         reject(error);
       } finally {
@@ -174,14 +204,19 @@ export function useDictionary(
     return flight;
   };
   const stop = watch(
-    currentSource,
-    (current, _previous, cleanup) => {
+    () => {
+      latestResolution = resolveSource();
+      return latestResolution;
+    },
+    (nextResolution, _previous, cleanup) => {
       // 上一源的取消事件可能同步切到第三个源，旧 watch 回调不能重新夺取所有权。
-      if (current !== currentSource()) return;
+      if (nextResolution !== latestResolution) return;
+      const current = nextResolution.source;
       const own: NonNullable<typeof owner> = {
         source: current,
         controller: new AbortController(),
         active: true,
+        revision: 0,
       };
       owner = own;
       let unsubscribe: (() => void) | undefined;
@@ -195,6 +230,8 @@ export function useDictionary(
         }
         own.controller.abort();
       });
+      resolution.value = nextResolution;
+      if (!own.active) return;
       // cleanup 必须先注册；同步状态观察者可以在任意发布点卸载整个作用域。
       let initial: DictionaryState | undefined;
       try {
@@ -221,7 +258,18 @@ export function useDictionary(
           if (!own.active) return;
           try {
             const snapshot = readState(current);
-            if (own.active) state.value = snapshot;
+            if (own.active) {
+              if (
+                current.getState &&
+                (snapshot.scope !== state.value?.scope ||
+                  (snapshot.status === "idle" && own.flight))
+              ) {
+                // 同一源暂停/换身份会取消旧 Promise；立即归还旧等待，旧拒绝不能覆盖新状态。
+                own.revision++;
+                own.flight = undefined;
+              }
+              state.value = snapshot;
+            }
           } catch (error) {
             if (own.active && state.value)
               state.value = { ...state.value, status: "error", error };
@@ -247,16 +295,27 @@ export function useDictionary(
     { immediate: true, flush: "sync" },
   );
   onScopeDispose(stop);
-  const values = computed(() => state.value?.options ?? EMPTY_OPTIONS);
+  const resolvedState = computed<DictionaryState | undefined>(() => {
+    return resolution.value.error
+      ? {
+          status: "error",
+          options: EMPTY_OPTIONS,
+          error: resolution.value.error,
+          scope: "",
+          updatedAt: null,
+        }
+      : state.value;
+  });
+  const values = computed(() => resolvedState.value?.options ?? EMPTY_OPTIONS);
   const labels = computed(
     () => new Map(values.value.map((option) => [option.value, option.label])),
   );
   return {
-    state: computed(() => state.value),
-    status: computed(() => state.value?.status ?? "idle"),
+    state: resolvedState,
+    status: computed(() => resolvedState.value?.status ?? "idle"),
     options: values,
-    loading: computed(() => state.value?.status === "loading"),
-    error: computed(() => state.value?.error ?? null),
+    loading: computed(() => resolvedState.value?.status === "loading"),
+    error: computed(() => resolvedState.value?.error ?? null),
     reload: () => load(true),
     label: (value: unknown, config?: DictionaryLabelOptions) => {
       // 标签只依赖选项快照；状态变化不重算文字，标准源继续使用自身 O(1) 索引。
@@ -268,6 +327,32 @@ export function useDictionary(
     },
   };
 }
+
+/** 插件接入后的详情简写；使用最近 Provider，显式 provider 仍可覆盖同层来源。 */
+export function useDictLabels<
+  TModel extends object,
+  const TFields extends DictionaryLabelFields<NoInfer<TModel>>,
+>(
+  model: MaybeRefOrGetter<TModel | null | undefined>,
+  fields: DictionaryFieldInput<TModel, TFields>,
+  options: DictionaryUseOptions & { provider?: DictionaryProvider } = {},
+) {
+  const provider =
+    options.provider ?? readDictionaryProvider() ?? missingDictionaryProvider;
+  return useDictionaryLabels<TModel, DictionaryProvider, TFields>(
+    provider,
+    model,
+    fields,
+    options,
+  );
+}
+
+export { DICTIONARY_PROVIDER_KEY, useDictionaries } from "./vue-context";
+export {
+  createDictionaryPlugin,
+  type DictionaryPluginConfig,
+  type DictionaryPlugin,
+} from "./vue-plugin";
 
 type LabelBinding = string | DictionaryOptionsSource;
 
@@ -338,42 +423,26 @@ export function useDictionaryLabels<
   const normalized = labelEntries(fields);
   const bindings = new Map<
     LabelBinding,
-    {
-      resolution: ComputedRef<{
-        source: DictionaryOptionsSource | undefined;
-        error: unknown;
-      }>;
-      view: ReturnType<typeof useDictionary> | undefined;
-    }
+    ReturnType<typeof useDictionary> | undefined
   >();
   for (const [, key] of normalized.entries) {
     if (bindings.has(key)) continue;
-    const resolution = computed(() => {
-      if (!enabled.value) return { source: undefined, error: null };
-      try {
-        const source =
-          typeof key === "string" ? provider.getDictionary(key) : key;
-        return {
-          source,
-          error: source
-            ? null
-            : new Error(`[dictionary] 未注册字典：${String(key)}`),
-        };
-      } catch (error) {
-        return { source: undefined, error };
-      }
-    });
-    bindings.set(key, {
-      resolution,
-      // 同步订阅可能卸载宿主，后续源不再创建消费者。
-      view:
-        owner?.active === false
-          ? undefined
-          : useDictionary(() => resolution.value.source, {
-              immediate: options.immediate,
-              enabled,
-            }),
-    });
+    const source = () => {
+      const resolved =
+        typeof key === "string" ? provider.getDictionary(key) : key;
+      if (!resolved) throw new Error(`[dictionary] 未注册字典：${String(key)}`);
+      return resolved;
+    };
+    // 同步订阅可能卸载宿主，后续源不再创建消费者。
+    bindings.set(
+      key,
+      owner?.active === false
+        ? undefined
+        : useDictionary(source, {
+            immediate: options.immediate,
+            enabled,
+          }),
+    );
   }
   // 字段路径预编译，读取只遍历自身属性，不访问原型链或修改记录。
   const entries = normalized.entries.map(([field, key]) => ({
@@ -408,7 +477,7 @@ export function useDictionaryLabels<
             const value = read(row, field, path);
             return [
               field,
-              bindings.get(key)?.view?.label(value) ??
+              bindings.get(key)?.label(value) ??
                 formatLabels(value, () => undefined),
             ];
           }),
@@ -416,23 +485,21 @@ export function useDictionaryLabels<
       ) as DictionaryLabels<TFields>;
     }),
     loading: computed(() =>
-      [...bindings.values()].some(({ view }) => view?.loading.value),
+      [...bindings.values()].some((view) => view?.loading.value),
     ),
     error: computed(() => {
       if (normalized.error) return normalized.error;
-      for (const { view, resolution } of bindings.values()) {
-        const error = resolution.value.error ?? view?.error.value;
+      for (const view of bindings.values()) {
+        const error = view?.error.value;
         if (error != null) return error;
       }
       return null;
     }),
     reload: () =>
       Promise.allSettled(
-        [...bindings.values()].map(({ view, resolution }) => {
-          if (resolution.value.error)
-            return Promise.reject(resolution.value.error);
-          return view?.reload() ?? Promise.resolve(EMPTY_OPTIONS);
-        }),
+        [...bindings.values()].map(
+          (view) => view?.reload() ?? Promise.resolve(EMPTY_OPTIONS),
+        ),
       ),
   };
 }

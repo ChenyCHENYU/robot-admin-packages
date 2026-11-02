@@ -47,6 +47,13 @@ function duration(
   return result;
 }
 
+function loadingEnabled(value: DictionaryStoreOptions["enabled"]): boolean {
+  const enabled = typeof value === "function" ? value() : (value ?? true);
+  if (typeof enabled !== "boolean")
+    throw new TypeError("[dictionary] enabled 必须返回 boolean。");
+  return enabled;
+}
+
 function abortError(reason?: unknown): Error {
   if (reason instanceof Error) return reason;
   const error = new Error("[dictionary] 字典等待已取消。");
@@ -175,6 +182,7 @@ function createSource(
     else current.resolve(snapshot);
   };
   const start = (): Flight["promise"] => {
+    const previousState = state;
     let resolve!: Flight["resolve"];
     let reject!: Flight["reject"];
     const promise = new Promise<readonly DictionaryOption[]>((done, fail) => {
@@ -202,6 +210,17 @@ function createSource(
     void Promise.resolve()
       .then(() => {
         if (!owns(current)) return EMPTY_OPTIONS;
+        // loading 通知可同步停用宿主；真正调用接口前再次检查，不能伪造成功空字典。
+        if (!loadingEnabled(options.enabled)) {
+          flight = undefined;
+          clearTimeout(current.timer);
+          const pausedGeneration = generation;
+          publish(previousState);
+          if (generation !== pausedGeneration || disposed)
+            current.reject(abortError());
+          else current.resolve(previousState.options);
+          return EMPTY_OPTIONS;
+        }
         return remote!.load({ signal: current.controller.signal, scope });
       })
       .then(
@@ -215,6 +234,12 @@ function createSource(
     if (config.signal?.aborted)
       return Promise.reject(abortError(config.signal.reason));
     if (!remote) return waitFor(Promise.resolve(state.options), config.signal);
+    try {
+      if (!loadingEnabled(options.enabled))
+        return waitFor(Promise.resolve(state.options), config.signal);
+    } catch (error) {
+      return Promise.reject(error);
+    }
     if (flight) return waitFor(flight.promise, config.signal);
     if (!config.force) {
       const fresh =
@@ -319,6 +344,12 @@ export function createDictionaryStore(
   const load = typeof input === "function" ? input : config.load;
   if (load !== undefined && typeof load !== "function")
     throw new TypeError("[dictionary] 统一 load 必须是函数。");
+  if (
+    config.enabled !== undefined &&
+    typeof config.enabled !== "boolean" &&
+    typeof config.enabled !== "function"
+  )
+    throw new TypeError("[dictionary] enabled 必须是 boolean 或函数。");
   let scope = config.scope ?? "default";
   if (typeof scope !== "string")
     throw new TypeError("[dictionary] scope 必须是字符串。");

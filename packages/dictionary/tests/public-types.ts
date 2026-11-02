@@ -9,7 +9,33 @@ import {
   useDictionary,
   useDictionaryLabels,
   useDictionaryRefresh,
+  createDictionaryPlugin,
+  useDictionaries,
+  useDictLabels,
 } from "../src/vue";
+import { ref } from "vue";
+
+const plugin = createDictionaryPlugin({
+  enabled: ref(true),
+  scope: () => "tenant:language",
+  load: async (name, { signal, scope }) =>
+    signal.aborted ? [] : [{ value: scope, label: name }],
+  dictionaries: { enabled: [{ value: false, label: "否" }] },
+});
+void plugin;
+useDictionary("backend_code");
+useDictionary(ref("backend_code"));
+useDictionary(() => "backend_code");
+useDictionaries().invalidate("backend_code");
+const injectedLabels = useDictLabels(ref({ enabled: false }), {
+  enabled: "backend_code",
+});
+const injectedLabel: string = injectedLabels.labels.value.enabled;
+// @ts-expect-error 插件简写不能读取未声明的字段。
+injectedLabels.labels.value.unknown;
+// @ts-expect-error scope 必须是字符串或其 ref/getter。
+createDictionaryPlugin({ scope: 1 });
+void injectedLabel;
 
 const store = createDictionaryStore({
   state: defineEnum([

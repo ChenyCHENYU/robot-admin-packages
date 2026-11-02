@@ -23,3 +23,6 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run verify
+      - name: Minimum Vue dictionary consumer
+        working-directory: packages/dictionary
+        run: bun run check:vue-min

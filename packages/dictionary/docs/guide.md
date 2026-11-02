@@ -6,16 +6,59 @@
 
 | 要做什么                          | 去哪里                                      |
 | --------------------------------- | ------------------------------------------- |
-| 接后台接口、提供应用实例          | [接入步骤](#一接入只做一次)                 |
+| 接后台接口、提供应用实例          | [接入步骤](#一插件与配置接入一次)           |
 | 下拉、搜索、列表、详情、MachTable | [场景索引](#二接入后按场景使用)             |
 | 静态枚举、专属接口、页面覆盖      | [场景六](#场景六静态枚举专属接口和页面覆盖) |
 | 无 Vue 的脚本、提示、导出         | [场景七](#场景七脚本提示和导出前准备)       |
 | 空字典、失败、重试                | [状态处理](#三空失败与重试)                 |
 | 身份切换、失效、销毁、性能        | [维护边界](#四身份切换维护与性能边界)       |
 
-## 一、接入只做一次
+## 一、插件与配置接入一次
 
-### 1. 接口统一返回选项
+### 1. 一个配置文件
+
+在已有配置目录统一声明接口与需要覆盖的默认项。文件名不固定，下面使用 `src/config/dictionary.ts`：
+
+```ts
+import { getDictionaryOptionsApi } from "../api/dictionary";
+
+export default {
+  load: getDictionaryOptionsApi,
+  // ttlMs、retryDelayMs、timeoutMs 按需覆盖，通常保留包内默认值。
+};
+```
+
+| 配置           | 默认值 / 含义                                        |
+| -------------- | ---------------------------------------------------- |
+| `load`         | 未配置时只使用静态字典，不猜测后台地址               |
+| `dictionaries` | 可选静态枚举或专属源，普通远程码不逐项登记           |
+| `ttlMs`        | 300000，成功缓存 5 分钟；0 为显式失效前一直有效      |
+| `retryDelayMs` | 5000，失败冷却 5 秒                                  |
+| `timeoutMs`    | 15000，单次加载超时 15 秒                            |
+| `scope`        | `"default"`；可传 ref/getter 关联用户、公司或语言    |
+| `enabled`      | `true`；可传 ref/getter 暂停远程消费，静态枚举仍可读 |
+| `onError`      | 可选共享请求失败观察者，不在包内弹全局消息           |
+
+`enabled: false` 不请求、不把暂停缓存为 `empty`；暂停、身份切换与恢复由插件同步处理。配置 getter 应闭包引用当前应用已创建的上下文，避免每次从全局 active Pinia 重新取另一个应用的 Store。
+
+### 2. 安装字典自己的插件
+
+在现有 Vue 应用创建后、mount 前安装；`app` 是已有 Vue 实例：
+
+```ts
+import { createDictionaryPlugin } from "@robot-admin/dictionary/vue";
+import dictionaryConfig from "./config/dictionary";
+
+app.use(createDictionaryPlugin(dictionaryConfig));
+```
+
+插件管理本应用的实例、响应式配置和卸载，Vue 3.4/3.5 均不要求业务手写销毁桥接。无配置也可安装 `createDictionaryPlugin()`；没有接口与枚举时不发请求，使用未配置字典时明确反馈。
+
+字典包不依赖 NUI、MachTable、Pinia 或请求库，也不要求引入它们的 key。Naive UI Components ≥0.26 自动读取插件的公开只读协议，独立 Vue/其他 UI 项目完全不需要安装 NUI。旧 NUI 版本的组件自动联动需要先升级。
+
+每个 app 使用独立 Store。插件对象复用到不同 app 不共享数据；同一个 app 不重复安装不同字典插件。不要从 `main.ts` 反向导入实例，页面通过本包 `useDictionaries()` 读取。
+
+### 3. 接一个通用接口
 
 以下是示例协议，路径换成项目真实接口。字段 `dictionary: "user_status"` 会把 `user_status` 原样传给接口函数：
 
@@ -29,7 +72,7 @@
 在已有 API 模块实现一个函数，所有字典共用：
 
 ```ts
-// api.ts：示例接口直接返回标准选项数组。
+// src/api/dictionary.ts：示例接口直接返回标准选项数组。
 import type { DictionaryLoader } from "@robot-admin/dictionary";
 
 export const getDictionaryOptionsApi: DictionaryLoader = async (
@@ -78,31 +121,40 @@ export const getDictionaryOptionsApi: DictionaryLoader = async (
 
 使用已有请求客户端时保留 `signal`，启用其静默错误模式（如 `silent: true`），由控件就地显示失败与重试；不要 `catch(() => [])`。租户、公司、语言等参数从上下文 `scope` 或现有请求层取得，库不猜测后台协议。
 
-### 2. 应用创建并提供同一个实例
-
-**已使用 Naive UI Components 的 Vue 项目**：把下面代码放在已有的 `createApp` 之后、`mount` 之前。`app` 是现有 Vue 应用，`./api` 是上一步的 API 模块；无需创建字典注册清单。
-
-```ts
-import { createDictionaryStore } from "@robot-admin/dictionary";
-import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
-import { getDictionaryOptionsApi } from "./api";
-
-const dictionaries = createDictionaryStore(getDictionaryOptionsApi);
-app.provide(DICTIONARY_PROVIDER_KEY, dictionaries);
-app.onUnmount(() => dictionaries.destroy());
-```
-
-此启动示例使用 Vue 3.5+ 的 [app.onUnmount](https://vuejs.org/api/application.html#app-onunmount)。Vue 3.4 项目把 `dictionaries.destroy()` 接入已有应用卸载流程即可，不需要修改每个页面或建立全局 mixin。
-
-创建 Store、声明字段、调用 `getDictionary()` 均不发请求，消费者启用后才加载。同码共用稳定源、缓存和请求。新增远程类型时只写后台字典码，不新增别名、loader 或 `dictionaries.ts`。
-
-**其他 Vue 或纯 TypeScript 项目**：只需要 `createDictionaryStore(getDictionaryOptionsApi)`；用项目现有服务/依赖注入传递实例。Vue 详情使用公开的 `useDictionaryLabels`，纯脚本见场景七，不必为此引入 Naive UI Components。
-
-不要从 `main.ts` 反向导入实例到组件，也不要在每个页面重新创建应用 Store。应用持有并销毁它；SSR 每个请求创建独立实例。
-
 ## 二、接入后按场景使用
 
-下列表单、搜索与 C_Table 片段在组件 `setup` 或其页面组合函数中使用，前提是应用已完成接入。Vue/组件导入按项目自动导入配置取舍；例中的类型导入用于检查字段，不是额外运行时依赖。
+下列片段在组件 `setup` 或其页面组合函数中使用，前提是应用已安装字典插件。Vue/组件导入按项目自动导入配置取舍；例中的类型导入用于检查字段，不是额外运行时依赖。
+
+### 独立 Vue：原生或其他组件库
+
+只从字典包读取，不需要任何组件库适配：
+
+```ts
+import { ref } from "vue";
+import { useDictionary } from "@robot-admin/dictionary/vue";
+
+const account = ref("1");
+const { options, loading, error, reload } = useDictionary("user_status");
+async function retry() {
+  try {
+    await reload();
+  } catch {
+    /* error 已保存失败，下面就地显示。 */
+  }
+}
+```
+
+```vue
+<select v-model="account" :disabled="loading">
+  <option v-for="option in options" :key="typeof option.value + ':' + option.value"
+    :value="option.value" :disabled="option.disabled">{{ option.label }}</option>
+</select>
+<p
+  v-if="error"
+>字典加载失败。<button type="button" @click="retry">重试</button></p>
+```
+
+也可把 `options/loading` 传给其他 UI 库的下拉。`useDictionary` 支持名称、名称 ref/getter，以及既有直接源写法；切换名称时自动清理上一消费者。同码仍共用应用缓存和请求。
 
 ### 场景一：表单下拉
 
@@ -182,27 +234,20 @@ const columns = defineTableColumns<UserRow>([
 
 ### 场景四：详情和弹窗
 
-**RobotAdmin**：`useDictLabels(record, fields)` 自动读取最近 Provider，模板直接使用 `labels.account`。`record` 是响应式记录，`fields` 可以复用场景一已有的表单字段，无需再写翻译映射；不要从本包导入 `useDictLabels`。
+本包的 `useDictLabels(record, fields)` 自动读取当前字典 Provider；RobotAdmin 只增加自动导入，不再包装另一套注入逻辑。已有表单或列字段直接复用，不再维护详情翻译映射。
 
-**其他 Vue 项目**使用公开 API。下面是已接 NUI Provider 的完整绑定片段；其他 Vue 项目把 `provider` 换成现有服务传入的 Store 即可：
+独立详情完整示例：
 
 ```ts
-import { inject, ref } from "vue";
-import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
-import { useDictionaryLabels } from "@robot-admin/dictionary/vue";
+import { ref } from "vue";
+import { useDictLabels } from "@robot-admin/dictionary/vue";
 
-const provider = inject(DICTIONARY_PROVIDER_KEY);
-if (!provider) throw new Error("请先在应用启动时提供字典实例");
 const user = ref<{ account: string } | null>(null);
 const visible = ref(false);
 const fields = [{ prop: "account", dictionary: "user_status" }] as const;
-const { labels, loading, error, reload } = useDictionaryLabels(
-  provider,
-  user,
-  fields,
-  { enabled: visible },
-);
-// 详情接口返回后，调用 showDetail(record)。
+const { labels, loading, error, reload } = useDictLabels(user, fields, {
+  enabled: visible,
+});
 function showDetail(record: { account: string }) {
   user.value = record;
   visible.value = true;
@@ -225,25 +270,26 @@ function showDetail(record: { account: string }) {
 </NModal>
 ```
 
-这里的 `fields` 仅演示独立详情；已有表单/表格配置时直接复用其 `prop/key/field + dictionary`，非字典字段会忽略。`labels` 是 ref，模板自动解包；脚本中读取 `labels.value.account`。
+上面的模板可替换为任意 UI；最小展示只是 `<span>{{ labels.account }}</span>`。已有表单/表格配置时直接复用其 `prop/key/field + dictionary`，非字典字段忽略。模板自动解包 ref，脚本读取 `labels.value.account`。
 
-记录为空或 `enabled: false` 时不解析、不订阅、不加载；关闭保留最后标签供离场动画使用，重开读取当前身份的数据。`reload()` 返回按字典去重的 `allSettled` 结果，一个失败不阻断其他字典。翻译不修改原始记录。
+记录为空或详情 `enabled: false` 时不解析、不订阅、不加载；关闭保留最后标签供离场动画使用，重开读取当前身份数据。`reload()` 返回按字典去重的 `allSettled` 结果；一个失败不阻断其他字典，翻译不修改原始记录。需要显式指定 Provider 的低层调用仍支持 `useDictionaryLabels(provider, record, fields)`。
 
 ### 场景五：MachTable
 
-MachTable 不读取 C_Table 的 `dictionary` 字段，使用自己的公共列策略。下面的页面组合函数接收**接入步骤创建的同一个 Store**；RobotAdmin 调用时传 `useAppDictionaries()`（从项目 `@/utils/d_dictionaryContext` 导入）。
+MachTable 不读取 C_Table 的 `dictionary` 字段，使用自己的公共列策略。下面的页面组合函数从字典包取得当前应用 Store，不从启动文件或组件库取实例。
 
 ```ts
 import { ref } from "vue";
-import type { DictionaryStore } from "@robot-admin/dictionary";
 import {
+  useDictionaries,
   useDictionary,
   useDictionaryRefresh,
 } from "@robot-admin/dictionary/vue";
 import { defineVueColumns, useMachTable } from "@agile-team/mach-table-vue";
 import { createDictionaryColumn } from "@agile-team/mach-table-vue/business";
 
-export function useAccountGrid(dictionaries: DictionaryStore) {
+export function useAccountGrid() {
+  const dictionaries = useDictionaries();
   const table = useMachTable<{ id: string; account: string }>();
   const rows = ref([{ id: "U-1", account: "1" }]);
   const source = dictionaries.getDictionary("user_status");
@@ -286,26 +332,25 @@ export function useAccountGrid(dictionaries: DictionaryStore) {
 
 ### 场景六：静态枚举、专属接口和页面覆盖
 
-**应用静态枚举或专属定义**：替换接入步骤中的 Store 创建语句，其余接入不变。普通远程码继续走统一接口：
+**应用静态枚举或专属定义**：只在统一配置文件补充差异，插件安装语句不变。普通远程码仍走通用 `load`：
 
 ```ts
-import { createDictionaryStore } from "@robot-admin/dictionary";
-import { getDictionaryOptionsApi } from "./api";
+import { getDictionaryOptionsApi } from "../api/dictionary";
+import type { DictionaryPluginConfig } from "@robot-admin/dictionary/vue";
 
-const dictionaries = createDictionaryStore(
-  {
+export default {
+  load: getDictionaryOptionsApi,
+  dictionaries: {
     urgency: [
       { value: false, label: "普通" },
       { value: true, label: "加急" },
     ],
-    // 只有需要特殊 TTL/接口的类型才单独声明。
     special_status: {
       ttlMs: 60_000,
       load: (context) => getDictionaryOptionsApi("special_status", context),
     },
   },
-  { load: getDictionaryOptionsApi },
-);
+} satisfies DictionaryPluginConfig;
 ```
 
 字段配置 `dictionary: "urgency"` 即可使用静态选项。需要导出同一枚举数组供其他业务复用时，再用 `defineEnum(options)` 校验、复制和冻结；仅注册给 Store 不必包装。
@@ -318,7 +363,7 @@ import {
   createDictionaryStore,
   createDictionaryProvider,
 } from "@robot-admin/dictionary";
-import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/naive-ui-components/config";
+import { DICTIONARY_PROVIDER_KEY } from "@robot-admin/dictionary/vue";
 
 const parent = inject(DICTIONARY_PROVIDER_KEY);
 if (!parent) throw new Error("请先提供应用字典实例");
@@ -330,7 +375,7 @@ provide(DICTIONARY_PROVIDER_KEY, provider);
 onScopeDispose(() => local.destroy());
 ```
 
-子组件的表单、搜索、C_Table 和详情自动读取最近 Provider。同一个 setup 内的详情显式把 `provider` 传给 `useDictionaryLabels`；RobotAdmin 使用 `useDictLabels(record, fields, { provider })`。Vue 的 inject 读取祖先，不会读取本层刚提供的值。
+子组件的表单、搜索、C_Table 和详情自动读取最近 Provider。同一个 setup 内的详情显式把 `provider` 传给 `useDictLabels(record, fields, { provider })`。Vue 的 inject 读取祖先，不会读取本层刚提供的值。
 
 只有“名称不存在”才向应用来源查找；已找到的源即使为空、失败或无匹配值，也不会换源掩盖问题。组合器不创建缓存，不代替所有者销毁 Store。
 
@@ -377,31 +422,33 @@ Store 配置可覆盖 `ttlMs/retryDelayMs/timeoutMs`；专属远程定义可覆�
 
 ## 四、身份切换、维护与性能边界
 
-- **身份变化**：应用调用 `setScope(scope)`；scope 包含影响结果的用户/租户/公司/语言，不含令牌。同步清空旧远程快照、取消旧请求并阻止迟到回填；静态枚举不重新加载。是否允许退出后的请求由应用认证层及 loader 决定。
+- **身份变化**：插件的 `scope/enabled` 配置引用所属应用的响应式上下文，插件自动同步身份与暂停。scope 包含影响结果的用户/租户/公司/语言，不含令牌。同步清空旧远程快照、取消旧请求并阻止迟到回填；静态枚举不重新加载。仅使用低层 Store 时才自行维护 `setScope/invalidate`。
 - **字典维护成功**：调用 `invalidate("user_status")`。活跃订阅源重载，未使用源继续惰性；没有名称时失效本 Store 的所有远程源。
-- **销毁**：应用卸载销毁应用 Store，页面卸载只销毁局部 Store。一个消费者取消不影响其他消费者的共享加载；销毁后不再创建新源。
+- **销毁**：插件自动清理应用 Store 和配置监听；页面卸载只销毁局部 Store。SSR 每个请求安装独立插件，渲染后在 finally 中调用 `plugin.dispose(app)`，因为 SSR 不经过客户端 mount/unmount。SSR 不跨请求复用外部可订阅源；低层直接源也须由宿主按请求创建和销毁。一个消费者取消不影响其他消费者的共享加载；销毁后不再创建新源。
 - **原码**：`0`、`false`、`"0"`、`"001"` 严格区分，不自动数字化；数组逐项翻译。逗号串只有 `source.label(value, { split: "," })` 才拆分，不修改模型。
 - **规模**：适合可整份读取的小字典。客户、物料、组织树的大型实体使用 DataPicker、分页检索或按码批量解析。按类型接口优先，不为每个原码重复拉全目录，也不再叠一套全目录缓存。
 - **旧接入**：显式注册表继续有效，无统一 loader 时未知名称返回 `undefined`。轻量 `getOptions/load/subscribe/getState` 源仍可接入；标准 Store 还提供稳定快照与 O(1) 标签索引。
 
 ## 五、API 速查
 
-| 入口/API                                                         | 用途                                                         |
-| ---------------------------------------------------------------- | ------------------------------------------------------------ |
-| 根入口 `createDictionaryStore(loader, options?)`                 | 应用统一远程接口                                             |
-| 根入口 `createDictionaryStore(definitions, options?)`            | 静态/专属源；`options.load` 处理其余名称                     |
-| 根入口 `createDictionaryProvider(...providers)`                  | 按顺序组合只读来源                                           |
-| 根入口 `defineEnum(options)`                                     | 校验、复制、冻结可复用静态枚举                               |
-| Store `getDictionary(name)`                                      | 取稳定源，不发请求；无统一 loader 的未知名称返回 `undefined` |
-| Store `preload(names?)`                                          | 去重预热，返回 `allSettled`                                  |
-| Store `setScope / invalidate / destroy`                          | 身份隔离、失效、销毁                                         |
-| 源 `getOptions / get / label`                                    | 当前选项与同步翻译                                           |
-| 源 `load / getState / subscribe`                                 | 加载、不可变状态与订阅清理                                   |
-| `/vue` `useDictionaryLabels(provider, record, fields, options?)` | 详情字段标签与组加载状态                                     |
-| `/vue` `useDictionary(source, options?)`                         | 单源状态与重试                                               |
-| `/vue` `useDictionaryRefresh(sources, refresh)`                  | 选项快照变化后合并刷新                                       |
+| 入口/API                                              | 用途                                                         |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| 根入口 `createDictionaryStore(loader, options?)`      | 应用统一远程接口                                             |
+| 根入口 `createDictionaryStore(definitions, options?)` | 静态/专属源；`options.load` 处理其余名称                     |
+| 根入口 `createDictionaryProvider(...providers)`       | 按顺序组合只读来源                                           |
+| 根入口 `defineEnum(options)`                          | 校验、复制、冻结可复用静态枚举                               |
+| Store `getDictionary(name)`                           | 取稳定源，不发请求；无统一 loader 的未知名称返回 `undefined` |
+| Store `preload(names?)`                               | 去重预热，返回 `allSettled`                                  |
+| Store `setScope / invalidate / destroy`               | 身份隔离、失效、销毁                                         |
+| 源 `getOptions / get / label`                         | 当前选项与同步翻译                                           |
+| 源 `load / getState / subscribe`                      | 加载、不可变状态与订阅清理                                   |
+| `/vue` `useDictLabels(record, fields, options?)`      | 详情字段标签与组加载状态                                     |
+| `/vue` `useDictionary(nameOrSource, options?)`        | 单源状态与重试                                               |
+| `/vue` `createDictionaryPlugin(config?)`              | 安装应用独立插件；SSR 可显式 `dispose(app)`                  |
+| `/vue` `useDictionaries()`                            | 读取所属应用 Store，维护或 MachTable 使用                    |
+| `/vue` `useDictionaryRefresh(sources, refresh)`       | 选项快照变化后合并刷新                                       |
 
-`useDictLabels`、`useAppDictionaries`、`setupDictionaries` 属于 RobotAdmin 应用，不是本包导出。`createDictionaryColumn` 属于 MachTable 的 `/business` 入口，NUI 的 Provider key 属于其 `/config` 入口。
+`createDictionaryPlugin`、`useDictionaries`、`useDictLabels` 和 `DICTIONARY_PROVIDER_KEY` 由本包 `/vue` 导出；`setupDictionaries` 只是 RobotAdmin 组织业务配置的启动函数。`createDictionaryColumn` 属于 MachTable 的 `/business` 入口，NUI 自己的兼容 key 只用于既有手工 provide 接入；通用插件不导入 NUI。
 
 维护流程见[仓库指南](https://github.com/ChenyCHENYU/robot-admin-packages/blob/main/docs/maintenance.md)。在本包运行 `bun run verify`，覆盖类型、生命周期、Vue 消费、ESM/CJS、SSR 和体积。
 

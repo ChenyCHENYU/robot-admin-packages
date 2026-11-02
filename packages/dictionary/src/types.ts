@@ -93,6 +93,8 @@ export interface DictionarySource extends DictionaryOptionsSource {
 }
 
 export interface DictionaryStoreOptions {
+  /** 暂停远程加载时只返回现有快照；由宿主在门控变化时失效在途请求。 */
+  enabled?: boolean | (() => boolean);
   /** 未显式定义的名称按原码加载；静态或专属定义优先，失败不换源。 */
   load?: DictionaryLoader;
   scope?: string;

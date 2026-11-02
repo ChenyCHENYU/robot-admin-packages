@@ -1,5 +1,12 @@
 # @robot-admin/dictionary
 
+## 0.5.0
+
+### Minor Changes
+
+- 提供独立 Vue 插件 createDictionaryPlugin(config)、按名 useDictionary、useDictionaries 和 useDictLabels。通用接口与默认策略集中配置，应用安装不再需要组件库的注入 key；核心仍无框架或 UI 依赖。每个应用独立持有 Store 和配置监听，支持认证暂停/恢复、响应式 scope、Vue 3.4/3.5 卸载和 SSR 显式 dispose；暂停保持 idle，不冒充成功空字典。保留直接源和显式 Provider API，修复同源切身份时旧取消覆盖当前状态。
+- 修复 Vue 3.4 SSR 下 computed 与同步 watch 重入导致的递归；按输入变化只解析一次来源，保留旧 Provider 和同步取消的所有权约定。
+
 ## 0.4.1
 
 ### Patch Changes

@@ -3,13 +3,21 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
-import { effectScope, ref } from "vue";
+import { createSSRApp, effectScope, h, onServerPrefetch, ref } from "vue";
+import { renderToString } from "vue/server-renderer";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const expected = {
   index: ["createDictionaryStore", "createDictionaryProvider", "defineEnum"],
-  vue: ["useDictionary", "useDictionaryLabels", "useDictionaryRefresh"],
+  vue: [
+    "useDictionary",
+    "useDictionaryLabels",
+    "useDictionaryRefresh",
+    "createDictionaryPlugin",
+    "useDictionaries",
+    "useDictLabels",
+  ],
 };
 
 async function sources(path, seen = new Set()) {
@@ -38,6 +46,12 @@ for (const [entry, names] of Object.entries(expected)) {
       if (typeof api[name] !== "function")
         throw new Error(`${entry}.${extension} 缺少 ${name}`);
     }
+    if (
+      /\b(?:from\s+|require\()["'](?:@robot-admin\/naive-ui-components|@agile-team\/mach-table|naive-ui|pinia|axios)(?:\/[^"']*)?["']/.test(
+        await sources(file),
+      )
+    )
+      throw new Error(`${entry}.${extension} 引入了其他 UI/请求包`);
     if (entry === "index") {
       const source = await sources(file);
       if (
@@ -100,6 +114,30 @@ for (const [entry, names] of Object.entries(expected)) {
         throw new Error(`${entry}.${extension} 详情原码变化未同步`);
       owner.stop();
       store.destroy();
+      const plugin = api.createDictionaryPlugin({
+        load: async (code) => [{ value: "1", label: code }],
+      });
+      const app = createSSRApp({
+        setup() {
+          const state = api.useDictionary("user_status");
+          const dictionaries = api.useDictionaries();
+          onServerPrefetch(() => dictionaries.preload(["user_status"]));
+          return () =>
+            h(
+              "select",
+              state.options.value.map((option) =>
+                h("option", { value: option.value }, option.label),
+              ),
+            );
+        },
+      });
+      app.use(plugin);
+      try {
+        if (!(await renderToString(app)).includes('value="1">user_status'))
+          throw new Error(`${entry}.${extension} 独立插件/原生 select 不可用`);
+      } finally {
+        plugin.dispose(app);
+      }
     }
   }
   for (const extension of ["d.ts", "d.cts"]) {
