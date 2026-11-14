@@ -72,12 +72,6 @@
     letter-spacing: 0.1px;
   }
 
-  .n-menu-item-content__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   // 限定图形在原生图标槽内，兼容宿主历史 SVG em 尺寸而不锁死图标大小。
   .n-menu-item-content__icon svg {
     display: block;
@@ -90,11 +84,8 @@
   }
 
   // 祖先仅在文字上提示所属路径；当前页面独占主要选中背景与指示条。
-  .n-menu-item-content--child-active .n-menu-item-content-header {
-    font-weight: 600;
-  }
-
-  .n-menu-item-content--selected .n-menu-item-content-header {
+  :is(.n-menu-item-content--child-active, .n-menu-item-content--selected)
+    .n-menu-item-content-header {
     font-weight: 600;
   }
 
@@ -125,10 +116,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-ra-sidebar-nav] .n-menu--vertical[data-ra-sidebar-menu] {
-    .n-menu-item-content,
-    .n-menu-item-content::before,
-    .n-menu-item-content__icon,
-    .n-menu-item-content__arrow {
+    :is(
+      .n-menu-item-content,
+      .n-menu-item-content__icon,
+      .n-menu-item-content__arrow
+    ),
+    .n-menu-item-content::before {
       transition: none;
     }
   }

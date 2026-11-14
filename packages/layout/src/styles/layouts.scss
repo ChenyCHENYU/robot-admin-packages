@@ -20,7 +20,9 @@
 
 // 精致侧栏通过显式菜单标记启用；旧菜单外观仅作用于未接入的菜单。
 // :where 保持原选择器权重，避免升级包后改变其他布局及内容区菜单的覆盖顺序。
-$legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] *))";
+// 根菜单检查自身及标记祖先，兼容自定义标签内嵌菜单；其余节点只检查标记祖先。
+$legacy-menu-root-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] *))";
+$legacy-menu-scope: ":not(:where([data-ra-sidebar-menu] *))";
 
 // ==================== 🎨 菜单样式自定义变量（可在主项目覆盖）====================
 .layout-container {
@@ -150,7 +152,7 @@ $legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] 
   display: none;
 }
 
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--vertical {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--vertical {
   flex: 1;
   min-height: min-content;
   overflow-y: auto;
@@ -365,18 +367,9 @@ $legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] 
 }
 
 /* 一级菜单项对齐 */
-.layout-container .n-menu#{$legacy-menu-scope} > .n-menu-item,
-.layout-container .n-menu#{$legacy-menu-scope} > .n-submenu {
+.layout-container .n-menu#{$legacy-menu-root-scope} > .n-menu-item,
+.layout-container .n-menu#{$legacy-menu-root-scope} > .n-submenu {
   margin: 4px 12px;
-}
-
-/* 二级及以下菜单项 */
-.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item {
-  margin: 4px 0;
-}
-
-.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item-content {
-  padding-left: 46px;
 }
 
 // ==================== 主题优化 ====================
@@ -431,14 +424,14 @@ $legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] 
 }
 
 // ==================== 折叠菜单样式 ====================
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed {
   width: 64px !important;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed .n-menu-item-content {
   justify-content: center !important;
   padding: 0 !important;
   display: flex;
@@ -446,37 +439,37 @@ $legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] 
   width: 62px;
 }
 
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-icon {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed .n-icon {
   margin-left: 40px !important;
   margin-top: 4px !important;
 }
 
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed .n-menu-item {
   padding: 0 !important;
   display: flex;
   justify-content: center;
   width: 100%;
 }
 
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content-header {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed .n-menu-item-content-header {
   margin: 0 auto;
   margin-top: -10px;
   padding: 0;
 }
 
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content__icon {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed .n-menu-item-content__icon {
   margin-right: 0;
 }
 
 .layout-container
-  .n-menu#{$legacy-menu-scope}.n-menu--collapsed
+  .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed
   .n-menu-item-content--child-active#{$legacy-menu-scope}
   .n-menu-item-content__icon#{$legacy-menu-scope} {
   color: var(--n-item-color-active) !important;
 }
 
 /* 折叠菜单选中状态 - 使用二级选中效果变量 */
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content--child-active {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed .n-menu-item-content--child-active {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
 
   &::before {
@@ -510,7 +503,7 @@ $legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] 
 }
 
 /* 折叠菜单 Hover 效果 */
-.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item:hover {
+.layout-container .n-menu#{$legacy-menu-root-scope}.n-menu--collapsed .n-menu-item:hover {
   transform: scale(1.05);
 
   &::before {
@@ -522,7 +515,7 @@ $legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] 
 }
 
 /* 折叠菜单图标颜色 */
-:where(.layout-container) .n-menu--collapsed#{$legacy-menu-scope} .n-menu-item-content__icon {
+:where(.layout-container) .n-menu--collapsed#{$legacy-menu-root-scope} .n-menu-item-content__icon {
   color: rgba(229, 231, 235, 0.9) !important;
 }
 

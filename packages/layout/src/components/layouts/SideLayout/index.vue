@@ -19,7 +19,7 @@
       :collapsed-width="ctx.sidebarCollapsedWidth.value"
       :width="ctx.sidebarWidth.value"
       :native-scrollbar="false"
-      content-style="display:flex;flex-direction:column;min-height:0"
+      :content-style="sidebarContentStyle"
       :collapsed="collapsed"
       @update:collapsed="handleCollapsedUpdate"
       :class="[
@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { NLayout, NLayoutSider, NLayoutContent } from "naive-ui";
 import { useLayoutContext } from "../../../composables/useLayoutContext";
 import LayoutRouterView from "../../LayoutRouterView/index.vue";
@@ -71,6 +71,14 @@ const emit = defineEmits<{
 }>();
 
 const ctx = useLayoutContext();
+
+// 为 NScrollbar 的内容建立有限高度，长菜单在内部滚动，品牌区保持固定。
+const sidebarContentStyle: CSSProperties = {
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 0,
+};
 
 // 内部折叠状态，与 prop 双向同步
 const _collapsed = ref(props.collapsed);
