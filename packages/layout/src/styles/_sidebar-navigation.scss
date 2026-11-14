@@ -1,0 +1,135 @@
+/**
+ * 侧栏导航外观。
+ *
+ * 显式标记 data-ra-sidebar-menu 的垂直 NMenu 才启用本预设，业务菜单与面板模式
+ * 保持自己的样式。行高、颜色、圆角继续由 NMenu themeOverrides 提供；本层只管理
+ * 侧栏的对齐、状态层级和装饰，不覆盖 NMenu 计算的缩进、图标尺寸与收起宽度。
+ */
+.ra-sidebar-navigation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+
+  // Logo 固定在菜单上方；长菜单仅在此容器滚动，避免嵌套滚动和高度溢出。
+  .menu-scroll-container {
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, currentColor 16%, transparent) transparent;
+  }
+
+  .menu-scroll-container::-webkit-scrollbar {
+    display: block;
+    width: 4px;
+  }
+
+  .menu-scroll-container::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: color-mix(in srgb, currentColor 16%, transparent);
+  }
+}
+
+[data-ra-sidebar-nav] .n-menu--vertical[data-ra-sidebar-menu] {
+  flex: none;
+  min-width: 0;
+  overflow: visible;
+  padding: 0 0 4px;
+  background: transparent;
+
+  // NMenu 的 --n-item-height 是外壳与点击区域唯一的尺寸来源。
+  .n-menu-item {
+    height: var(--n-item-height, 36px);
+    margin: 2px 0;
+  }
+
+  .n-menu-item-content {
+    height: 100%;
+    margin: 0;
+    padding-block: 0;
+    border-radius: var(--n-border-radius, 8px);
+    transition:
+      color 160ms ease,
+      background-color 160ms ease;
+  }
+
+  // 背景边界不随深度递进，只有内容使用 NMenu 的原生逐级缩进。
+  .n-menu-item-content::before {
+    inset: 0 8px;
+    border-radius: var(--n-border-radius, 8px);
+    transition: background-color 160ms ease;
+  }
+
+  .n-menu-item-content-header {
+    font-size: var(--n-font-size, 14px);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.1px;
+  }
+
+  .n-menu-item-content__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  // 限定图形在原生图标槽内，兼容宿主历史 SVG em 尺寸而不锁死图标大小。
+  .n-menu-item-content__icon svg {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .n-menu-item-content__arrow {
+    font-size: 12px;
+  }
+
+  // 祖先仅在文字上提示所属路径；当前页面独占主要选中背景与指示条。
+  .n-menu-item-content--child-active .n-menu-item-content-header {
+    font-weight: 600;
+  }
+
+  .n-menu-item-content--selected .n-menu-item-content-header {
+    font-weight: 600;
+  }
+
+  .n-menu-item-content--selected::after {
+    content: "";
+    position: absolute;
+    inset-inline-start: 8px;
+    top: calc(50% - 8px);
+    width: 2px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--n-item-icon-color-active);
+    pointer-events: none;
+  }
+
+  // 键盘焦点独立于选中态；自定义可聚焦标签同样保留可见反馈。
+  .n-menu-item:focus-visible > .n-menu-item-content::before,
+  .n-menu-item-content:focus-within::before {
+    outline: 2px solid var(--n-item-icon-color-active);
+    outline-offset: -2px;
+  }
+
+  // 收起后祖先图标代表当前页面，沿用 NMenu 原生的居中与弹出菜单行为。
+  &.n-menu--collapsed .n-menu-item-content--child-active::before {
+    background-color: var(--n-item-color-active-collapsed);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ra-sidebar-nav] .n-menu--vertical[data-ra-sidebar-menu] {
+    .n-menu-item-content,
+    .n-menu-item-content::before,
+    .n-menu-item-content__icon,
+    .n-menu-item-content__arrow {
+      transition: none;
+    }
+  }
+}

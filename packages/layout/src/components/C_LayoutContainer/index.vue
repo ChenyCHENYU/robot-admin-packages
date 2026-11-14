@@ -27,8 +27,12 @@
       v-model:collapsed="sideCollapsed"
     >
       <template v-if="$slots.logo" #logo><slot name="logo" /></template>
-      <template #menu>
-        <slot name="menu" :collapsed="sideCollapsed" />
+      <template #menu="{ collapsed, collapsedWidth }">
+        <slot
+          name="menu"
+          :collapsed="collapsed"
+          :collapsed-width="collapsedWidth"
+        />
       </template>
       <template #header><slot name="header" /></template>
       <template #footer><slot name="footer" /></template>

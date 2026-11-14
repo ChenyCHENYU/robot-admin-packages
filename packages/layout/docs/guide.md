@@ -215,6 +215,32 @@ provideLayout({
 `provideLayout()` 会自动桥接布局模式、折叠状态、尺寸、动画和显示开关。只有需要完全
 自定义响应式来源时，才直接构造 `LayoutContext` 并调用 `provideLayoutContext()`。
 
+#### 精简的侧栏菜单外观
+
+Side 的 `#menu` 插槽同时提供 `collapsed` 与 `collapsedWidth`，菜单和品牌区域可以
+直接使用同一折叠状态。给垂直 `NMenu`（或透传属性的 `C_Menu`）添加
+`data-ra-sidebar-menu`，即可使用透明普通行、全宽选中背景和细指示条：
+
+```vue
+<template #menu="{ collapsed, collapsedWidth }">
+  <NMenu
+    data-ra-sidebar-menu
+    :options="menuOptions"
+    :collapsed="collapsed"
+    :collapsed-width="collapsedWidth"
+    :root-indent="20"
+    :indent="16"
+    :theme-overrides="{ itemHeight: '36px', borderRadius: '8px' }"
+  />
+</template>
+```
+
+行高只通过原生 `itemHeight` 配置，颜色继续使用当前 Naive Provider；圆角字段为
+`borderRadius`。布局不会重算菜单缩进、锁死收起宽度或给每一层子树额外增加缩进。
+该预设只作用于 Side 插槽内显式标记的垂直菜单，其他布局、内容区菜单与面板模式
+保持现有外观。自定义分组容器可以继续使用 `menu-scroll-container`，由该容器统一
+滚动，品牌区留在上方。
+
 ### 3. 添加设置抽屉
 
 ```vue

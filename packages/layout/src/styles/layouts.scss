@@ -2,7 +2,7 @@
  * @robot-admin/layout
  *
  * 布局全局样式 - 所有布局共享的基础样式
- * 包含：布局容器、内容区、主题适配、侧边栏基础、菜单毛玻璃效果、折叠菜单、过渡动画
+ * 包含：布局容器、内容区、主题适配、侧边栏导航、历史菜单外观与过渡动画
  *
  * CSS 变量依赖（消费方需定义）：
  *   --app-bg-body      : 页面背景色
@@ -14,6 +14,13 @@
  *   --app-border-color  : 边框色
  *   --primary-color     : 主题色
  */
+
+// 侧栏导航独立维护；菜单数据、原生缩进及弹出层仍由 NMenu 管理。
+@use "./sidebar-navigation";
+
+// 精致侧栏通过显式菜单标记启用；旧菜单外观仅作用于未接入的菜单。
+// :where 保持原选择器权重，避免升级包后改变其他布局及内容区菜单的覆盖顺序。
+$legacy-menu-scope: ":not(:where([data-ra-sidebar-menu], [data-ra-sidebar-menu] *))";
 
 // ==================== 🎨 菜单样式自定义变量（可在主项目覆盖）====================
 .layout-container {
@@ -143,7 +150,7 @@
   display: none;
 }
 
-.layout-container .n-menu.n-menu--vertical {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--vertical {
   flex: 1;
   min-height: min-content;
   overflow-y: auto;
@@ -151,7 +158,7 @@
 }
 
 // ==================== 菜单图标和文字样式 ====================
-.layout-container .n-menu-item-content__icon {
+.layout-container .n-menu-item-content__icon#{$legacy-menu-scope} {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,25 +170,25 @@
   font-size: 18px !important;
 }
 
-.layout-container .n-menu-item-content__icon .n-icon {
+.layout-container .n-menu-item-content__icon#{$legacy-menu-scope} .n-icon {
   width: 18px !important;
   height: 18px !important;
   font-size: 18px !important;
 }
 
-.layout-container .n-menu-item-content__icon svg {
+.layout-container .n-menu-item-content__icon#{$legacy-menu-scope} svg {
   width: 18px !important;
   height: 18px !important;
 }
 
-.layout-container .n-menu-item-content-header {
+.layout-container .n-menu-item-content-header#{$legacy-menu-scope} {
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.2px;
   line-height: 1.5;
 }
 
-.layout-container .n-menu-item-content__arrow {
+.layout-container .n-menu-item-content__arrow#{$legacy-menu-scope} {
   font-size: 14px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -189,7 +196,7 @@
 // ==================== 🎨 毛玻璃质感菜单效果（性能优化版）====================
 
 /* 菜单项基础样式 - 卡片质感默认状态 */
-.layout-container .n-menu-item {
+.layout-container .n-menu-item#{$legacy-menu-scope} {
   border-radius: 0;
   position: relative;
   overflow: visible;
@@ -218,7 +225,7 @@
 }
 
 /* 菜单项内容容器 - 卡片质感 */
-.layout-container .n-menu-item-content {
+.layout-container .n-menu-item-content#{$legacy-menu-scope} {
   border-radius: var(--menu-border-radius, 10px);
   background: transparent;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -241,7 +248,7 @@
 }
 
 /* Hover 状态 - 增强卡片效果 */
-.layout-container .n-menu-item:hover {
+.layout-container .n-menu-item#{$legacy-menu-scope}:hover {
   transform: translateX(2px);
 
   &::before {
@@ -253,7 +260,7 @@
   }
 }
 
-.layout-container .n-menu-item:hover .n-menu-item-content {
+.layout-container .n-menu-item#{$legacy-menu-scope}:hover .n-menu-item-content {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 10px;
@@ -267,14 +274,14 @@
   }
 }
 
-.layout-container .n-menu-item:hover .n-menu-item-content__icon {
+.layout-container .n-menu-item#{$legacy-menu-scope}:hover .n-menu-item-content__icon {
   transform: scale(1.08);
   color: var(--n-item-icon-color-active-hover);
 }
 
 /* Active/选中状态 - 二级菜单选中（当前页面）- 略强玻璃质感 */
-.layout-container .n-menu-item--selected,
-.layout-container .n-menu-item-content--selected {
+.layout-container .n-menu-item--selected#{$legacy-menu-scope},
+.layout-container .n-menu-item-content--selected#{$legacy-menu-scope} {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
 
   &::before {
@@ -295,8 +302,8 @@
   }
 }
 
-.layout-container .n-menu-item--selected .n-menu-item-content,
-.layout-container .n-menu-item-content--selected {
+.layout-container .n-menu-item--selected#{$legacy-menu-scope} .n-menu-item-content,
+.layout-container .n-menu-item-content--selected#{$legacy-menu-scope} {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
   backdrop-filter: blur(var(--menu-selected-blur, 16px))
     saturate(var(--menu-selected-saturate, 135%));
@@ -313,19 +320,19 @@
   }
 }
 
-.layout-container .n-menu-item--selected .n-menu-item-content__icon {
+.layout-container .n-menu-item--selected#{$legacy-menu-scope} .n-menu-item-content__icon {
   filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.5));
   transform: scale(1.05);
   color: var(--n-item-icon-color-active);
 }
 
 /* Active 按下状态 */
-.layout-container .n-menu-item:active {
+.layout-container .n-menu-item#{$legacy-menu-scope}:active {
   transform: scale(0.98);
 }
 
 /* 子菜单父项样式 - 一级菜单展开状态（较淡玻璃质感）*/
-.layout-container .n-menu-item-content--child-active {
+.layout-container .n-menu-item-content--child-active#{$legacy-menu-scope} {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
 
   &::before {
@@ -358,17 +365,17 @@
 }
 
 /* 一级菜单项对齐 */
-.layout-container .n-menu > .n-menu-item,
-.layout-container .n-menu > .n-submenu {
+.layout-container .n-menu#{$legacy-menu-scope} > .n-menu-item,
+.layout-container .n-menu#{$legacy-menu-scope} > .n-submenu {
   margin: 4px 12px;
 }
 
 /* 二级及以下菜单项 */
-.layout-container .n-submenu-children .n-menu-item {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item {
   margin: 4px 0;
 }
 
-.layout-container .n-submenu-children .n-menu-item-content {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item-content {
   padding-left: 46px;
 }
 
@@ -376,7 +383,7 @@
 :where(.layout-container) .dark-theme {
   color-scheme: dark;
 
-  .layout-container .n-menu-item::before {
+  .layout-container .n-menu-item#{$legacy-menu-scope}::before {
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.08) 0%,
@@ -387,7 +394,7 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
-  .layout-container .n-menu-item:hover::before {
+  .layout-container .n-menu-item#{$legacy-menu-scope}:hover::before {
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.12) 0%,
@@ -399,7 +406,7 @@
 :where(.layout-container) .light-theme {
   color-scheme: light;
 
-  .layout-container .n-menu-item::before {
+  .layout-container .n-menu-item#{$legacy-menu-scope}::before {
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.6) 0%,
@@ -410,7 +417,7 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.8);
   }
 
-  .layout-container .n-menu-item:hover::before {
+  .layout-container .n-menu-item#{$legacy-menu-scope}:hover::before {
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.8) 0%,
@@ -418,20 +425,20 @@
     );
   }
 
-  .layout-container .n-menu-item-content::after {
+  .layout-container .n-menu-item-content#{$legacy-menu-scope}::after {
     border-color: rgba(0, 0, 0, 0.08);
   }
 }
 
 // ==================== 折叠菜单样式 ====================
-.layout-container .n-menu.n-menu--collapsed {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed {
   width: 64px !important;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.layout-container .n-menu.n-menu--collapsed .n-menu-item-content {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content {
   justify-content: center !important;
   padding: 0 !important;
   display: flex;
@@ -439,37 +446,37 @@
   width: 62px;
 }
 
-.layout-container .n-menu.n-menu--collapsed .n-icon {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-icon {
   margin-left: 40px !important;
   margin-top: 4px !important;
 }
 
-.layout-container .n-menu.n-menu--collapsed .n-menu-item {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item {
   padding: 0 !important;
   display: flex;
   justify-content: center;
   width: 100%;
 }
 
-.layout-container .n-menu.n-menu--collapsed .n-menu-item-content-header {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content-header {
   margin: 0 auto;
   margin-top: -10px;
   padding: 0;
 }
 
-.layout-container .n-menu.n-menu--collapsed .n-menu-item-content__icon {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content__icon {
   margin-right: 0;
 }
 
 .layout-container
-  .n-menu.n-menu--collapsed
-  .n-menu-item-content--child-active
-  .n-menu-item-content__icon {
+  .n-menu#{$legacy-menu-scope}.n-menu--collapsed
+  .n-menu-item-content--child-active#{$legacy-menu-scope}
+  .n-menu-item-content__icon#{$legacy-menu-scope} {
   color: var(--n-item-color-active) !important;
 }
 
 /* 折叠菜单选中状态 - 使用二级选中效果变量 */
-.layout-container .n-menu.n-menu--collapsed .n-menu-item-content--child-active {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item-content--child-active {
   background: transparent !important; /* 覆盖 Naive UI 默认背景 */
 
   &::before {
@@ -503,7 +510,7 @@
 }
 
 /* 折叠菜单 Hover 效果 */
-.layout-container .n-menu.n-menu--collapsed .n-menu-item:hover {
+.layout-container .n-menu#{$legacy-menu-scope}.n-menu--collapsed .n-menu-item:hover {
   transform: scale(1.05);
 
   &::before {
@@ -515,7 +522,7 @@
 }
 
 /* 折叠菜单图标颜色 */
-:where(.layout-container) .n-menu--collapsed .n-menu-item-content__icon {
+:where(.layout-container) .n-menu--collapsed#{$legacy-menu-scope} .n-menu-item-content__icon {
   color: rgba(229, 231, 235, 0.9) !important;
 }
 
@@ -530,15 +537,15 @@
 }
 
 // ==================== 子菜单和菜单组毛玻璃效果 ====================
-.layout-container .n-submenu {
+.layout-container .n-submenu#{$legacy-menu-scope} {
   margin: 4px 0;
 }
 
-.layout-container .n-submenu > .n-menu-item-content {
+.layout-container .n-submenu#{$legacy-menu-scope} > .n-menu-item-content {
   padding: 10px 16px;
 }
 
-.layout-container .n-submenu-children .n-menu-item {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item {
   margin: 2px 0;
   position: relative;
 
@@ -547,34 +554,34 @@
   }
 }
 
-.layout-container .n-submenu-children .n-menu-item-content {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item-content {
   padding: 8px 16px 8px 46px;
   font-size: 13px;
 }
 
-.layout-container .n-submenu-children .n-menu-item-content__icon {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item-content__icon {
   width: 16px !important;
   height: 16px !important;
   font-size: 16px !important;
   margin-right: 8px;
 }
 
-.layout-container .n-submenu-children .n-menu-item-content__icon .n-icon {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item-content__icon .n-icon {
   width: 16px !important;
   height: 16px !important;
   font-size: 16px !important;
 }
 
-.layout-container .n-submenu-children .n-menu-item-content__icon svg {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item-content__icon svg {
   width: 16px !important;
   height: 16px !important;
 }
 
-.layout-container .n-submenu-children .n-menu-item:hover {
+.layout-container .n-submenu-children#{$legacy-menu-scope} .n-menu-item:hover {
   transform: translateX(2px);
 }
 
-.layout-container .n-submenu-children {
+.layout-container .n-submenu-children#{$legacy-menu-scope} {
   background: rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -584,7 +591,7 @@
 }
 
 /* 菜单组标题 */
-.layout-container .n-menu-item-group-title {
+.layout-container .n-menu-item-group-title#{$legacy-menu-scope} {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -610,7 +617,7 @@
 }
 
 /* 菜单分割线 */
-.layout-container .n-menu-divider {
+.layout-container .n-menu-divider#{$legacy-menu-scope} {
   margin: 8px 16px;
   height: 1px;
   background: linear-gradient(
@@ -624,7 +631,7 @@
 }
 
 /* 加载状态优化 */
-.layout-container .n-menu-item.n-menu-item--loading {
+.layout-container .n-menu-item#{$legacy-menu-scope}.n-menu-item--loading {
   &::before {
     background: linear-gradient(
       90deg,
@@ -659,7 +666,7 @@
 }
 
 /* 禁用状态 */
-.layout-container .n-menu-item.n-menu-item--disabled {
+.layout-container .n-menu-item#{$legacy-menu-scope}.n-menu-item--disabled {
   opacity: 0.4;
   filter: grayscale(0.5);
   cursor: not-allowed;

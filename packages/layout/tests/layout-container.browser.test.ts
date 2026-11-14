@@ -58,7 +58,16 @@ async function mountMode(mode: LayoutMode) {
           header: () => h("header", { "data-slot": "header" }, "header"),
           "header-extra": () =>
             h("aside", { "data-slot": "header-extra" }, "extra"),
-          menu: () => h("nav", { "data-slot": "menu" }, "menu"),
+          menu: ({ collapsed, collapsedWidth }) =>
+            h(
+              "nav",
+              {
+                "data-slot": "menu",
+                "data-collapsed": String(collapsed),
+                "data-collapsed-width": String(collapsedWidth),
+              },
+              "menu",
+            ),
           "tags-view": () => h("div", { "data-slot": "tags" }, "tags"),
         });
     },
@@ -94,8 +103,28 @@ describe("layout container browser contract", () => {
       expect(wrapper.find("[data-ra-layout]").exists()).toBe(true);
       expect(wrapper.find("[data-route-content]").text()).toBe("content");
       expect(wrapper.find('[data-slot="footer"]').exists()).toBe(true);
+      // 侧栏预设只提供给 Side 插槽，不向其他五种布局的菜单传播。
+      expect(wrapper.find("[data-ra-sidebar-nav]").exists()).toBe(mode === "side");
     });
   }
+
+  it("shares reactive collapse state and custom width with the side menu slot", async () => {
+    const { settings, wrapper } = await mountMode("side");
+    const menu = wrapper.get('[data-ra-sidebar-nav] [data-slot="menu"]');
+    expect(menu.attributes("data-collapsed")).toBe("false");
+    expect(menu.attributes("data-collapsed-width")).toBe("64");
+
+    settings.sidebarCollapsedWidth = 96;
+    settings.collapsed = true;
+    await nextTick();
+    expect(menu.attributes("data-collapsed")).toBe("true");
+    expect(menu.attributes("data-collapsed-width")).toBe("96");
+
+    settings.collapsed = false;
+    await nextTick();
+    expect(menu.attributes("data-collapsed")).toBe("false");
+    expect(menu.attributes("data-collapsed-width")).toBe("96");
+  });
 
   it("keeps typed and legacy collapse injections synchronized", async () => {
     const pinia = createPinia();

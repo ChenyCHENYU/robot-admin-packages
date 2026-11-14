@@ -19,6 +19,7 @@
       :collapsed-width="ctx.sidebarCollapsedWidth.value"
       :width="ctx.sidebarWidth.value"
       :native-scrollbar="false"
+      content-style="display:flex;flex-direction:column;min-height:0"
       :collapsed="collapsed"
       @update:collapsed="handleCollapsedUpdate"
       :class="[
@@ -28,7 +29,13 @@
       ]"
     >
       <slot name="logo" />
-      <slot name="menu" :collapsed="collapsed" />
+      <div class="ra-sidebar-navigation" data-ra-sidebar-nav>
+        <slot
+          name="menu"
+          :collapsed="collapsed"
+          :collapsed-width="ctx.sidebarCollapsedWidth.value"
+        />
+      </div>
     </NLayoutSider>
 
     <NLayout>
