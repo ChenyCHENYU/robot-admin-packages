@@ -42,6 +42,17 @@
   padding: 0 0 4px;
   background: transparent;
 
+  // 只给根展开组一条装饰引导线；字号控制线槽，不参与原生缩进和点击区域。
+  > .n-submenu > .n-submenu-children {
+    background: linear-gradient(
+        transparent,
+        color-mix(in srgb, var(--n-item-icon-color-active) 16%, transparent) 12px
+          calc(100% - 12px),
+        transparent
+      )
+      2em 4px / 1px calc(100% - 8px) no-repeat;
+  }
+
   // NMenu 的 --n-item-height 是外壳与点击区域唯一的尺寸来源。
   .n-menu-item {
     height: var(--n-item-height, 36px);
