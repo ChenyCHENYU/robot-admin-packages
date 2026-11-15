@@ -13,25 +13,19 @@
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 
   // Logo 固定在菜单上方；长菜单仅在此容器滚动，避免嵌套滚动和高度溢出。
   .menu-scroll-container {
     height: auto;
     min-height: 0;
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, currentColor 16%, transparent) transparent;
+    scrollbar-width: none;
   }
 
+  &::-webkit-scrollbar,
   .menu-scroll-container::-webkit-scrollbar {
-    display: block;
-    width: 4px;
-  }
-
-  .menu-scroll-container::-webkit-scrollbar-thumb {
-    border-radius: 4px;
-    background: color-mix(in srgb, currentColor 16%, transparent);
+    display: none;
   }
 }
 
