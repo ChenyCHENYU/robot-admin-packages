@@ -68,14 +68,13 @@ export interface TemplateConfig {
 }
 
 type ZipContent = string | Blob | Uint8Array | ArrayBuffer;
-type MediaFolderType = "image" | "video" | "audio" | "other";
-
-interface MediaFolders {
-  image: JSZip;
-  video: JSZip;
-  audio: JSZip;
-  other: JSZip;
-}
+type MediaArchiveConfig = Pick<MediaConfig, "files" | "organizeByCategory" | "includeMetadata" | "operation">;
+const MEDIA_DIRECTORIES = {
+  image: "images",
+  video: "videos",
+  audio: "audios",
+  other: "others",
+} as const;
 
 interface ArchiveStats {
   files: number;
@@ -111,6 +110,37 @@ export function sanitizeZipPath(rawPath: string): string {
     segments.push(sanitizeZipSegment(rawSegment));
   }
   return segments.join("/") || "unnamed";
+}
+
+function assertNewZipPath(path: string, occupied: boolean): void {
+  if (occupied) {
+    throw new FileUtilsError("INVALID_ARGUMENT", `ZIP 内存在重复文件路径：${path}`);
+  }
+}
+
+function createMediaEntries(config: MediaArchiveConfig) {
+  const paths = new Set<string>();
+  const media = config.files.map(({ name, file, category: inputCategory }) => {
+    throwIfAborted(config.operation?.signal);
+    const category = inputCategory === "image" || inputCategory === "video" || inputCategory === "audio"
+      ? inputCategory
+      : "other";
+    const safeName = sanitizeZipPath(name);
+    const path = config.organizeByCategory ? `${MEDIA_DIRECTORIES[category]}/${safeName}` : safeName;
+    assertNewZipPath(path, paths.has(path));
+    paths.add(path);
+    return { path, content: file, name, category };
+  });
+  const metadataPath = "media-info.json";
+  const includeMetadata = config.includeMetadata && media.length > 0;
+  if (includeMetadata) assertNewZipPath(metadataPath, paths.has(metadataPath));
+  return { media, metadataPath: includeMetadata ? metadataPath : undefined };
+}
+
+/** 根据与导出相同的规则预览媒体 ZIP 中的文件路径。 */
+export function planMediaArchive(config: MediaArchiveConfig): string[] {
+  const { media, metadataPath } = createMediaEntries(config);
+  return [...media.map(entry => entry.path), ...(metadataPath ? [metadataPath] : [])];
 }
 
 function contentSize(content: ZipContent): number {
@@ -169,12 +199,7 @@ export function useJSZip(options: UseJSZipOptions = {}) {
   ): void => {
     throwIfAborted(operation.signal);
     const safePath = sanitizeZipPath(fileName);
-    if (zip.file(safePath)) {
-      throw new FileUtilsError(
-        "INVALID_ARGUMENT",
-        `ZIP 内存在重复文件路径：${safePath}`,
-      );
-    }
+    assertNewZipPath(safePath, Boolean(zip.file(safePath)));
     const stats = archiveStats.get(zip.files) ?? { files: 0, bytes: 0 };
     const next = {
       files: stats.files + 1,
@@ -359,41 +384,21 @@ export function useJSZip(options: UseJSZipOptions = {}) {
     executeExport(
       config,
       async (zip, cfg) => {
-        const folders: MediaFolders | null = cfg.organizeByCategory
-          ? {
-              image: createFolder(zip, "images"),
-              video: createFolder(zip, "videos"),
-              audio: createFolder(zip, "audios"),
-              other: createFolder(zip, "others"),
-            }
-          : null;
-        const metadata: Array<Record<string, unknown>> = [];
-        for (let index = 0; index < cfg.files.length; index++) {
-          throwIfAborted(cfg.operation?.signal);
-          const item = cfg.files[index];
-          const category: MediaFolderType =
-            item.category === "image" ||
-            item.category === "video" ||
-            item.category === "audio"
-              ? item.category
-              : "other";
-          addFile(folders?.[category] ?? zip, item.name, item.file, cfg.operation);
-          if (cfg.includeMetadata) {
-            metadata.push({
-              name: item.name,
-              size: item.file.size,
-              type: item.file.type,
-              category,
-            });
-          }
-          updateProgress(20 + ((index + 1) / Math.max(cfg.files.length, 1)) * 60, item.name);
+        const { media, metadataPath } = createMediaEntries(cfg);
+        if (cfg.organizeByCategory) {
+          Object.values(MEDIA_DIRECTORIES).forEach(folder => createFolder(zip, folder));
         }
-        let fileCount = cfg.files.length;
-        if (cfg.includeMetadata && metadata.length > 0) {
-          addFile(zip, "media-info.json", JSON.stringify(metadata, null, 2), cfg.operation);
-          fileCount++;
+        for (const [index, entry] of media.entries()) {
+          addFile(zip, entry.path, entry.content, cfg.operation);
+          updateProgress(20 + ((index + 1) / media.length) * 60, entry.name);
         }
-        return { fileName: `${cfg.packageName}.zip`, fileCount };
+        if (metadataPath) {
+          const metadata = media.map(({ name, content, category }) => ({
+            name, size: content.size, type: content.type, category,
+          }));
+          addFile(zip, metadataPath, JSON.stringify(metadata, null, 2), cfg.operation);
+        }
+        return { fileName: `${cfg.packageName}.zip`, fileCount: media.length + Number(Boolean(metadataPath)) };
       },
       `媒体包 ${config.packageName} 导出成功`,
     );

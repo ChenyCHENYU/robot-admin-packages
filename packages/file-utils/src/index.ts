@@ -67,7 +67,7 @@ export type {
   FileExtension,
 } from "./download";
 
-export { sanitizeZipPath, useJSZip } from "./zip";
+export { planMediaArchive, sanitizeZipPath, useJSZip } from "./zip";
 export type {
   CodeProjectConfig,
   ExportState,
