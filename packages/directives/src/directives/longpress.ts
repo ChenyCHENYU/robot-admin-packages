@@ -10,6 +10,8 @@ export interface LongPressOptions {
   onProgress?: (progress: number, elapsed: number) => void;
   onTrigger?: (event: Event) => void;
   onCancel?: (event: Event) => void;
+  /** 每次已开始的按压结束时通知，包括触发后释放、取消和卸载。 */
+  onEnd?: (event: Event, triggered: boolean) => void;
 }
 
 export type LongPressBinding =
@@ -37,8 +39,10 @@ interface LongPressState {
   pointerdown: (event: PointerEvent) => void;
   pointermove: (event: PointerEvent) => void;
   pointerup: (event: PointerEvent) => void;
+  pointercancel: (event: PointerEvent) => void;
   keydown: (event: KeyboardEvent) => void;
   keyup: (event: KeyboardEvent) => void;
+  blur: (event: FocusEvent) => void;
   contextmenu: (event: Event) => void;
 }
 
@@ -78,13 +82,16 @@ function clearTimers(state: LongPressState): void {
 }
 
 function updateProgress(state: LongPressState): void {
-  if (!state.sourceEvent || state.triggered) return;
+  const source = state.sourceEvent;
+  if (!source || state.triggered) return;
   const elapsed = now() - state.startTime;
   state.options.onProgress?.(
     Math.min(1, elapsed / state.options.duration),
     elapsed,
   );
-  state.frame = requestAnimationFrame(() => updateProgress(state));
+  if (state.sourceEvent === source) {
+    state.frame = requestAnimationFrame(() => updateProgress(state));
+  }
 }
 
 function start(state: LongPressState, event: Event): void {
@@ -93,8 +100,10 @@ function start(state: LongPressState, event: Event): void {
   state.startTime = now();
   state.triggered = false;
   state.options.onStart?.(event);
+  if (state.sourceEvent !== event) return;
   if (state.options.onProgress) {
     state.options.onProgress(0, 0);
+    if (state.sourceEvent !== event) return;
     state.frame = requestAnimationFrame(() => updateProgress(state));
   }
   state.timer = setTimeout(() => {
@@ -103,17 +112,28 @@ function start(state: LongPressState, event: Event): void {
     if (state.frame !== undefined) cancelAnimationFrame(state.frame);
     state.frame = undefined;
     state.options.onProgress?.(1, state.options.duration);
-    state.options.onTrigger?.(event);
+    if (state.sourceEvent === event) state.options.onTrigger?.(event);
   }, state.options.duration);
 }
 
-function finish(state: LongPressState, event: Event, canceled = false): void {
+function finish(
+  state: LongPressState,
+  event: Event,
+  reason: "release" | "cancel" | "dispose",
+): void {
   if (!state.sourceEvent) return;
-  if (!state.triggered || canceled) state.options.onCancel?.(event);
+  const { triggered, options } = state;
   clearTimers(state);
   state.pointerId = undefined;
   state.sourceEvent = undefined;
   state.triggered = false;
+  try {
+    if (reason !== "dispose" && (reason === "cancel" || !triggered)) {
+      options.onCancel?.(event);
+    }
+  } finally {
+    options.onEnd?.(event, triggered);
+  }
 }
 
 function bind(el: HTMLElement, value: LongPressBinding | undefined): void {
@@ -127,6 +147,7 @@ function bind(el: HTMLElement, value: LongPressBinding | undefined): void {
   state.pointerdown = (event) => {
     if (
       state.options.disabled ||
+      state.sourceEvent ||
       (event.pointerType === "mouse" && event.button !== 0)
     ) {
       return;
@@ -147,22 +168,29 @@ function bind(el: HTMLElement, value: LongPressBinding | undefined): void {
       event.clientX - state.startX,
       event.clientY - state.startY,
     );
-    if (distance > state.options.movementTolerance) finish(state, event, true);
+    if (distance > state.options.movementTolerance) finish(state, event, "cancel");
   };
   state.pointerup = (event) => {
-    if (state.pointerId === event.pointerId) finish(state, event);
+    if (state.pointerId === event.pointerId) finish(state, event, "release");
+  };
+  state.pointercancel = (event) => {
+    if (state.pointerId === event.pointerId) finish(state, event, "cancel");
   };
   state.keydown = (event) => {
-    if ((event.key === " " || event.key === "Enter") && !event.repeat) {
-      event.preventDefault();
-      start(state, event);
-    }
+    if (state.options.disabled || state.pointerId !== undefined) return;
+    if (event.key !== " " && event.key !== "Enter") return;
+    event.preventDefault();
+    if (!event.repeat) start(state, event);
   };
   state.keyup = (event) => {
-    if (event.key === " " || event.key === "Enter") {
+    const source = state.sourceEvent;
+    if (source && "key" in source && source.key === event.key) {
       event.preventDefault();
-      finish(state, event);
+      finish(state, event, "release");
     }
+  };
+  state.blur = (event) => {
+    if (state.pointerId === undefined) finish(state, event, "cancel");
   };
   state.contextmenu = (event) => {
     if (state.options.preventContextMenu && state.sourceEvent) {
@@ -173,26 +201,28 @@ function bind(el: HTMLElement, value: LongPressBinding | undefined): void {
   el.addEventListener("pointerdown", state.pointerdown);
   el.addEventListener("pointermove", state.pointermove);
   el.addEventListener("pointerup", state.pointerup);
-  el.addEventListener("pointercancel", state.pointerup);
-  el.addEventListener("lostpointercapture", state.pointerup);
+  el.addEventListener("pointercancel", state.pointercancel);
+  el.addEventListener("lostpointercapture", state.pointercancel);
   el.addEventListener("keydown", state.keydown);
   el.addEventListener("keyup", state.keyup);
+  el.addEventListener("blur", state.blur);
   el.addEventListener("contextmenu", state.contextmenu);
 }
 
 function unbind(el: HTMLElement): void {
   const state = states.get(el);
   if (!state) return;
-  clearTimers(state);
   el.removeEventListener("pointerdown", state.pointerdown);
   el.removeEventListener("pointermove", state.pointermove);
   el.removeEventListener("pointerup", state.pointerup);
-  el.removeEventListener("pointercancel", state.pointerup);
-  el.removeEventListener("lostpointercapture", state.pointerup);
+  el.removeEventListener("pointercancel", state.pointercancel);
+  el.removeEventListener("lostpointercapture", state.pointercancel);
   el.removeEventListener("keydown", state.keydown);
   el.removeEventListener("keyup", state.keyup);
+  el.removeEventListener("blur", state.blur);
   el.removeEventListener("contextmenu", state.contextmenu);
   states.delete(el);
+  if (state.sourceEvent) finish(state, state.sourceEvent, "dispose");
 }
 
 const longPressDirective: Directive<
@@ -210,7 +240,7 @@ const longPressDirective: Directive<
     }
     const next = parseOptions(binding.value);
     if (next.disabled && state.sourceEvent) {
-      finish(state, state.sourceEvent, true);
+      finish(state, state.sourceEvent, "cancel");
     }
     state.options = next;
   },

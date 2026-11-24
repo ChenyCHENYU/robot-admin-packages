@@ -1,5 +1,11 @@
 # @robot-admin/directives
 
+## 2.1.0
+
+### Minor Changes
+
+- 新增长按结束回调 onEnd，覆盖成功释放、取消与组件卸载，保留 onCancel 的取消语义。媒体 ZIP 新增 planMediaArchive，预览和导出共用路径、分类和元数据规则。
+
 ## 2.0.2
 
 ### Patch Changes

@@ -22,7 +22,7 @@
 
 **Robot Directives** 为 Vue 3 提供 11 个通用交互指令，以 `@robot-admin/directives` 发布。它关注 DOM 交互、应用级权限和反馈适配，以及挂载、更新、卸载时的资源清理，无运行时 UI 框架依赖。
 
-当前仓库版本 **2.0.2**。支持 ESM、CommonJS、类型声明与逐指令子路径；适合现有 Vue 应用按需补齐交互能力。
+当前仓库版本 **2.1.0**。支持 ESM、CommonJS、类型声明与逐指令子路径；适合现有 Vue 应用按需补齐交互能力。
 
 ## 能力地图
 
@@ -69,6 +69,8 @@ const search = (event: Event) => {
 ```
 
 新代码推荐由指令持有 `handler`。`v-debounce="300" @click="save"` 等旧事件模式仍兼容，迁移方式见[完整指南](./docs/guide.md#推荐事件模式)。
+
+`v-longpress` 的 `onTrigger` 在达到长按阈值时触发。用 `onEnd(event, triggered)` 停止持续计时或清理状态，释放、取消和卸载都会结束已开始的会话。`onCancel` 用于未达到阈值的释放或指针取消。
 
 ### 应用级注册
 

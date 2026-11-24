@@ -6,6 +6,7 @@ import { createCopyDirective } from "../src/directives/copy";
 import debounce from "../src/directives/debounce";
 import clickOutside from "../src/directives/click-outside";
 import drag from "../src/directives/drag";
+import longpress from "../src/directives/longpress";
 import {
   createPermissionDirective,
   hasPermission,
@@ -162,6 +163,59 @@ describe("DOM ownership", () => {
 });
 
 describe("owned event directives", () => {
+  it("ends a triggered pointer hold on release without reporting a cancellation", () => {
+    vi.useFakeTimers();
+    const button = document.createElement("button");
+    const onCancel = vi.fn();
+    const onEnd = vi.fn();
+    const increment = vi.fn();
+    let repeat: ReturnType<typeof setInterval> | undefined;
+    mount(longpress, button, {
+      duration: 50,
+      onTrigger: () => { repeat = setInterval(increment, 20); },
+      onCancel,
+      onEnd: (event: Event, triggered: boolean) => {
+        clearInterval(repeat);
+        onEnd(event.type, triggered);
+      },
+    });
+    button.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1 }));
+    button.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 2 }));
+    vi.advanceTimersByTime(95);
+    button.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
+    button.dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 1 }));
+    vi.advanceTimersByTime(200);
+    expect(increment).toHaveBeenCalledTimes(2);
+    expect(onEnd).toHaveBeenCalledExactlyOnceWith("pointerup", true);
+    expect(onCancel).not.toHaveBeenCalled();
+    unmount(longpress, button);
+  });
+
+  it("also ends keyboard release, pointer cancellation and unmount", () => {
+    vi.useFakeTimers();
+    const button = document.createElement("button");
+    const onCancel = vi.fn();
+    const onTrigger = vi.fn();
+    const ended: Array<[string, boolean]> = [];
+    mount(longpress, button, {
+      duration: 50,
+      onCancel,
+      onTrigger,
+      onEnd: (event: Event, triggered: boolean) => ended.push([event.type, triggered]),
+    });
+    button.dispatchEvent(new KeyboardEvent("keydown", { key: " " }));
+    button.dispatchEvent(new KeyboardEvent("keyup", { key: " " }));
+    button.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1 }));
+    vi.advanceTimersByTime(60);
+    button.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 }));
+    button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    unmount(longpress, button);
+    vi.runAllTimers();
+    expect(ended).toEqual([["keyup", false], ["pointercancel", true], ["keydown", false]]);
+    expect(onCancel).toHaveBeenCalledTimes(2);
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
   it("debounces a handler and clears pending work on unmount", () => {
     vi.useFakeTimers();
     const handler = vi.fn();
