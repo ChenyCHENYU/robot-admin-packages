@@ -1,5 +1,11 @@
 # @robot-admin/file-utils
 
+## 3.1.1
+
+### Patch Changes
+
+- 修复模板 ZIP 打包模式。分离模式为每个模板保留独立目录，合并模式将文件写入共同根目录；重复路径或与生成的 README 冲突时明确失败。
+
 ## 3.1.0
 
 ### Minor Changes
