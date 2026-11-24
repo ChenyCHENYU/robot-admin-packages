@@ -62,6 +62,7 @@ export interface TemplateConfig {
     name: string;
     files: Record<string, string>;
   }>;
+  /** separate 为每个模板保留目录，combined 将内容放在同一根目录。默认 separate。 */
   bundleMode?: "separate" | "combined";
   includeDocumentation?: boolean;
   operation?: ZipOperationOptions;
@@ -410,9 +411,9 @@ export function useJSZip(options: UseJSZipOptions = {}) {
         let fileCount = 0;
         cfg.templates.forEach((template, index) => {
           throwIfAborted(cfg.operation?.signal);
-          const prefix = cfg.bundleMode === "separate" ? template.name : template.name;
           Object.entries(template.files).forEach(([path, content]) => {
-            addFile(zip, `${prefix}/${path}`, content, cfg.operation);
+            const archivePath = cfg.bundleMode === "combined" ? path : `${template.name}/${path}`;
+            addFile(zip, archivePath, content, cfg.operation);
             fileCount++;
           });
           updateProgress(20 + ((index + 1) / Math.max(cfg.templates.length, 1)) * 60, template.name);
